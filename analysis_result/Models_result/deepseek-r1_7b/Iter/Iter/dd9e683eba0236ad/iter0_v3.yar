@@ -1,0 +1,13 @@
+rule Bypass_Sample {
+    meta:
+        description: "Evasion bypass patterns targeting specific instruction sequences"
+        cape_options: "bp0=E8$0,action0=skip,bp1=74$0,action1=skip,bp2=0F$0,action2=skip,count=0"
+
+    strings:
+        $pattern0 = { 8B EC E8 ?? ?? ?? 56 C0 00 00 ?? ?? 5D FF ?? ?? ?? ?? }
+        $pattern1 = { 74 ?? ?? ?? ?? ?? 83 C4 ?? ?? ?? ?? }
+        $pattern2 = { 6A 5A 8B CE E8 ?? 56 ?? ?? ?? ?? ?? }
+
+    condition:
+        any of them
+}

@@ -1,0 +1,2635 @@
+{
+  "sha256": "7ba13b48de98631df3b53e0e069bd17d8ff87281b85558683cf77c6ee1558753",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Evasion {\n    meta:\n        description = \"Bypasses evasion check at 0x0040E7C3h\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 FF 75 08 ?? ?? ?? ?? ?? ?? 4F E3 ?? ?? ?? ?? ?? }\n        $pattern1 = { ?? ?? ?? 8B EC F9 2E ?? ?? ?? ?? 85 C0 FF ?? ?? ?? ?? ?? }\n        $pattern2 = { ?? ?? ?? ?? 8B EC 73 1C ?? ?? ?? ?? FF 75 08 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1486",
+      "status": "bypass_failed",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "YARA pattern did not match",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nOkay, so I'm trying to figure out how to create a Yara rule based on the given traces of malware execution. The goal is to find an evasion bypass that allows the malware to continue executing despite some checks. \n\nFirst, I'll look at the first trace where ExitProcess happens at 0x0040E7F6. There's a call from address 0x0040E7C3h with the argument 0x0041B0ACh. The next trace also stops at 0x0040E7FF, making another call to the same function.\n\nLooking deeper into these traces, I notice that after a series of push and mov instructions, there's a call from 0x0040E7C3h with a specific argument. Maybe this is where the bypass happens. \n\nThe trace before that has some 85 C0 and FF7508 instructions which might be part of the setup for the bypass. Perhaps these are used to mask the address or create a fake call.\n\nI think I can use the instruction at 0x0040E7C3h as the target point because it's called twice in the traces. The argument here is fixed, so if we can skip this instruction or manipulate its context, it might bypass the check.\n\nSo, to create a pattern, I'll include the surrounding instructions that lead up to 0x0040E7C3h and ensure that when skipped, execution continues. I'll use wildcards for any address or offset bytes to make sure the pattern is specific enough without being too broad.\n\nI need three different patterns targeting this instruction at different points in time. Each pattern should be between 6-20 bytes long, combining multiple instructions with wildcards where necessary.\n</think>\n\nTo create a Yara rule that bypasses the evasion check by skipping the call to `0x0040E7C3h`, we focus on manipulating the instruction at this target location. The pattern combines surrounding context and skips the specific call instruction.\n\nHere's how each pattern is constructed:\n\n1. **Pattern 0**: Combines the setup bytes before the target instruction, ensuring they are replaced with wildcards to avoid detection.\n2. **Pattern 1**: Includes different preceding instructions but targets the same call point for bypass.\n3. **Pattern 2**: Uses a variation of surrounding context while skipping the target call.\n\nEach pattern is designed to be specific enough (6-20 bytes) and uses wildcards where necessary without being too broad, ensuring it only matches the intended target location.\n\n```yara\nrule Bypass_Evasion {\n    meta:\n        description = \"Bypasses evasion check at 0x0040E7C3h\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 FF 75 08 ?? ??:??:??:??:?? 4F E3 ??:??:??:??:?? }\n        $pattern1 = { ?? ?? ?? 8B EC F9 2E ?? ?? ?? ?? 85 C0 FF ??:??:??:??:?? }\n        $pattern2 = { ?? ?? ?? ?? 8B EC 73 1C ?? ?? ?? ?? FF 75 08 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\7ba13b48de98631d\\iter0_v3.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass detection\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 8B 40 ?? ?? ?? ?? 6A ?? 5A 8B CE ?? ?? ?? ?? }\n        $pattern2 = { FF 75 08 ?? 8B 40 ?? FF 75 08 ?? FF 15 3C 1C E1 CE 00 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1487",
+      "status": "bypass_failed",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "YARA pattern did not match",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nOkay, so I need to help create a YARA rule based on the provided trace data. The goal is to find an evasion bypass in the given trace. Let's break it down step by step.\n\nFirst, looking at the trace, I notice that each phase of the attack seems to involve specific instructions and checks. My job is to identify where the attacker might have placed their checks and how they're evading them.\n\nLooking at Phase 1 from the attacker's perspective: They probably inserted some code after the initial phases to bypass detection. The trace shows a lot of CALL, TEST, and conditional jumps like 74/75. Maybe these are used as evasion points because they're common in sandboxes.\n\nFor each phase, I need to find where the attacker could have added their checks. Let's look at Phase 1: The attacker might have inserted something after the initial TEST EAX and JZ. So perhaps instructions like TEST EAX, then a conditional jump (JMP or CALL) with an offset, followed by another TEST.\n\nIn Phase 2, the defender needs to find where they can manipulate to bypass these checks. Maybe after certain jumps, if the code skips some instructions, it can avoid the attacker's tests. For example, skipping the JZ instruction might allow execution to proceed without triggering a check.\n\nFor the adversarial analysis part, I think each phase (like Phase 1 and Phase 2) has specific points where the attacker checks for certain conditions. The defender needs to find gaps in these checks that can be exploited by skipping or modifying nearby instructions.\n\nNow, focusing on creating the YARA rule patterns:\n\nI need to extract exactly three different patterns from the trace. Each pattern should combine 6-20 bytes, including the target instruction and surrounding context with wildcards for address/offsets.\n\nLooking at the Phase 1 trace:\nThere's a TEST EAX (85 C0), then JZ (74 or 75), followed by a conditional jump. For example, after TEST EAX, there might be something like JZ (conditional) and then a call with an offset.\n\nIn the second part of Phase 1, after inserting some code, there's a series of instructions including TEST AL, JNE, etc., which are used as checks.\n\nSo potential bypass points could be:\n1. After TEST EAX and before the jump.\n2. After the conditional jump but before another check.\n3. Another point where a test is done that can be skipped or modified.\n\nNow, creating patterns for each:\n\nPattern 0: Maybe around the first JZ instruction. So after TEST EAX (85 C0) comes JZ (74/75), then a call with an offset. The pattern would include these instructions and some wildcards for other possible offsets.\n\nPattern 1: Another point where a conditional jump is used, perhaps after Phase 2's initial checks. Maybe the attacker inserted another TEST AL followed by JNE.\n\nPattern 2: A later part of the trace where another test instruction exists that can be bypassed similarly.\n\nEach pattern needs to capture these sequences with appropriate wildcards and include enough context bytes to avoid false positives.\n\nI'll make sure each pattern is unique, combines multiple instructions, uses wildcards for address/offsets, and keeps opcodes and register encodings concrete.\n</think>\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass detection\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 8B 40 ?? ?? ?? ?? 6A ?? 5A 8B CE ?? ?? ?? ?? }\n        $pattern2 = { FF 75 08 ?? 8B 40 ?? FF 75 08 ?? FF 15 3C 1CE1 CE00 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\7ba13b48de98631d\\iter1_v3.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass patterns for sandbox detection\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 ?? 74 ?? ?? ?? 0F ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1488",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 0,
+      "new_signatures": 12,
+      "new_signature_names": [
+        "static_pe_pdbpath",
+        "createtoolhelp32snapshot_module_enumeration",
+        "antidebug_guardpages",
+        "injection_rwx",
+        "deletes_executed_files",
+        "antivm_checks_available_memory",
+        "antidebug_setunhandledexceptionfilter",
+        "packer_entropy",
+        "dropper",
+        "procmem_yara",
+        "persistence_autorun",
+        "language_check_registry"
+      ],
+      "new_signature_details": [
+        {
+          "name": "antivm_checks_available_memory",
+          "description": "Checks available memory",
+          "categories": [
+            "antivm"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 630
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 635
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 638
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "static_pe_pdbpath",
+          "description": "The PE file contains a PDB path",
+          "categories": [
+            "static"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 80,
+          "references": [
+            "https://www.fireeye.com/blog/threat-research/2019/08/definitive-dossier-of-devilish-debug-details-part-one-pdb-paths-malware.html"
+          ],
+          "data": [
+            {
+              "pdbpath": "wextract.pdb"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "antidebug_setunhandledexceptionfilter",
+          "description": "SetUnhandledExceptionFilter detected (possible anti-debug)",
+          "categories": [
+            "anti-debug"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 40,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 1660,
+              "cid": 19
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "language_check_registry",
+          "description": "Checks system language via registry key (possible geofencing)",
+          "categories": [
+            "location_discovery",
+            "geofence"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "regkey": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Nls\\CustomLocale\\en-US"
+            },
+            {
+              "regkey": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Nls\\ExtendedLocale\\en-US"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "antidebug_guardpages",
+          "description": "Guard pages use detected - possible anti-debugging.",
+          "categories": [
+            "anti-debug"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 482
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 485
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 486
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 487
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 568
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 569
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 575
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 576
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 577
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 578
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 579
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 582
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 586
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 600
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 616
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 623
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 625
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 632
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 633
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 636
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 637
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 639
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 640
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 652
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 710
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 726
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 770
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 771
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 772
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 773
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 774
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 775
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 776
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 777
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 778
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 779
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 780
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 781
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 782
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 783
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 784
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 785
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 786
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 787
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 788
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 789
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 790
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 791
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 792
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 793
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 794
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 795
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 796
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 797
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 802
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 804
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 811
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 813
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 815
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 817
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 819
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 820
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 821
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 822
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 823
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 824
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 825
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 826
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 827
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 828
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 829
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 830
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 831
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 832
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 833
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 834
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 835
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 836
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 837
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 838
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 839
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 840
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 841
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 842
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 843
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 844
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 845
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 846
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 847
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 848
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 849
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 850
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 851
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 863
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 865
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 869
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 875
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 877
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 900
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 901
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 903
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 907
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 910
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 914
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 915
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 918
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 919
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 920
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 929
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 930
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 933
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 934
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 935
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 936
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 940
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 941
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 942
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 943
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 944
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 945
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 946
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 947
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 948
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 949
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 950
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 951
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 958
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 959
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 981
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 983
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 985
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 986
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 990
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 991
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "createtoolhelp32snapshot_module_enumeration",
+          "description": "Enumerates the modules from a process (may be used to locate base addresses in process injection)",
+          "categories": [
+            "discovery"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 252
+            },
+            {
+              "module": "pid 1900 module ntdll.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 254
+            },
+            {
+              "module": "pid 1900 module KERNEL32.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 255
+            },
+            {
+              "module": "pid 1900 module KERNELBASE.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 256
+            },
+            {
+              "module": "pid 1900 module apphelp.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 257
+            },
+            {
+              "module": "pid 1900 module AcLayers.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 258
+            },
+            {
+              "module": "pid 1900 module msvcrt.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 259
+            },
+            {
+              "module": "pid 1900 module USER32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 260
+            },
+            {
+              "module": "pid 1900 module win32u.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 261
+            },
+            {
+              "module": "pid 1900 module GDI32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 262
+            },
+            {
+              "module": "pid 1900 module gdi32full.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 263
+            },
+            {
+              "module": "pid 1900 module msvcp_win.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 264
+            },
+            {
+              "module": "pid 1900 module ucrtbase.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 265
+            },
+            {
+              "module": "pid 1900 module SHELL32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 266
+            },
+            {
+              "module": "pid 1900 module SHLWAPI.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 267
+            },
+            {
+              "module": "pid 1900 module OLEAUT32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 268
+            },
+            {
+              "module": "pid 1900 module combase.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 269
+            },
+            {
+              "module": "pid 1900 module RPCRT4.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 270
+            },
+            {
+              "module": "pid 1900 module SETUPAPI.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 271
+            },
+            {
+              "module": "pid 1900 module cfgmgr32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 272
+            },
+            {
+              "module": "pid 1900 module bcrypt.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 273
+            },
+            {
+              "module": "pid 1900 module MPR.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 274
+            },
+            {
+              "module": "pid 1900 module sfc.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 275
+            },
+            {
+              "module": "pid 1900 module WINSPOOL.DRV"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 276
+            },
+            {
+              "module": "pid 1900 module sfc_os.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 277
+            },
+            {
+              "module": "pid 1900 module IMM32.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 278
+            },
+            {
+              "module": "pid 1900 module CRYPT32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 279
+            },
+            {
+              "module": "pid 1900 module WS2_32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 280
+            },
+            {
+              "module": "pid 1900 module ADVAPI32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 281
+            },
+            {
+              "module": "pid 1900 module sechost.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 282
+            },
+            {
+              "module": "pid 1900 module ole32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 283
+            },
+            {
+              "module": "pid 1900 module CRYPTBASE.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 284
+            },
+            {
+              "module": "pid 1900 module SspiCli.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 285
+            },
+            {
+              "module": "pid 1900 module msimg32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 286
+            },
+            {
+              "module": "pid 1900 module kernel.appcore.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 287
+            },
+            {
+              "module": "pid 1900 module bcryptPrimitives.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 288
+            },
+            {
+              "module": "pid 1900 module uxtheme.dll"
+            },
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 289
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "packer_entropy",
+          "description": "The binary likely contains encrypted or compressed data",
+          "categories": [
+            "packer"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [
+            "http://www.forensickb.com/2013/03/file-entropy-explained.html",
+            "http://virii.es/U/Using%20Entropy%20Analysis%20to%20Find%20Encrypted%20and%20Packed%20Malware.pdf"
+          ],
+          "data": [
+            {
+              "section": {
+                "name": ".rsrc",
+                "raw_address": "0x00007c00",
+                "virtual_address": "0x0000c000",
+                "virtual_size": "0x0007b000",
+                "size_of_data": "0x0007ae00",
+                "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ",
+                "characteristics_raw": "0x40000040",
+                "entropy": "7.86"
+              }
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "dropper",
+          "description": "Drops a binary and executes it",
+          "categories": [
+            "dropper"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 50,
+          "references": [],
+          "data": [
+            {
+              "binary": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP001.TMP\\aiFf.exe"
+            },
+            {
+              "binary": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP\\biFg.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "injection_rwx",
+          "description": "Creates RWX memory",
+          "categories": [
+            "injection"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 50,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 1900,
+              "cid": 21
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "persistence_autorun",
+          "description": "Installs itself for autorun at Windows startup",
+          "categories": [
+            "persistence"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 1660,
+              "cid": 207
+            },
+            {
+              "type": "call",
+              "pid": 5384,
+              "cid": 203
+            },
+            {
+              "regkey": "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\wextract_cleanup1"
+            },
+            {
+              "data": "rundll32.exe C:\\Windows\\system32\\advpack.dll,DelNodeRunDLL32 \"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP001.TMP\\\""
+            },
+            {
+              "regkey": "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\wextract_cleanup0"
+            },
+            {
+              "data": "rundll32.exe C:\\Windows\\system32\\advpack.dll,DelNodeRunDLL32 \"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP\\\""
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "procmem_yara",
+          "description": "Yara detections observed in process dumps, payloads or dropped files",
+          "categories": [
+            "malware"
+          ],
+          "severity": 3,
+          "weight": 4,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "Hit": "PID 1900 triggered the Yara rule 'RedLine' with data '['#\\x00+\\x003\\x00;\\x00C\\x00S\\x00c\\x00s\\x00', '{ 68 10 84 2D 2C 71 EA 7E 2C 71 EA 7E 2C 71 EA 7E 32 23 7F 7E 3F 71 EA 7E 0B B7 91 7E 2B 71 EA 7E 2C 71 EB 7E 5C 71 EA 7E 32 23 6E 7E 1C 71 EA 7E 32 23 69 7E A2 71 EA 7E 32 23 7B 7E 2D 71 EA 7E }', '{ 83 EC 38 53 B0 C4 88 44 24 2B 88 44 24 2F B0 3F 88 44 24 30 88 44 24 31 88 44 24 33 55 56 8B F1 B8 0C 00 FE FF 2B C6 89 44 24 14 B8 0D 00 FE FF 2B C6 89 44 24 1C B8 02 00 FE FF 2B C6 89 44 24 18 B3 32 B8 0E 00 FE FF 2B C6 88 5C 24 32 88 5C 24 41 89 44 24 28 57 B1 4D BB 0B 00 FE FF B8 03 00 FE FF 2B DE 2B C6 BF 00 00 FE FF B2 BC 2B FE 88 4C 24 38 88 4C 24 42 88 4C 24 47 C6 44 24 34 78 C6 44 24 35 61 88 54 24 3A C6 44 24 3E 66 C6 44 24 41 33 C6 44 24 43 D4 C6 44 24 44 74 88 54 24 46 C6 44 24 40 80 C6 44 24 39 62 C7 44 24 10 }', 'B\\x00|\\x00B\\x00x\\x00B\\x00t\\x00B\\x00p\\x00B\\x00l\\x00B\\x00h\\x00B\\x00d\\x00B\\x00`\\x00B\\x00\\\\\\x00B\\x00X\\x00B\\x00T\\x00B\\x00P\\x00B\\x00L\\x00B\\x00H\\x00B\\x00D\\x00B\\x00@\\x00B\\x00<\\x00B\\x008\\x00B\\x004\\x00B\\x000\\x00B\\x00,\\x00B\\x00(\\x00B\\x00$\\x00B\\x00 \\x00B\\x00', ' delete[]', 'constructor or from DllMain.']'"
+            },
+            {
+              "Hit": "PID  triggered the Yara rule 'Amadey' with data '['{ 8B D1 B8 FF FF FF 7F D1 EA 2B C2 3B C8 76 07 BB FF FF FF 7F EB 08 8D 04 0A 3B D8 0F 42 D8 }', '{ 8A 04 02 88 04 0F 41 8B 7D FC 8D 42 01 3B CB 7C }']'"
+            },
+            {
+              "Hit": "PID 1900 triggered the Yara rule 'RedLine' with data '['#\\x00+\\x003\\x00;\\x00C\\x00S\\x00c\\x00s\\x00', '{ 68 10 84 2D 2C 71 EA 7E 2C 71 EA 7E 2C 71 EA 7E 32 23 7F 7E 3F 71 EA 7E 0B B7 91 7E 2B 71 EA 7E 2C 71 EB 7E 5C 71 EA 7E 32 23 6E 7E 1C 71 EA 7E 32 23 69 7E A2 71 EA 7E 32 23 7B 7E 2D 71 EA 7E }', '{ 83 EC 38 53 B0 C4 88 44 24 2B 88 44 24 2F B0 3F 88 44 24 30 88 44 24 31 88 44 24 33 55 56 8B F1 B8 0C 00 FE FF 2B C6 89 44 24 14 B8 0D 00 FE FF 2B C6 89 44 24 1C B8 02 00 FE FF 2B C6 89 44 24 18 B3 32 B8 0E 00 FE FF 2B C6 88 5C 24 32 88 5C 24 41 89 44 24 28 57 B1 4D BB 0B 00 FE FF B8 03 00 FE FF 2B DE 2B C6 BF 00 00 FE FF B2 BC 2B FE 88 4C 24 38 88 4C 24 42 88 4C 24 47 C6 44 24 34 78 C6 44 24 35 61 88 54 24 3A C6 44 24 3E 66 C6 44 24 41 33 C6 44 24 43 D4 C6 44 24 44 74 88 54 24 46 C6 44 24 40 80 C6 44 24 39 62 C7 44 24 10 }', 'B\\x00|\\x00B\\x00x\\x00B\\x00t\\x00B\\x00p\\x00B\\x00l\\x00B\\x00h\\x00B\\x00d\\x00B\\x00`\\x00B\\x00\\\\\\x00B\\x00X\\x00B\\x00T\\x00B\\x00P\\x00B\\x00L\\x00B\\x00H\\x00B\\x00D\\x00B\\x00@\\x00B\\x00<\\x00B\\x008\\x00B\\x004\\x00B\\x000\\x00B\\x00,\\x00B\\x00(\\x00B\\x00$\\x00B\\x00 \\x00B\\x00', ' delete[]', 'constructor or from DllMain.']'"
+            },
+            {
+              "Hit": "PID 1900 triggered the Yara rule 'RedLine' with data '['#\\x00+\\x003\\x00;\\x00C\\x00S\\x00c\\x00s\\x00', '{ 68 10 84 2D 2C 71 EA 7E 2C 71 EA 7E 2C 71 EA 7E 32 23 7F 7E 3F 71 EA 7E 0B B7 91 7E 2B 71 EA 7E 2C 71 EB 7E 5C 71 EA 7E 32 23 6E 7E 1C 71 EA 7E 32 23 69 7E A2 71 EA 7E 32 23 7B 7E 2D 71 EA 7E }', '{ 83 EC 38 53 B0 C4 88 44 24 2B 88 44 24 2F B0 3F 88 44 24 30 88 44 24 31 88 44 24 33 55 56 8B F1 B8 0C 00 FE FF 2B C6 89 44 24 14 B8 0D 00 FE FF 2B C6 89 44 24 1C B8 02 00 FE FF 2B C6 89 44 24 18 B3 32 B8 0E 00 FE FF 2B C6 88 5C 24 32 88 5C 24 41 89 44 24 28 57 B1 4D BB 0B 00 FE FF B8 03 00 FE FF 2B DE 2B C6 BF 00 00 FE FF B2 BC 2B FE 88 4C 24 38 88 4C 24 42 88 4C 24 47 C6 44 24 34 78 C6 44 24 35 61 88 54 24 3A C6 44 24 3E 66 C6 44 24 41 33 C6 44 24 43 D4 C6 44 24 44 74 88 54 24 46 C6 44 24 40 80 C6 44 24 39 62 C7 44 24 10 }', 'B\\x00|\\x00B\\x00x\\x00B\\x00t\\x00B\\x00p\\x00B\\x00l\\x00B\\x00h\\x00B\\x00d\\x00B\\x00`\\x00B\\x00\\\\\\x00B\\x00X\\x00B\\x00T\\x00B\\x00P\\x00B\\x00L\\x00B\\x00H\\x00B\\x00D\\x00B\\x00@\\x00B\\x00<\\x00B\\x008\\x00B\\x004\\x00B\\x000\\x00B\\x00,\\x00B\\x00(\\x00B\\x00$\\x00B\\x00 \\x00B\\x00', ' delete[]', 'constructor or from DllMain.']'"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "deletes_executed_files",
+          "description": "Deletes executed files from disk",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "file": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP"
+            },
+            {
+              "file": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP001.TMP"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": "=== 1900.log ===\nCAPE Sandbox - Debugger log: Tue Dec 23 18:29:45 2025\nBreakpoint 1 hit by instruction at 0x03EC7660 (thread 6128) EBX=0x2d ECX=0x8 EDX=0x2d ESI=0x4171370 EDI=0x4171370 ESP=0x19d950 *ESP=0x0 EBP=0x19d964\n0x03EC7660  E8B3FCFFFF               CALL      0xfffffcb8                    \nActionDispatcher: skipping instruction.\n0x03EC7665  8BF8                     MOV       EDI, EAX                      \nBreakpoint 1 hit by instruction at 0x03EC7660 (thread 6128) EBX=0x21 ECX=0x4b EDX=0x21 ESI=0x4175308 EDI=0x21 ESP=0x19c6d4 *ESP=0x0 EBP=0x19c6e8\n0x03EC7660  E8B3FCFFFF               CALL      0xfffffcb8                    \nActionDispatcher: skipping instruction.\n0x03EC7665  8BF8                     MOV       EDI, EAX                      \n",
+      "raw_response": "<think>\nAlright, I need to create a Yara rule based on the given trace and follow the adversarial analysis strategy. Let me start by understanding the problem.\n\nFirst, looking at the trace, it's from different phases in an execution. The user provided three traces: one from a benign process (YAR), another from a VM (VTREE), and some custom code (CEE). The goal is to find bypass patterns that can be used against these to exit without triggering analysis.\n\nPhase 1: Attacker's Perspective\n- What am I trying to detect? Sandbox detection, VM, debugger.\n- Checks implemented: Likely TEST, JZX, and conditional jumps like EAX test or CLM.\n- Evasion points are in the trace where these checks occur. For example:\n   - 85 C0 (TEST EAX)\n   - 74 1A (JZX)\n   - 0F 84 (CLM)\n\nPhase 2: Defender's Perspective\n- Decision points could be around TEST, JZX, or CLM instructions.\n- Skipping these would bypass checks.\n\nPotential bypass targets:\n1. Around TEST EAX + JZX: If we skip the TEST and JZX bytes, the check is neutralized.\n2. Around CLM: Skip the CLM instruction to bypass its check.\n3. After a conditional jump (like 74 1A) that's skipped.\n\nPhase 3: Adversarial Game Analysis\n- The first target might be too obvious for detection tools to easily counter.\n- The second could be specific enough but might not cover all legitimate uses.\n- The third is based on a conditional jump, which can be tricky if the attacker can make the jump always fail or succeed.\n\nBuilding patterns:\n1. Around TEST EAX + JZX: Skip these bytes so the checks are bypassed.\n2. CLM instruction with surrounding context to avoid detection.\n3. Conditional jump without its offset, making it hard for defences to flag as suspicious.\n\nEach pattern must be 6-20 bytes long and use wildcards where applicable. Also, ensure all address/offsets are replaced with ??.\n\nLet me structure each pattern:\n\nPattern 1: Around TEST EAX (85 C0) and JZX (74 1A)\n- Target instruction is around these.\n- Pattern could be: 8B 45 (MOV eax, offset) followed by skip of EAX test and JZX jump.\n\nPattern 2: CLM instruction with displacement\n- CLM has a displacement in the trace (0F 84). Skipping this byte would bypass the check.\n\nPattern 3: Conditional jump without its displacement\n- Instead of having the offset, it's just the opcode, making detection harder.\n\nI need to ensure each pattern is unique and covers different parts of the trace. Now, time to write them in Yara format with wildcards.\n</think>\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass patterns for sandbox detection\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 ?? 74 ?? ???? ?? 0F ?? }\n        $pattern1 = { E8 ????.??.??.??.??.??.?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ????.??.??.??.??.??.?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\7ba13b48de98631d\\iter2_v3.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v3",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass patterns for sandbox detection\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 ?? 74 ?? ?? ?? 0F ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1488",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 0,
+    "new_signatures": 12,
+    "new_signature_names": [
+      "static_pe_pdbpath",
+      "createtoolhelp32snapshot_module_enumeration",
+      "antidebug_guardpages",
+      "injection_rwx",
+      "deletes_executed_files",
+      "antivm_checks_available_memory",
+      "antidebug_setunhandledexceptionfilter",
+      "packer_entropy",
+      "dropper",
+      "procmem_yara",
+      "persistence_autorun",
+      "language_check_registry"
+    ],
+    "new_signature_details": [
+      {
+        "name": "antivm_checks_available_memory",
+        "description": "Checks available memory",
+        "categories": [
+          "antivm"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 630
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 635
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 638
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "static_pe_pdbpath",
+        "description": "The PE file contains a PDB path",
+        "categories": [
+          "static"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 80,
+        "references": [
+          "https://www.fireeye.com/blog/threat-research/2019/08/definitive-dossier-of-devilish-debug-details-part-one-pdb-paths-malware.html"
+        ],
+        "data": [
+          {
+            "pdbpath": "wextract.pdb"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "antidebug_setunhandledexceptionfilter",
+        "description": "SetUnhandledExceptionFilter detected (possible anti-debug)",
+        "categories": [
+          "anti-debug"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 40,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 1660,
+            "cid": 19
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "language_check_registry",
+        "description": "Checks system language via registry key (possible geofencing)",
+        "categories": [
+          "location_discovery",
+          "geofence"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "regkey": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Nls\\CustomLocale\\en-US"
+          },
+          {
+            "regkey": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Nls\\ExtendedLocale\\en-US"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "antidebug_guardpages",
+        "description": "Guard pages use detected - possible anti-debugging.",
+        "categories": [
+          "anti-debug"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 482
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 485
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 486
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 487
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 568
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 569
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 575
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 576
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 577
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 578
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 579
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 582
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 586
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 600
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 616
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 623
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 625
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 632
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 633
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 636
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 637
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 639
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 640
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 652
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 710
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 726
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 770
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 771
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 772
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 773
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 774
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 775
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 776
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 777
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 778
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 779
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 780
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 781
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 782
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 783
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 784
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 785
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 786
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 787
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 788
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 789
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 790
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 791
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 792
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 793
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 794
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 795
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 796
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 797
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 802
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 804
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 811
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 813
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 815
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 817
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 819
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 820
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 821
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 822
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 823
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 824
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 825
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 826
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 827
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 828
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 829
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 830
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 831
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 832
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 833
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 834
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 835
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 836
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 837
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 838
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 839
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 840
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 841
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 842
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 843
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 844
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 845
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 846
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 847
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 848
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 849
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 850
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 851
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 863
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 865
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 869
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 875
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 877
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 900
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 901
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 903
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 907
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 910
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 914
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 915
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 918
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 919
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 920
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 929
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 930
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 933
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 934
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 935
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 936
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 940
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 941
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 942
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 943
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 944
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 945
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 946
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 947
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 948
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 949
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 950
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 951
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 958
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 959
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 981
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 983
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 985
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 986
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 990
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 991
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "createtoolhelp32snapshot_module_enumeration",
+        "description": "Enumerates the modules from a process (may be used to locate base addresses in process injection)",
+        "categories": [
+          "discovery"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 252
+          },
+          {
+            "module": "pid 1900 module ntdll.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 254
+          },
+          {
+            "module": "pid 1900 module KERNEL32.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 255
+          },
+          {
+            "module": "pid 1900 module KERNELBASE.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 256
+          },
+          {
+            "module": "pid 1900 module apphelp.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 257
+          },
+          {
+            "module": "pid 1900 module AcLayers.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 258
+          },
+          {
+            "module": "pid 1900 module msvcrt.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 259
+          },
+          {
+            "module": "pid 1900 module USER32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 260
+          },
+          {
+            "module": "pid 1900 module win32u.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 261
+          },
+          {
+            "module": "pid 1900 module GDI32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 262
+          },
+          {
+            "module": "pid 1900 module gdi32full.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 263
+          },
+          {
+            "module": "pid 1900 module msvcp_win.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 264
+          },
+          {
+            "module": "pid 1900 module ucrtbase.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 265
+          },
+          {
+            "module": "pid 1900 module SHELL32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 266
+          },
+          {
+            "module": "pid 1900 module SHLWAPI.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 267
+          },
+          {
+            "module": "pid 1900 module OLEAUT32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 268
+          },
+          {
+            "module": "pid 1900 module combase.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 269
+          },
+          {
+            "module": "pid 1900 module RPCRT4.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 270
+          },
+          {
+            "module": "pid 1900 module SETUPAPI.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 271
+          },
+          {
+            "module": "pid 1900 module cfgmgr32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 272
+          },
+          {
+            "module": "pid 1900 module bcrypt.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 273
+          },
+          {
+            "module": "pid 1900 module MPR.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 274
+          },
+          {
+            "module": "pid 1900 module sfc.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 275
+          },
+          {
+            "module": "pid 1900 module WINSPOOL.DRV"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 276
+          },
+          {
+            "module": "pid 1900 module sfc_os.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 277
+          },
+          {
+            "module": "pid 1900 module IMM32.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 278
+          },
+          {
+            "module": "pid 1900 module CRYPT32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 279
+          },
+          {
+            "module": "pid 1900 module WS2_32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 280
+          },
+          {
+            "module": "pid 1900 module ADVAPI32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 281
+          },
+          {
+            "module": "pid 1900 module sechost.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 282
+          },
+          {
+            "module": "pid 1900 module ole32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 283
+          },
+          {
+            "module": "pid 1900 module CRYPTBASE.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 284
+          },
+          {
+            "module": "pid 1900 module SspiCli.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 285
+          },
+          {
+            "module": "pid 1900 module msimg32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 286
+          },
+          {
+            "module": "pid 1900 module kernel.appcore.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 287
+          },
+          {
+            "module": "pid 1900 module bcryptPrimitives.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 288
+          },
+          {
+            "module": "pid 1900 module uxtheme.dll"
+          },
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 289
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "packer_entropy",
+        "description": "The binary likely contains encrypted or compressed data",
+        "categories": [
+          "packer"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [
+          "http://www.forensickb.com/2013/03/file-entropy-explained.html",
+          "http://virii.es/U/Using%20Entropy%20Analysis%20to%20Find%20Encrypted%20and%20Packed%20Malware.pdf"
+        ],
+        "data": [
+          {
+            "section": {
+              "name": ".rsrc",
+              "raw_address": "0x00007c00",
+              "virtual_address": "0x0000c000",
+              "virtual_size": "0x0007b000",
+              "size_of_data": "0x0007ae00",
+              "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ",
+              "characteristics_raw": "0x40000040",
+              "entropy": "7.86"
+            }
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "dropper",
+        "description": "Drops a binary and executes it",
+        "categories": [
+          "dropper"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 50,
+        "references": [],
+        "data": [
+          {
+            "binary": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP001.TMP\\aiFf.exe"
+          },
+          {
+            "binary": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP\\biFg.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "injection_rwx",
+        "description": "Creates RWX memory",
+        "categories": [
+          "injection"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 50,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 1900,
+            "cid": 21
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "persistence_autorun",
+        "description": "Installs itself for autorun at Windows startup",
+        "categories": [
+          "persistence"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 1660,
+            "cid": 207
+          },
+          {
+            "type": "call",
+            "pid": 5384,
+            "cid": 203
+          },
+          {
+            "regkey": "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\wextract_cleanup1"
+          },
+          {
+            "data": "rundll32.exe C:\\Windows\\system32\\advpack.dll,DelNodeRunDLL32 \"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP001.TMP\\\""
+          },
+          {
+            "regkey": "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\wextract_cleanup0"
+          },
+          {
+            "data": "rundll32.exe C:\\Windows\\system32\\advpack.dll,DelNodeRunDLL32 \"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP\\\""
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "procmem_yara",
+        "description": "Yara detections observed in process dumps, payloads or dropped files",
+        "categories": [
+          "malware"
+        ],
+        "severity": 3,
+        "weight": 4,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "Hit": "PID 1900 triggered the Yara rule 'RedLine' with data '['#\\x00+\\x003\\x00;\\x00C\\x00S\\x00c\\x00s\\x00', '{ 68 10 84 2D 2C 71 EA 7E 2C 71 EA 7E 2C 71 EA 7E 32 23 7F 7E 3F 71 EA 7E 0B B7 91 7E 2B 71 EA 7E 2C 71 EB 7E 5C 71 EA 7E 32 23 6E 7E 1C 71 EA 7E 32 23 69 7E A2 71 EA 7E 32 23 7B 7E 2D 71 EA 7E }', '{ 83 EC 38 53 B0 C4 88 44 24 2B 88 44 24 2F B0 3F 88 44 24 30 88 44 24 31 88 44 24 33 55 56 8B F1 B8 0C 00 FE FF 2B C6 89 44 24 14 B8 0D 00 FE FF 2B C6 89 44 24 1C B8 02 00 FE FF 2B C6 89 44 24 18 B3 32 B8 0E 00 FE FF 2B C6 88 5C 24 32 88 5C 24 41 89 44 24 28 57 B1 4D BB 0B 00 FE FF B8 03 00 FE FF 2B DE 2B C6 BF 00 00 FE FF B2 BC 2B FE 88 4C 24 38 88 4C 24 42 88 4C 24 47 C6 44 24 34 78 C6 44 24 35 61 88 54 24 3A C6 44 24 3E 66 C6 44 24 41 33 C6 44 24 43 D4 C6 44 24 44 74 88 54 24 46 C6 44 24 40 80 C6 44 24 39 62 C7 44 24 10 }', 'B\\x00|\\x00B\\x00x\\x00B\\x00t\\x00B\\x00p\\x00B\\x00l\\x00B\\x00h\\x00B\\x00d\\x00B\\x00`\\x00B\\x00\\\\\\x00B\\x00X\\x00B\\x00T\\x00B\\x00P\\x00B\\x00L\\x00B\\x00H\\x00B\\x00D\\x00B\\x00@\\x00B\\x00<\\x00B\\x008\\x00B\\x004\\x00B\\x000\\x00B\\x00,\\x00B\\x00(\\x00B\\x00$\\x00B\\x00 \\x00B\\x00', ' delete[]', 'constructor or from DllMain.']'"
+          },
+          {
+            "Hit": "PID  triggered the Yara rule 'Amadey' with data '['{ 8B D1 B8 FF FF FF 7F D1 EA 2B C2 3B C8 76 07 BB FF FF FF 7F EB 08 8D 04 0A 3B D8 0F 42 D8 }', '{ 8A 04 02 88 04 0F 41 8B 7D FC 8D 42 01 3B CB 7C }']'"
+          },
+          {
+            "Hit": "PID 1900 triggered the Yara rule 'RedLine' with data '['#\\x00+\\x003\\x00;\\x00C\\x00S\\x00c\\x00s\\x00', '{ 68 10 84 2D 2C 71 EA 7E 2C 71 EA 7E 2C 71 EA 7E 32 23 7F 7E 3F 71 EA 7E 0B B7 91 7E 2B 71 EA 7E 2C 71 EB 7E 5C 71 EA 7E 32 23 6E 7E 1C 71 EA 7E 32 23 69 7E A2 71 EA 7E 32 23 7B 7E 2D 71 EA 7E }', '{ 83 EC 38 53 B0 C4 88 44 24 2B 88 44 24 2F B0 3F 88 44 24 30 88 44 24 31 88 44 24 33 55 56 8B F1 B8 0C 00 FE FF 2B C6 89 44 24 14 B8 0D 00 FE FF 2B C6 89 44 24 1C B8 02 00 FE FF 2B C6 89 44 24 18 B3 32 B8 0E 00 FE FF 2B C6 88 5C 24 32 88 5C 24 41 89 44 24 28 57 B1 4D BB 0B 00 FE FF B8 03 00 FE FF 2B DE 2B C6 BF 00 00 FE FF B2 BC 2B FE 88 4C 24 38 88 4C 24 42 88 4C 24 47 C6 44 24 34 78 C6 44 24 35 61 88 54 24 3A C6 44 24 3E 66 C6 44 24 41 33 C6 44 24 43 D4 C6 44 24 44 74 88 54 24 46 C6 44 24 40 80 C6 44 24 39 62 C7 44 24 10 }', 'B\\x00|\\x00B\\x00x\\x00B\\x00t\\x00B\\x00p\\x00B\\x00l\\x00B\\x00h\\x00B\\x00d\\x00B\\x00`\\x00B\\x00\\\\\\x00B\\x00X\\x00B\\x00T\\x00B\\x00P\\x00B\\x00L\\x00B\\x00H\\x00B\\x00D\\x00B\\x00@\\x00B\\x00<\\x00B\\x008\\x00B\\x004\\x00B\\x000\\x00B\\x00,\\x00B\\x00(\\x00B\\x00$\\x00B\\x00 \\x00B\\x00', ' delete[]', 'constructor or from DllMain.']'"
+          },
+          {
+            "Hit": "PID 1900 triggered the Yara rule 'RedLine' with data '['#\\x00+\\x003\\x00;\\x00C\\x00S\\x00c\\x00s\\x00', '{ 68 10 84 2D 2C 71 EA 7E 2C 71 EA 7E 2C 71 EA 7E 32 23 7F 7E 3F 71 EA 7E 0B B7 91 7E 2B 71 EA 7E 2C 71 EB 7E 5C 71 EA 7E 32 23 6E 7E 1C 71 EA 7E 32 23 69 7E A2 71 EA 7E 32 23 7B 7E 2D 71 EA 7E }', '{ 83 EC 38 53 B0 C4 88 44 24 2B 88 44 24 2F B0 3F 88 44 24 30 88 44 24 31 88 44 24 33 55 56 8B F1 B8 0C 00 FE FF 2B C6 89 44 24 14 B8 0D 00 FE FF 2B C6 89 44 24 1C B8 02 00 FE FF 2B C6 89 44 24 18 B3 32 B8 0E 00 FE FF 2B C6 88 5C 24 32 88 5C 24 41 89 44 24 28 57 B1 4D BB 0B 00 FE FF B8 03 00 FE FF 2B DE 2B C6 BF 00 00 FE FF B2 BC 2B FE 88 4C 24 38 88 4C 24 42 88 4C 24 47 C6 44 24 34 78 C6 44 24 35 61 88 54 24 3A C6 44 24 3E 66 C6 44 24 41 33 C6 44 24 43 D4 C6 44 24 44 74 88 54 24 46 C6 44 24 40 80 C6 44 24 39 62 C7 44 24 10 }', 'B\\x00|\\x00B\\x00x\\x00B\\x00t\\x00B\\x00p\\x00B\\x00l\\x00B\\x00h\\x00B\\x00d\\x00B\\x00`\\x00B\\x00\\\\\\x00B\\x00X\\x00B\\x00T\\x00B\\x00P\\x00B\\x00L\\x00B\\x00H\\x00B\\x00D\\x00B\\x00@\\x00B\\x00<\\x00B\\x008\\x00B\\x004\\x00B\\x000\\x00B\\x00,\\x00B\\x00(\\x00B\\x00$\\x00B\\x00 \\x00B\\x00', ' delete[]', 'constructor or from DllMain.']'"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "deletes_executed_files",
+        "description": "Deletes executed files from disk",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "file": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP"
+          },
+          {
+            "file": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP001.TMP"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": "=== 1900.log ===\nCAPE Sandbox - Debugger log: Tue Dec 23 18:29:45 2025\nBreakpoint 1 hit by instruction at 0x03EC7660 (thread 6128) EBX=0x2d ECX=0x8 EDX=0x2d ESI=0x4171370 EDI=0x4171370 ESP=0x19d950 *ESP=0x0 EBP=0x19d964\n0x03EC7660  E8B3FCFFFF               CALL      0xfffffcb8                    \nActionDispatcher: skipping instruction.\n0x03EC7665  8BF8                     MOV       EDI, EAX                      \nBreakpoint 1 hit by instruction at 0x03EC7660 (thread 6128) EBX=0x21 ECX=0x4b EDX=0x21 ESI=0x4175308 EDI=0x21 ESP=0x19c6d4 *ESP=0x0 EBP=0x19c6e8\n0x03EC7660  E8B3FCFFFF               CALL      0xfffffcb8                    \nActionDispatcher: skipping instruction.\n0x03EC7665  8BF8                     MOV       EDI, EAX                      \n",
+    "raw_response": "<think>\nAlright, I need to create a Yara rule based on the given trace and follow the adversarial analysis strategy. Let me start by understanding the problem.\n\nFirst, looking at the trace, it's from different phases in an execution. The user provided three traces: one from a benign process (YAR), another from a VM (VTREE), and some custom code (CEE). The goal is to find bypass patterns that can be used against these to exit without triggering analysis.\n\nPhase 1: Attacker's Perspective\n- What am I trying to detect? Sandbox detection, VM, debugger.\n- Checks implemented: Likely TEST, JZX, and conditional jumps like EAX test or CLM.\n- Evasion points are in the trace where these checks occur. For example:\n   - 85 C0 (TEST EAX)\n   - 74 1A (JZX)\n   - 0F 84 (CLM)\n\nPhase 2: Defender's Perspective\n- Decision points could be around TEST, JZX, or CLM instructions.\n- Skipping these would bypass checks.\n\nPotential bypass targets:\n1. Around TEST EAX + JZX: If we skip the TEST and JZX bytes, the check is neutralized.\n2. Around CLM: Skip the CLM instruction to bypass its check.\n3. After a conditional jump (like 74 1A) that's skipped.\n\nPhase 3: Adversarial Game Analysis\n- The first target might be too obvious for detection tools to easily counter.\n- The second could be specific enough but might not cover all legitimate uses.\n- The third is based on a conditional jump, which can be tricky if the attacker can make the jump always fail or succeed.\n\nBuilding patterns:\n1. Around TEST EAX + JZX: Skip these bytes so the checks are bypassed.\n2. CLM instruction with surrounding context to avoid detection.\n3. Conditional jump without its offset, making it hard for defences to flag as suspicious.\n\nEach pattern must be 6-20 bytes long and use wildcards where applicable. Also, ensure all address/offsets are replaced with ??.\n\nLet me structure each pattern:\n\nPattern 1: Around TEST EAX (85 C0) and JZX (74 1A)\n- Target instruction is around these.\n- Pattern could be: 8B 45 (MOV eax, offset) followed by skip of EAX test and JZX jump.\n\nPattern 2: CLM instruction with displacement\n- CLM has a displacement in the trace (0F 84). Skipping this byte would bypass the check.\n\nPattern 3: Conditional jump without its displacement\n- Instead of having the offset, it's just the opcode, making detection harder.\n\nI need to ensure each pattern is unique and covers different parts of the trace. Now, time to write them in Yara format with wildcards.\n</think>\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass patterns for sandbox detection\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 ?? 74 ?? ???? ?? 0F ?? }\n        $pattern1 = { E8 ????.??.??.??.??.??.?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ????.??.??.??.??.??.?? }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\7ba13b48de98631d\\iter2_v3.yar"
+  },
+  "best_score": 12,
+  "optimization_history": [
+    "Iteration 1: bypass_failed - YARA pattern did not match",
+    "Iteration 2: bypass_failed - YARA pattern did not match",
+    "Iteration 3: SUCCESS - 12 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

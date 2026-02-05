@@ -1,0 +1,75 @@
+{
+  "prompt_version": "v2",
+  "prompt_name": "Counterfactual Reasoning",
+  "iterations": [
+    {
+      "iteration_number": 0,
+      "prompt_version": "v2",
+      "llm_query": {
+        "query_id": "4c2fc72c1d9b",
+        "timestamp": "2025-12-13T09:19:09.999086",
+        "iteration": 0,
+        "prompt_version": "v2",
+        "prompt_text": "# Malware Evasion Bypass Analysis\n\nYou are analyzing a malware execution trace that terminates early due to sandbox/VM evasion.\n\n## TRACE DATA\n\nSHA256: caf42d835224609c61dcc1b6ddfcf517e47088e750ee67b16508c4fb2fdc5e6b\nExitProcess Address: 0234EDBC\nInstructions: 31\n--------------------------------------------------------------------------------\nAddress      Opcode               Instruction\n--------------------------------------------------------------------------------\n    0234ED40  5A                   pop edx\n    0234ED41  E854D3FFFF           call 023435BCh\n    0234ED46  8D854CF2FFFF         lea eax, dword ptr [ebp-00000DB4h]\n    0234ED4C  BACCF63402           mov edx, 0234F6CCh  # ASCII \\\n    0234ED51  E872E5FFFF           call 02334A98h\n    0234ED56  8B854CF2FFFF         mov eax, dword ptr [ebp-00000DB4h]\n    0234ED5C  50                   push eax\n    0234ED5D  A1AC5B3502           mov eax, dword ptr [02355BACh]  # 0x02909C28\n    0234ED62  E8E7E9FFFF           call 02334D64h\n    0234ED67  8BD0                 mov edx, eax\n    0234ED69  8D8548F2FFFF         lea eax, dword ptr [ebp-00000DB8h]\n    0234ED6F  E872E5FFFF           call 02334A98h\n    0234ED74  8B8548F2FFFF         mov eax, dword ptr [ebp-00000DB8h]\n    0234ED7A  5A                   pop edx\n    0234ED7B  E854D3FFFF           call 023435BCh\n    0234ED80  8D8544F2FFFF         lea eax, dword ptr [ebp-00000DBCh]\n    0234ED86  BAD8F63402           mov edx, 0234F6D8h  # ASCII \\\n    0234ED8B  E872E5FFFF           call 02334A98h\n    0234ED90  8B8544F2FFFF         mov eax, dword ptr [ebp-00000DBCh]\n    0234ED96  50                   push eax\n    0234ED97  A1AC5B3502           mov eax, dword ptr [02355BACh]  # 0x02909C28\n    0234ED9C  E8E7E9FFFF           call 02334D64h\n    0234EDA1  8BD0                 mov edx, eax\n    0234EDA3  8D8540F2FFFF         lea eax, dword ptr [ebp-00000DC0h]\n    0234EDA9  E872E5FFFF           call 02334A98h\n    0234EDAE  8B8540F2FFFF         mov eax, dword ptr [ebp-00000DC0h]\n    0234EDB4  5A                   pop edx\n    0234EDB5  E854D3FFFF           call 023435BCh\n    0234EDBA  6A00                 push 00000000h\n>>> 0234EDBC  E8FB79FEFF           call 023367BCh  # ExitProcess@KERNEL32.DLL (Import, Unknown Params)\n    0234EDC1  33C0                 xor eax, eax\n\n---\n\n## REASONING STRATEGY: Counterfactual Analysis\n\nAnalyze this trace using counterfactual reasoning (\"what if\" scenarios):\n\n**Phase 1: Establish the factual outcome**\n- The program exits (this is the observed fact)\n- Identify the exact instruction sequence leading to exit\n\n**Phase 2: Generate counterfactual hypotheses**\nFor each suspicious instruction, ask:\n- \"What if this instruction were skipped?\"\n- \"Would the program continue instead of exiting?\"\n\n**Phase 3: Evaluate each hypothesis**\nFor each candidate instruction:\n\n*Counterfactual 1:* [Instruction at line X]\n- Factual: This instruction executes \u2192 leads to exit\n- Counterfactual: If skipped \u2192 would execution continue?\n- Necessity: Is skipping this NECESSARY to prevent exit?\n- Sufficiency: Is skipping this SUFFICIENT to prevent exit?\n\n*Counterfactual 2:* [Different instruction at line Y]\n- Same analysis...\n\n*Counterfactual 3:* [Another instruction at line Z]\n- Same analysis...\n\n**Phase 4: Select the 3 best bypass points**\nChoose instructions where skipping is likely SUFFICIENT to bypass evasion.\n\n**Phase 5: Build patterns (6-20 bytes each)**\nFor each selected bypass point, combine it with 2-3 adjacent instructions and apply wildcards.\n\n---\n\n## PATTERN LENGTH REQUIREMENT (CRITICAL)\n\nEach pattern must be **6-20 bytes long** to be specific enough to match only the target location.\n\n**How to build patterns:**\n- Combine 2-3 consecutive instructions from the trace into one pattern\n- Include the target instruction PLUS surrounding context instructions\n- **All patterns MUST come from the TRACE DATA above** - do not invent byte sequences\n\n**Good Example:** `85 C0 0F 84 ?? ?? ?? ?? 8B 45 ??` (TEST EAX + JZ + MOV = 11 bytes)\n**Good Example:** `6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0` (PUSH + POP + MOV + CALL + TEST = 12 bytes)\n\n---\n\n## WILDCARD RULES\n\n**Wildcard principle:** Any byte that represents an address, offset, or displacement MUST be replaced with `??`\n\n**Apply wildcards to:**\n- CALL/JMP offset bytes (4 bytes after opcode)\n- Conditional jump offsets (1 or 4 bytes after opcode)\n- Memory address bytes\n- Stack offsets\n\n**Keep concrete:** All opcode bytes, register-encoding bytes\n\n---\n\n## OUTPUT FORMAT\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [6-20 bytes with wildcards] }\n        $pattern1 = { [6-20 bytes - DIFFERENT sequence] }\n        $pattern2 = { [6-20 bytes - DIFFERENT sequence] }\n\n    condition:\n        any of them\n}\n```\n\n## REQUIREMENTS\n\n1. Extract exactly 3 patterns ($pattern0, $pattern1, $pattern2)\n2. All 3 patterns must be DIFFERENT hex sequences\n3. **Each pattern must be 6-20 bytes long** (combine multiple instructions)\n4. **Add context bytes after CALL/JMP** to avoid triggering new signatures\n5. Use wildcards (??) for all address/offset bytes\n6. Keep opcode and register bytes concrete\n7. Format: spaces between hex bytes, patterns wrapped in { }\n8. cape_options references patterns as $pattern0, $pattern1, $pattern2",
+        "prompt_length": 5409,
+        "prompt_tokens": 1352,
+        "response_text": "To address the scenario where the program exits due to a direct call to `ExitProcess` (likely via the `E8` opcode with a displacement), we can construct **YARA patterns** that detect critical sequences leading to this exit. These patterns focus on **specific instruction sequences** that could be **skipped or modified** to bypass the exit.\n\n---\n\n### \u2705 **Pattern 1: Call to ExitProcess and preceding Push 0**\n\nThis pattern captures the immediate call to `ExitProcess` and the preceding `push 0` instruction. Skipping this call would prevent the program from terminating.\n\n**Pattern:**\n```yara\nrule Pattern1\n{\n    meta:\n        description = \"Call to ExitProcess and preceding push 0\"\n    strings:\n        $a = { 6A 00 E8 ?? ?? ?? ?? }\n    condition:\n        $a\n}\n```\n\n---\n\n### \u2705 **Pattern 2: Call to 02334A98h and preceding LEA instruction**\n\nThis pattern targets a call to a routine at `02334A98h`, which is likely part of a sandbox detection check. If this call is skipped, the program may not trigger the exit.\n\n**Pattern:**\n```yara\nrule Pattern2\n{\n    meta:\n        description = \"Call to 02334A98h and preceding LEA instruction\"\n    strings:\n        $b = { 8D 85 ?? ?? ?? ?? E8 ?? ?? ?? ?? }\n    condition:\n        $b\n}\n```\n\n---\n\n### \u2705 **Pattern 3: Instruction sequence leading to ExitProcess**\n\nThis pattern captures the sequence of instructions that lead up to the `ExitProcess` call, including the `mov edx, eax` and `push 0` instructions. Detecting this sequence could help identify the path to termination.\n\n**Pattern:**\n```yara\nrule Pattern3\n{\n    meta:\n        description = \"Instruction sequence leading to ExitProcess\"\n    strings:\n        $c = { 8B D0 5A 6A 00 E8 ?? ?? ?? ?? }\n    condition:\n        $c\n}\n```\n\n---\n\n### \ud83d\udccc Summary\n\nThese three YARA patterns are designed to detect **key instruction sequences** that may lead to program termination via `ExitProcess`. They are particularly useful in **malware analysis** or **behavior monitoring**, where detecting abnormal exits is critical.\n\nEach pattern includes **wildcards** for address parts to account for variations in memory layout, while still capturing the **core structure** of the relevant instruction sequence.",
+        "response_length": 2187,
+        "response_tokens": 546,
+        "query_start_time": 1765639013.1141336,
+        "query_end_time": 1765639149.9990692,
+        "query_duration_seconds": 136.8849356174469,
+        "model_name": "qwen3:latest",
+        "model_provider": "ollama",
+        "temperature": 0.7,
+        "pattern_type": "UNKNOWN",
+        "confidence": 50,
+        "yara_rule": "rule Pattern1\n{\n    meta:\n        description = \"Call to ExitProcess and preceding push 0\"\n    strings:\n        $a = { 6A 00 E8 ?? ?? ?? ?? }\n    condition:\n        $a\n}",
+        "opcodes_generic": "",
+        "opcodes_specific": ""
+      },
+      "cape_analysis": {
+        "task_id": 799,
+        "analysis_type": "bypass",
+        "vm_host": "192.168.197.148",
+        "vm_name": "cape_vm3",
+        "submit_time": 1765639160.3215303,
+        "complete_time": 1765639277.016802,
+        "duration_seconds": 116.69527173042297,
+        "signatures_count": 5,
+        "signature_names": [
+          "contains_pe_overlay",
+          "packer_unknown_pe_section_name",
+          "language_check_registry",
+          "stealth_timeout",
+          "antianalysis_tls_section"
+        ],
+        "rule_hit": true,
+        "yara_rule": "rule Pattern1\n{\n    meta:\n        description = \"Call to ExitProcess and preceding push 0\"\n        cape_options = \"bp0=$a+0,action0=skip,count=0\"\n    strings:\n        $a = { 6A 00 E8 ?? ?? ?? ?? }\n    condition:\n        $a\n}",
+        "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\caf42d835224609c\\iter0_v2.yar"
+      },
+      "success": true,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "stealth_timeout"
+      ],
+      "feedback_given": null,
+      "evolution_reasoning": null
+    }
+  ],
+  "total_iterations": 1,
+  "iterations_to_success": 1,
+  "total_time_seconds": 495.8202590942383,
+  "avg_query_time_seconds": 136.8849356174469,
+  "avg_analysis_time_seconds": 116.69527173042297,
+  "total_input_tokens": 4056,
+  "total_output_tokens": 1655,
+  "total_tokens": 5711,
+  "success": true,
+  "best_score": 1,
+  "best_iteration": 0,
+  "final_yara_rule": "rule Pattern1\n{\n    meta:\n        description = \"Call to ExitProcess and preceding push 0\"\n        cape_options = \"bp0=$a+0,action0=skip,count=0\"\n    strings:\n        $a = { 6A 00 E8 ?? ?? ?? ?? }\n    condition:\n        $a\n}",
+  "final_new_signatures": [
+    "stealth_timeout"
+  ]
+}

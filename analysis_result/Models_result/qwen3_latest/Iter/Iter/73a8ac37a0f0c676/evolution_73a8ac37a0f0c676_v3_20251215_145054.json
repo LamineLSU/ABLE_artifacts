@@ -1,0 +1,83 @@
+{
+  "sha256": "73a8ac37a0f0c6761800a276b77b0fd34d1cf43830f822ef18ff50dbda934751",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 06 83 C4 14 52 FF D0 }\n        $pattern1 = { E8 ?? ?? ?? ?? 8B 55 ?? }\n        $pattern2 = { 83 C4 14 52 FF D0 }\n\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1706",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 18,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 8880.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 04:29:29 2025\nBreakpoint 0 hit by instruction at 0x0041A2A2 (thread 8312) EAX=0x4c30000 ECX=0x773d5f90 kernel32.dll ESI=0x9ff7c8 \"\u0010N6w\" EDI=0x41ed40 ESP=0x9fe388 *ESP=0x9feb4c EBP=0x9fe3a0\nBreak at 0x0041A2A2 in 73a8ac37a0f0c6761800.exe (RVA 0x1a2a2, thread 8312, Stack 0x009F1000-0x00A00000, ImageBase 0x00400000)\n0x0041A2A2  8B06                     MOV       EAX, [ESI]                    \nActionDispatcher: skipping instruction.\n0x0041A2A4  83C414                   ADD       ESP, 0x14                     \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 06 83 C4 14 52 FFD0 }\n        $pattern1 = { E8 ?? ?? ?? ?? 8B 55 ?? }\n        $pattern2 = { 83 C4 14 52 FFD0 }\n\n    condition:\n        all of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\73a8ac37a0f0c676\\iter0_v3.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule EvasionCheck\n{\n    meta:\n        description = \"Detects evasion checks via indirect calls and register-based calls\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n\n    strings:\n        $a = { 52 FF D0 5E 5D C3 }  // PUSH EDX, CALL EAX, POP ESI, POP EBP, RET\n        $b = { 50 E8 ?? ?? ?? ?? 8B 55 0C }  // PUSH EAX, CALL (offset), MOV EDX, [EBP+0C]\n        $c = { E8 ?? ?? ?? ?? 8B 55 0C }  // CALL (offset), MOV EDX, [EBP+0C]\n\n    condition:\n        $a or $b or $c\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1707",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 18,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Refine the YARA patterns to explicitly target register-specific calls (e.g., `call edx`) and correct memory operand references (e.g., `mov ecx, [eax+10h]`). Adjust skip offsets to avoid invalid jumps."
+      ],
+      "debugger_log": null,
+      "raw_response": "To address the requirement of extending the original YARA patterns to meet the minimum length of 6–20 bytes and ensure proper use of wildcards for address or offset parts, the corrected YARA rule is structured as follows:\n\n---\n\n### ✅ **Corrected YARA Rule**\n\n```yara\nrule EvasionCheck\n{\n    meta:\n        description = \"Detects evasion checks via indirect calls and register-based calls\"\n\n    strings:\n        $a = {52 FFD0 5E 5D C3}  // PUSH EDX, CALL EAX, POP ESI, POP EBP, RET\n        $b = {50 E8 ?? ?? ?? ?? 8B 55 0C}  // PUSH EAX, CALL (offset), MOV EDX, [EBP+0C]\n        $c = {E8 ?? ?? ?? ?? 8B 55 0C}  // CALL (offset), MOV EDX, [EBP+0C]\n\n    condition:\n        $a or $b or $c\n}\n```\n\n---\n\n### 📌 **Explanation of Each Pattern**\n\n#### 1. **Pattern $a**\n- **Bytes:** `52 FFD0 5E 5D C3`\n- **Breakdown:**\n  - `52`: `PUSH EDX` (prepares register for call)\n  - `FFD0`: `CALL EAX` (indirect call to EAX register)\n  - `5E`: `POP ESI` (restores register after call)\n  - `5D`: `POP EBP` (restores register after call)\n  - `C3`: `RET` (returns from function)\n- **Purpose:** Detects a call chain ending in `CALL EAX`, which is a common evasion technique to avoid direct address checks.\n\n#### 2. **Pattern $b**\n- **Bytes:** `50 E8 ?? ?? ?? ?? 8B 55 0C`\n- **Breakdown:**\n  - `50`: `PUSH EAX` (prepares register for call)\n  - `E8 ?? ?? ?? ??`: `CALL` with 4-byte offset (indirect call)\n  - `8B 55 0C`: `MOV EDX, [EBP+0C]` (reads from stack, possibly to bypass checks)\n- **Purpose:** Identifies a call to an address with an offset, followed by a memory read, which is a classic evasion signature.\n\n#### 3. **Pattern $c**\n- **Bytes:** `E8 ?? ?? ?? ?? 8B 55 0C`\n- **Breakdown:**\n  - `E8 ?? ?? ?? ??`: `CALL` with 4-byte offset (indirect call)\n  - `8B 55 0C`: `MOV EDX, [EBP+0C]` (reads from stack, possibly to bypass checks)\n- **Purpose:** Detects an indirect call followed by a memory read, a common pattern in evasion logic.\n\n---\n\n### 🛡️ **Why This Works**\n- **Wildcard Usage:** All address parts (like `??` for 4-byte offset) are replaced with `??` to avoid matching exact memory addresses.\n- **Length Constraints:** Each pattern exceeds the 6-byte minimum, ensuring robust detection.\n- **Behavioral Focus:** The patterns target common evasion tactics such as indirect calls and stack-based data reads, which are often used to bypass static analysis.\n\n---\n\n### ✅ **Conclusion**\nThis YARA rule effectively captures evasion patterns by leveraging indirect calls and memory reads, ensuring compatibility with both static and dynamic analysis tools. The use of wildcards ensures the rule remains flexible and avoids false positives.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\73a8ac37a0f0c676\\iter1_v3.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v3",
+      "yara_rule": "rule MaliciousBehavior\n{\n    meta:\n        description = \"Detects evasion behavior through indirect calls and suspicious memory manipulation\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n        author = \"Security Analyst\"\n\n    strings:\n        $a = { 8B 56 ?? 83 C4 ?? 52 FF D0 }  // mov edx, [esi+??], add esp, ??, push edx, call eax\n        $b = { 50 56 E8 ?? ?? ?? ?? }         // push eax, push esi, call ?? (indirect jump)\n        $c = { 83 C4 ?? 52 FF D0 }            // add esp, ??, push edx, call eax\n\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1708",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 18,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Adjust the patterns to match the actual opcodes used in the evasion code (e.g., `call edx` instead of `call eax`)."
+      ],
+      "debugger_log": null,
+      "raw_response": "To address the issue of overly short patterns in the original YARA rule, we must ensure that each pattern contains **at least 6 bytes** of instruction data, with **wildcards** (`??`) used for any hardcoded values, offsets, or displacements that may vary between different execution contexts.\n\n---\n\n### ✅ Final Corrected YARA Rule\n\n```yara\nrule MaliciousBehavior\n{\n    meta:\n        description = \"Detects evasion behavior through indirect calls and suspicious memory manipulation\"\n        author = \"Security Analyst\"\n\n    strings:\n        $a = { 8B 56 ?? 83 C4 ?? 52 FF D0 }  // mov edx, [esi+??], add esp, ??, push edx, call eax\n        $b = { 50 56 E8 ?? ?? ?? ?? }         // push eax, push esi, call ?? (indirect jump)\n        $c = { 83 C4 ?? 52 FF D0 }            // add esp, ??, push edx, call eax\n\n    condition:\n        all of them\n}\n```\n\n---\n\n### 🔍 Explanation of Patterns\n\n#### **Pattern $a**  \n`{ 8B 56 ?? 83 C4 ?? 52 FF D0 }`  \n- **Disassembly:**  \n  - `8B 56 ??` → `mov edx, [esi + ??]`  \n  - `83 C4 ??` → `add esp, ??`  \n  - `52` → `push edx`  \n  - `FF D0` → `call eax`  \n- **Purpose:** This sequence is likely used to prepare the stack and call a function, possibly to trigger an exit or evasion mechanism. The `??` values are used to mask hardcoded displacements and offsets.\n\n#### **Pattern $b**  \n`{ 50 56 E8 ?? ?? ?? ?? }`  \n- **Disassembly:**  \n  - `50` → `push eax`  \n  - `56` → `push esi`  \n  - `E8 ?? ?? ?? ??` → `call ??` (indirect jump)  \n- **Purpose:** This is a common pattern in obfuscated code, often used to redirect execution to a function that may perform evasion or other malicious activities.\n\n#### **Pattern $c**  \n`{ 83 C4 ?? 52 FF D0 }`  \n- **Disassembly:**  \n  - `83 C4 ??` → `add esp, ??`  \n  - `52` → `push edx`  \n  - `FF D0` → `call eax`  \n- **Purpose:** This is a simplified version of the first pattern, focusing on the stack manipulation and the final call to `eax`, which may be a pointer to the `ExitProcess` API or similar.\n\n---\n\n### 🧠 Why This Works\n\n- Each pattern contains **6–8 bytes** of instruction data, meeting the minimum length requirement.\n- **Wildcard (`??`)** usage ensures flexibility in matching different execution contexts.\n- The patterns collectively capture both **stack manipulation** and **indirect calls**, which are strong indicators of evasion or malicious behavior.\n\nThis rule is now ready for use in threat detection systems or static analysis tools.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\73a8ac37a0f0c676\\iter2_v3.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "prompt_version": "v1",
+  "prompt_name": "Simple Chain-of-Thought",
+  "iterations": [
+    {
+      "iteration_number": 0,
+      "prompt_version": "v1",
+      "llm_query": {
+        "query_id": "cf3c340b56a8",
+        "timestamp": "2025-12-15T21:12:49.704652",
+        "iteration": 0,
+        "prompt_version": "v1",
+        "prompt_text": "# Malware Evasion Bypass Analysis\n\nYou are analyzing a malware execution trace that terminates early due to sandbox/VM evasion.\n\n## TRACE DATA\n\nSHA256: 7bdd1409b080eb8510163cea3761d694be0eaec7e22bc44736cbfbc3025a310b\nExitProcess Address: 004160B4\nInstructions: 13\n--------------------------------------------------------------------------------\nAddress      Opcode               Instruction\n--------------------------------------------------------------------------------\n    0041608B  681C274700           push 0047271Ch  # ASCII \\\n    00416090  FF15F4634500         call dword ptr [004563F4h]  # GetModuleHandleA@KERNEL32.DLL (Import, Unknown Params)\n    00416096  85C0                 test eax, eax  # Return Compare (GetModuleHandleA)\n    00416098  7416                 je 004160B0h\n    0041609A  680C274700           push 0047270Ch  # ASCII \\\n    0041609F  50                   push eax\n    004160A0  FF15F8634500         call dword ptr [004563F8h]  # GetProcAddress@KERNEL32.DLL (Import, 2 Params)\n    004160A6  85C0                 test eax, eax  # Return Compare (GetProcAddress)\n    004160A8  7416                 je 004160B0h\n    004160AA  FF742404             push dword ptr [esp+04h]\n    004160AE  FFD0                 call eax\n    004160B0  FF742404             push dword ptr [esp+04h]\n>>> 004160B4  FF158C624500         call dword ptr [0045628Ch]  # ExitProcess@KERNEL32.DLL (Import, Unknown Params)\n\n---\n\n## REASONING STRATEGY: Chain-of-Thought\n\nThink through this problem step by step:\n\n**Step 1: Identify all suspicious instructions**\nScan the trace and list every instruction that could be part of the evasion:\n- Conditional jumps (JE, JNE, JZ, JNZ, etc.)\n- Test/compare instructions (TEST, CMP)\n- Function calls (CALL)\n- The exit point\n\n**Step 2: Trace the exit path backwards**\nStarting from the exit, trace backwards to understand:\n- What instruction directly causes the exit?\n- What conditional jump led to that path?\n- What check determined that jump's direction?\n\n**Step 3: Select 3 different bypass candidates**\nChoose 3 DIFFERENT instructions that, if skipped, could bypass the evasion.\n\n**Step 4: Build patterns (6-20 bytes each)**\nFor each candidate, combine it with 2-3 adjacent instructions to create a specific pattern.\n\n**Step 5: Apply wildcards and generate the YARA rule**\nReplace address/offset bytes with ?? and create the final rule.\n\n---\n\n## PATTERN LENGTH REQUIREMENT (CRITICAL)\n\nEach pattern must be **6-20 bytes long** to be specific enough to match only the target location.\n\n**How to build patterns:**\n- Combine 2-3 consecutive instructions from the trace into one pattern\n- Include the target instruction PLUS surrounding context instructions\n- **All patterns MUST come from the TRACE DATA above** - do not invent byte sequences\n\n**Good Example:** `85 C0 0F 84 ?? ?? ?? ?? 8B 45 ??` (TEST EAX + JZ + MOV = 11 bytes)\n**Good Example:** `6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0` (PUSH + POP + MOV + CALL + TEST = 12 bytes)\n\n---\n\n## WILDCARD RULES\n\n**Wildcard principle:** Any byte that represents an address, offset, or displacement MUST be replaced with `??`\n\n**Apply wildcards to:**\n- CALL/JMP offset bytes (4 bytes after opcode)\n- Conditional jump offsets (1 or 4 bytes after opcode)\n- Memory address bytes\n- Stack offsets\n\n**Keep concrete:** All opcode bytes, register-encoding bytes\n\n---\n\n## OUTPUT FORMAT\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [6-20 bytes with wildcards] }\n        $pattern1 = { [6-20 bytes - DIFFERENT sequence] }\n        $pattern2 = { [6-20 bytes - DIFFERENT sequence] }\n\n    condition:\n        any of them\n}\n```\n\n## REQUIREMENTS\n\n1. Extract exactly 3 patterns ($pattern0, $pattern1, $pattern2)\n2. All 3 patterns must be DIFFERENT hex sequences\n3. **Each pattern must be 6-20 bytes long** (combine multiple instructions)\n4. Use wildcards (??) for all address/offset bytes\n5. Keep opcode and register bytes concrete\n6. Format: spaces between hex bytes, patterns wrapped in { }\n7. cape_options references patterns as $pattern0, $pattern1, $pattern2",
+        "prompt_length": 4210,
+        "prompt_tokens": 1052,
+        "response_text": "Here are three YARA patterns that detect the key elements of the evasion logic in the provided code:\n\n1. **Test after `GetModuleHandleA` and the subsequent `JE` instruction**  \n   This pattern captures the condition check following the `GetModuleHandleA` call.  \n   ```yara\n   rule TestAfterGetModuleHandleA\n       meta:\n           description = \"Detects test after GetModuleHandleA followed by a JE\"\n       strings:\n           $a = {85 C0 74 ??}\n       condition:\n           $a\n   ```\n\n2. **Test after `GetProcAddress` and the subsequent `JE` instruction**  \n   This pattern captures the condition check following the `GetProcAddress` call.  \n   ```yara\n   rule TestAfterGetProcAddress\n       meta:\n           description = \"Detects test after GetProcAddress followed by a JE\"\n       strings:\n           $b = {85 C0 74 ??}\n       condition:\n           $b\n   ```\n\n3. **Call to `ExitProcess`**  \n   This pattern identifies the direct call to `ExitProcess`, which is the result of the evasion logic.  \n   ```yara\n   rule ExitProcessCall\n       meta:\n           description = \"Detects direct call to ExitProcess\"\n       strings:\n           $c = {FF 15 ?? ?? ?? ??}\n       condition:\n           $c\n   ```\n\n---\n\n**Explanation:**  \n- **Pattern 1 & 2:** These patterns detect the `test` instruction followed by a conditional jump (`JE`) after calls to `GetModuleHandleA` and `GetProcAddress`. These checks are often used to bypass certain protections by validating the module or function pointer.  \n- **Pattern 3:** The call to `ExitProcess` indicates the program is terminating abruptly, which could be a sign of evasion or anti-debugging logic.  \n\nThese rules can be combined or extended to detect more complex evasion behaviors.",
+        "response_length": 1724,
+        "response_tokens": 431,
+        "query_start_time": 1765854654.897131,
+        "query_end_time": 1765854769.7046525,
+        "query_duration_seconds": 114.80752158164978,
+        "model_name": "qwen3:latest",
+        "model_provider": "ollama",
+        "temperature": 0.7,
+        "pattern_type": "UNKNOWN",
+        "confidence": 50,
+        "yara_rule": "rule TestAfterGetModuleHandleA\n       meta:\n           description = \"Detects test after GetModuleHandleA followed by a JE\"\n       strings:\n           $a = {85 C0 74 ??}\n       condition:\n           $a",
+        "opcodes_generic": "",
+        "opcodes_specific": ""
+      },
+      "cape_analysis": {
+        "task_id": 1380,
+        "analysis_type": "bypass",
+        "vm_host": "192.168.52.148",
+        "vm_name": "cape_vm2",
+        "submit_time": 1765854780.0332778,
+        "complete_time": 1765855077.5941827,
+        "duration_seconds": 297.5609049797058,
+        "signatures_count": 17,
+        "signature_names": [
+          "resumethread_remote_process",
+          "procmem_yara",
+          "antidebug_setunhandledexceptionfilter",
+          "terminates_remote_process",
+          "accesses_public_folder",
+          "deletes_self",
+          "persistence_autorun_tasks",
+          "persistence_autorun",
+          "mouse_movement_detect",
+          "accesses_recyclebin",
+          "stealth_timeout",
+          "injection_rwx",
+          "queries_computer_name",
+          "queries_keyboard_layout",
+          "removes_zoneid_ads",
+          "queries_locale_api",
+          "language_check_registry"
+        ],
+        "rule_hit": true,
+        "yara_rule": "rule TestAfterGetModuleHandleA\n       meta:\n           description = \"Detects test after GetModuleHandleA followed by a JE\"\n        cape_options = \"bp0=$a+0,action0=skip,count=0\"\n       strings:\n           $a = { 85 C0 74 ?? }\n       condition:\n           $a",
+        "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\7bdd1409b080eb85\\iter0_v1.yar"
+      },
+      "success": true,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "feedback_given": null,
+      "evolution_reasoning": null
+    }
+  ],
+  "total_iterations": 1,
+  "iterations_to_success": 1,
+  "total_time_seconds": 652.5496878623962,
+  "avg_query_time_seconds": 114.80752158164978,
+  "avg_analysis_time_seconds": 297.5609049797058,
+  "total_input_tokens": 3156,
+  "total_output_tokens": 1212,
+  "total_tokens": 4368,
+  "success": true,
+  "best_score": 1,
+  "best_iteration": 0,
+  "final_yara_rule": "rule TestAfterGetModuleHandleA\n       meta:\n           description = \"Detects test after GetModuleHandleA followed by a JE\"\n        cape_options = \"bp0=$a+0,action0=skip,count=0\"\n       strings:\n           $a = { 85 C0 74 ?? }\n       condition:\n           $a",
+  "final_new_signatures": [
+    "terminates_remote_process"
+  ]
+}

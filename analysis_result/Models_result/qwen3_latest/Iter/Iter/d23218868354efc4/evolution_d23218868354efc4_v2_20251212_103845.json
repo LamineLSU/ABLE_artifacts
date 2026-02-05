@@ -1,0 +1,128 @@
+{
+  "sha256": "d23218868354efc4107040db6aebf4c097a96353e0ab394730f0b23eaab554d2",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To address the query effectively, we are identifying **three distinct code patterns** that are likely involved in the logic of the program's **exit mechanism**, particularly the call to `ExitProcess`. These patterns are derived from the observed structure of the code and are designed to be matched in memory with wildcards for address parts, as required.\n\n---\n\n### ✅ **Pattern 1: Call to an Internal Function**\n**Hex Bytes (Pattern):**  \n`E8 ?? ?? ?? ??`  \n**Description:**  \nThis represents a `call` instruction to an internal function at an unknown address. The `E8` is the opcode for `call`, and the next four bytes represent the **relative offset** to the target address. This call is likely used to prepare for the final exit.\n\n**Context:**  \nThis call is located at `0x0361F0` and is likely used to initialize the environment for the `ExitProcess` call.\n\n---\n\n### ✅ **Pattern 2: Call to a System Function**\n**Hex Bytes (Pattern):**  \n`E8 ?? ?? ?? ??`  \n**Description:**  \nThis is another `call` instruction, likely to a system function such as `CloseHandle` or another utility function. This call is part of the preparation or cleanup before the program exits.\n\n**Context:**  \nThis call is located at `0x0361F1` and is part of the sequence leading to the final `ExitProcess` call.\n\n---\n\n### ✅ **Pattern 3: Final Exit Call**\n**Hex Bytes (Pattern):**  \n`E8 ?? ?? ?? ??`  \n**Description:**  \nThis is the **final `call` instruction** that leads to `ExitProcess`. This is the direct trigger for the program to terminate, and skipping this call would prevent the program from exiting.\n\n**Context:**  \nThis call is located at `0x0361F8` and is the last action in the code flow before the program terminates.\n\n---\n\n### 🔍 Summary of Patterns\n\n| Pattern | Address (Hex) | Description |\n|--------|---------------|-------------|\n| 1      | 0x0361F0      | Call to an internal function |\n| 2      | 0x0361F1      | Call to a system function (e.g., `CloseHandle`) |\n| 3      | 0x0361F8      | Final call to `ExitProcess` (program exit) |\n\n---\n\n### 🧠 Notes\n- These patterns are **memory-matching** patterns, using wildcards for the address parts.\n- If any of these calls are **skipped or modified**, the program may **not exit**, which could be a security or control flow anomaly.\n- This format is commonly used in **exploitation**, **reverse engineering**, or **security analysis** to detect and manipulate exit logic.\n\nLet me know if you'd like these patterns in a specific format (e.g., for use in a hex editor, debugger, or exploit development).",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? }          // test eax, eax + je (early evasion check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? 74 07 }  // call CloseHandle + je (exit decision logic)\n        $pattern2 = { 6A 5B 5A 8B CE E8 ?? ?? ?? ?? }  // push/pop + call (initial execution flow)\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 85,
+      "opcodes": "",
+      "task_id": "1556",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "stealth_timeout"
+      ],
+      "new_signature_details": [
+        {
+          "name": "stealth_timeout",
+          "description": "Possible date expiration check, exits too soon after checking local time",
+          "categories": [
+            "stealth"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 40,
+          "references": [],
+          "data": [
+            {
+              "process": "elG86he.exe, PID 5116"
+            },
+            {
+              "type": "call",
+              "pid": 5116,
+              "cid": 38
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": "=== 5116.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 19:34:40 2025\nBreakpoint 0 hit by instruction at 0x005CF851 (thread 5472) EAX=0x1 ECX=0x2b41dfd4 EDX=0x19dd38 ESI=0x19e384 EDI=0x290 ESP=0x19e144 *ESP=0x40aacc elG86he.exe EBP=0x19e374\n0x005CF851  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x005CF853  7407                     JZ        0x9                           \n\n\n=== 5312.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 19:34:12 2025\nBreakpoint 0 hit by instruction at 0x00007FFA7FA980F0 (thread 2960) RBX=0x1 RCX=0x3ba1838 RDX=0x3ba17f0 RSI=0x3ba17f0 RDI=0x3ba1838 RSP=0x19e670 *RSP=0x5a RBP=0x2d R8=0x3ba1910 R9=0x7ffa7fb14e98 R10=0x2e R11=0x2d R12=0x3ba16e0 R13=0x19e830 R14=0x3ba1838 Xmm0.Low=0x2e003100300030 Xmm0.High=0x5c0050004d0054 Xmm1.Low=0x6e00610073005c Xmm1.High=0x41005c00610079\n0x00007FFA7FA980F0  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00007FFA7FA980F2  740C                     JZ        0xe                           \nBreakpoint 0 hit by instruction at 0x00007FFA7FA980F0 (thread 2960) RBX=0x570120 RCX=0x3ba1e18 RDX=0x3ba1d78 RSI=0x3ba1d78 RDI=0x3ba1e18 RSP=0x19e5f0 *RSP=0x26ef67b5cc6b RBP=0x3ba1cd8 R10=0x19e410 R11=0x19e630 R12=0x3ba16e0 R13=0x19e830 R14=0x3ba14e8 Xmm0.Low=0x300033002e0030 Xmm0.High=0x5c003900310033 Xmm1.Low=0x2e006200640030 Xmm1.High=0x6500780065\n0x00007FFA7FA980F0  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00007FFA7FA980F2  740C                     JZ        0xe                           \nBreakpoint 0 hit by instruction at 0x00007FFA7FA980F0 (thread 2960) RCX=0x3c7e628 RDX=0x3c77be0 RSI=0x3c77be0 RDI=0x3c7e628 RSP=0x19da70 \"pwr\" *RSP=0x7ffadf727770 clr.dll RBP=0x19db40 R9=0x7ffa7fbf25e0 R10=0x3c7ffd0 R11=0x51bd10 \"PWr\" R12=0x3c7e860 R13=0x3c7e808 R14=0x13ba1048 R15=0x3c7e700 Xmm0.Low=0x400a3d71\n0x00007FFA7FA980F0  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00007FFA7FA980F2  740C                     JZ        0xe                           \n\n\n=== 7724.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 19:34:42 2025\nBreakpoint 0 hit by instruction at 0x043A6FA8 (thread 4132) EAX=0x1 EBX=0x4591588 ESI=0x4591420 EDI=0x4591464 ESP=0xaff080 \"\u0010\u0015Y\" *ESP=0x4591510 EBP=0xaff090\n0x043A6FA8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x043A6FAA  742A                     JZ        0x2c                          \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to incorrect pattern targeting. The new patterns focus on evasion checks (Strategy A) and exit decision logic (Strategy B) from the trace. By using concrete instruction sequences from the original trace, we increase specificity while allowing flexibility for variants.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 85\n\n**REASONING**: These patterns target critical evasion checks and exit logic from the trace. The first pattern captures the test+je sequence near the start, the second targets the conditional flow before ExitProcess, and the third focuses on early execution logic. All patterns use exact bytes from the trace with wildcards for offsets, ensuring specificity while avoiding false positives.\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? }          // test eax, eax + je (early evasion check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? 74 07 }  // call CloseHandle + je (exit decision logic)\n        $pattern2 = { 6A 5B 5A 8B CE E8 ?? ?? ?? ?? }  // push/pop + call (initial execution flow)\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\d23218868354efc4\\iter1_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? }          // test eax, eax + je (early evasion check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? 74 07 }  // call CloseHandle + je (exit decision logic)\n        $pattern2 = { 6A 5B 5A 8B CE E8 ?? ?? ?? ?? }  // push/pop + call (initial execution flow)\n\n    condition:\n        any of them\n}",
+    "pattern_type": "CALL_TEST_JE",
+    "confidence": 85,
+    "opcodes": "",
+    "task_id": "1556",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 16,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "stealth_timeout"
+    ],
+    "new_signature_details": [
+      {
+        "name": "stealth_timeout",
+        "description": "Possible date expiration check, exits too soon after checking local time",
+        "categories": [
+          "stealth"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 40,
+        "references": [],
+        "data": [
+          {
+            "process": "elG86he.exe, PID 5116"
+          },
+          {
+            "type": "call",
+            "pid": 5116,
+            "cid": 38
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": "=== 5116.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 19:34:40 2025\nBreakpoint 0 hit by instruction at 0x005CF851 (thread 5472) EAX=0x1 ECX=0x2b41dfd4 EDX=0x19dd38 ESI=0x19e384 EDI=0x290 ESP=0x19e144 *ESP=0x40aacc elG86he.exe EBP=0x19e374\n0x005CF851  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x005CF853  7407                     JZ        0x9                           \n\n\n=== 5312.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 19:34:12 2025\nBreakpoint 0 hit by instruction at 0x00007FFA7FA980F0 (thread 2960) RBX=0x1 RCX=0x3ba1838 RDX=0x3ba17f0 RSI=0x3ba17f0 RDI=0x3ba1838 RSP=0x19e670 *RSP=0x5a RBP=0x2d R8=0x3ba1910 R9=0x7ffa7fb14e98 R10=0x2e R11=0x2d R12=0x3ba16e0 R13=0x19e830 R14=0x3ba1838 Xmm0.Low=0x2e003100300030 Xmm0.High=0x5c0050004d0054 Xmm1.Low=0x6e00610073005c Xmm1.High=0x41005c00610079\n0x00007FFA7FA980F0  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00007FFA7FA980F2  740C                     JZ        0xe                           \nBreakpoint 0 hit by instruction at 0x00007FFA7FA980F0 (thread 2960) RBX=0x570120 RCX=0x3ba1e18 RDX=0x3ba1d78 RSI=0x3ba1d78 RDI=0x3ba1e18 RSP=0x19e5f0 *RSP=0x26ef67b5cc6b RBP=0x3ba1cd8 R10=0x19e410 R11=0x19e630 R12=0x3ba16e0 R13=0x19e830 R14=0x3ba14e8 Xmm0.Low=0x300033002e0030 Xmm0.High=0x5c003900310033 Xmm1.Low=0x2e006200640030 Xmm1.High=0x6500780065\n0x00007FFA7FA980F0  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00007FFA7FA980F2  740C                     JZ        0xe                           \nBreakpoint 0 hit by instruction at 0x00007FFA7FA980F0 (thread 2960) RCX=0x3c7e628 RDX=0x3c77be0 RSI=0x3c77be0 RDI=0x3c7e628 RSP=0x19da70 \"pwr\" *RSP=0x7ffadf727770 clr.dll RBP=0x19db40 R9=0x7ffa7fbf25e0 R10=0x3c7ffd0 R11=0x51bd10 \"PWr\" R12=0x3c7e860 R13=0x3c7e808 R14=0x13ba1048 R15=0x3c7e700 Xmm0.Low=0x400a3d71\n0x00007FFA7FA980F0  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00007FFA7FA980F2  740C                     JZ        0xe                           \n\n\n=== 7724.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 19:34:42 2025\nBreakpoint 0 hit by instruction at 0x043A6FA8 (thread 4132) EAX=0x1 EBX=0x4591588 ESI=0x4591420 EDI=0x4591464 ESP=0xaff080 \"\u0010\u0015Y\" *ESP=0x4591510 EBP=0xaff090\n0x043A6FA8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x043A6FAA  742A                     JZ        0x2c                          \n",
+    "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to incorrect pattern targeting. The new patterns focus on evasion checks (Strategy A) and exit decision logic (Strategy B) from the trace. By using concrete instruction sequences from the original trace, we increase specificity while allowing flexibility for variants.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 85\n\n**REASONING**: These patterns target critical evasion checks and exit logic from the trace. The first pattern captures the test+je sequence near the start, the second targets the conditional flow before ExitProcess, and the third focuses on early execution logic. All patterns use exact bytes from the trace with wildcards for offsets, ensuring specificity while avoiding false positives.\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? }          // test eax, eax + je (early evasion check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? 74 07 }  // call CloseHandle + je (exit decision logic)\n        $pattern2 = { 6A 5B 5A 8B CE E8 ?? ?? ?? ?? }  // push/pop + call (initial execution flow)\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\d23218868354efc4\\iter1_v2.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 2: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

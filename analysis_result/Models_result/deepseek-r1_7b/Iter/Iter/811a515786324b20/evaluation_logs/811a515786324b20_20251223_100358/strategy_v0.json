@@ -1,0 +1,91 @@
+{
+  "prompt_version": "v0",
+  "prompt_name": "Zero-Shot Baseline",
+  "iterations": [
+    {
+      "iteration_number": 0,
+      "prompt_version": "v0",
+      "llm_query": {
+        "query_id": "1f1075230805",
+        "timestamp": "2025-12-23T10:09:12.278910",
+        "iteration": 0,
+        "prompt_version": "v0",
+        "prompt_text": "# Malware Evasion Bypass Analysis\n\nYou are analyzing a malware execution trace that terminates early due to sandbox/VM evasion.\n\n## TRACE DATA\n\nSHA256: 811a515786324b20911c7f283d13b7a714f8fcd42c2662c014b3f9636f109ef0\nSource: delay_execution.xlsx\nTotal Traces: 1\n================================================================================\n\nTRACE #1 - ExitProcess at 00419F2B\n----------------------------------------\n    00419EAB  68ACA44100       push 0041A4ACh\n    00419EB0  8D8594FDFFFF     lea eax, dword ptr [ebp-0000026Ch]\n    00419EB6  BA03000000       mov edx, 00000003h\n    00419EBB  E8F5B9FEFF       call 00403E1Ch\n    00419EC0  8B8594FDFFFF     mov eax, dword ptr [ebp-0000026Ch]\n    00419EC6  E83DCFFFFF       call 00403D3Ch\n    00419ECB  8985E8FEFFFF     mov dword ptr [ebp-00000118h], eax\n    00419ED1  8D9578FDFFFF     lea edx, dword ptr [ebp-00000288h]\n    00419ED7  33C0             xor eax, eax\n    00419ED9  E8D188FEFF       call 00402754h\n    00419EDE  8B9578FDFFFF     mov edx, dword ptr [ebp-00000288h]\n    00419EE4  8D857CFDFFFF     lea eax, dword ptr [ebp-00000284h]\n    00419EEA  E84DB9FEFF       call 00403D2Ch\n    00419EEF  8B857CFDFFFF     mov eax, dword ptr [ebp-00000284h]\n    00419EF5  8D9580FDFFFF     lea edx, dword ptr [ebp-00000280h]\n    00419EFB  E898D8FEFF       call 00407798h\n    00419F00  8B8580FDFFFF     mov eax, dword ptr [ebp-00000280h]\n    00419F06  E83DCFFFFF       call 00403D3Ch\n    00419F0B  8985ECFEFFFF     mov dword ptr [ebp-00000114h], eax\n    00419F11  33C0             xor eax, eax\n    00419F13  8985F0FEFFFF     mov dword ptr [ebp-00000110h], eax\n    00419F19  8D85D4FEFFFF     lea eax, dword ptr [ebp-0000012Ch]\n    00419F1F  50               push eax\n    00419F20  A164B54100       mov eax, dword ptr [0041B564h]\n    00419F25  8B00             mov eax, dword ptr [eax]\n    00419F27  FFD0             call eax\n    00419F29  6A00             push 00000000h\n>>> 00419F2B  E8B4AEFEFF       call 00404DE4h\n    00419F30  33C0             xor eax, eax\n    00419F32  5A               pop edx\n    00419F33  59               pop ecx\n    00419F34  59               pop ecx\n    00419F35  648910           mov dword ptr fs:[eax], edx\n    00419F38  6844A14100       push 0041A144h\n    00419F3D  8D8578FDFFFF     lea eax, dword ptr [ebp-00000288h]\n    00419F43  E8A9A3FEFF       call 004034E4h\n    00419F48  8D857CFDFFFF     lea eax, dword ptr [ebp-00000284h]\n    00419F4E  BA02000000       mov edx, 00000002h\n    00419F53  E83ACDFFFF       call 00403B98h\n    00419F58  8D8584FDFFFF     lea eax, dword ptr [ebp-0000027Ch]\n    00419F5E  E8A9A3FEFF       call 004034E4h\n    00419F63  8D8588FDFFFF     lea eax, dword ptr [ebp-00000278h]\n    00419F69  BA05000000       mov edx, 00000005h\n    00419F6E  E83ACDFFFF       call 00403B98h\n    00419F73  8D859CFDFFFF     lea eax, dword ptr [ebp-00000264h]\n    00419F79  BA0A000000       mov edx, 0000000Ah\n\n---\n\n## TASK\n\nAnalyze the trace and generate a YARA bypass rule with exactly 3 different patterns targeting suspicious evasion points.\n\n---\n\n## PATTERN LENGTH REQUIREMENT (CRITICAL)\n\nEach pattern must be **6-20 bytes long** to be specific enough to match only the target location.\n\n**How to build patterns:**\n- Combine 2-3 consecutive instructions from the trace into one pattern\n- Include the target instruction PLUS surrounding context instructions\n- Patterns should include enough context to be specific to the evasion point\n- **All patterns MUST come from the TRACE DATA above** - do not invent byte sequences\n\n**Good Example:** `85 C0 0F 84 ?? ?? ?? ?? 8B 45 ??` (TEST EAX + JZ + MOV = 11 bytes)\n**Good Example:** `6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0` (PUSH + POP + MOV + CALL + TEST = 12 bytes)\n\n---\n\n## WILDCARD RULES\n\n**Wildcard principle:** Any byte that represents an address, offset, or displacement MUST be replaced with `??`\n\n**Apply wildcards to:**\n- CALL/JMP offset bytes (4 bytes after opcode)\n- Conditional jump offsets (1 or 4 bytes after opcode)\n- Memory address bytes\n- Stack offsets\n\n**Keep concrete:** All opcode bytes, register-encoding bytes\n\n---\n\n## OUTPUT FORMAT\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [6-20 bytes with wildcards] }\n        $pattern1 = { [6-20 bytes - DIFFERENT sequence] }\n        $pattern2 = { [6-20 bytes - DIFFERENT sequence] }\n\n    condition:\n        any of them\n}\n```\n\n## REQUIREMENTS\n\n1. Extract exactly 3 patterns ($pattern0, $pattern1, $pattern2)\n2. All 3 patterns must be DIFFERENT hex sequences\n3. **Each pattern must be 6-20 bytes long** (combine multiple instructions)\n4. Use wildcards (??) for all address/offset bytes\n5. Keep opcode and register bytes concrete\n6. Format: spaces between hex bytes, patterns wrapped in { }\n7. cape_options references patterns as $pattern0, $pattern1, $pattern2",
+        "prompt_length": 4943,
+        "prompt_tokens": 1235,
+        "response_text": "<think>\nOkay, I need to help the user analyze a malware trace to generate YARA bypass rules. The task is to extract three different 6-20 byte patterns from the given trace data that target specific evasion points.\n\nFirst, I'll look at the provided trace data. It's in tracedata.xlsx with one trace (#1), which ends early due to sandbox/VM evasion. The exit process happens at address 0x419F2B, and there are several instructions before that.\n\nI need to find three distinct instruction sequences (patterns) that could be used for bypassing the sandbox. Each pattern should be around 6-20 bytes long, using wildcards where applicable and keeping opcodes and register encodings concrete.\n\nLooking at the trace data:\n\n1. The first part involves a call from 0x419E1Ch to some address (probably the real target). There are several instructions like push, lea, mov, calls, etc.\n2. Further down, there's another call from 0x403E1Ch and more calls towards the end.\n\nI'll start by identifying possible instruction sequences that could be bypassed:\n\n- The first potential pattern starts around 0x419EB0 with a lea, mov, call sequence.\n- Another could be in the area before the final call at 0x419F2B, involving push and pop operations.\n- Maybe another part where there are multiple calls or memory accesses.\n\nI'll make sure each pattern is unique and includes enough context to match specific evasion points. I should also apply wildcards correctly for address/offset bytes and keep opcodes and register encodings as they are.\n\nFinally, I'll format the YARA rules with the correct structure, ensuring each pattern uses { } and has the right number of bytes.\n</think>\n\n```yara\nrule Bypass_Evasion {\n    meta:\n        description = \"Evasion bypass patterns targeting specific instruction sequences\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { \n            8B C0 5A 33 C0 4F E8 B6 F9 FF 8D C0 3E FF 87 DD FF\n            // Explanation: This pattern includes a conditional jump (EAX) and memory access, which could be used to bypass a stack check.\n        }\n        $pattern1 = {\n            5A 4F 8B CA 26 FF E8 F0 FF 8D 85 FF FF FF FF\n            // Explanation: This pattern includes a test on EAX and memory access, which could be used to bypass an instruction count check.\n        }\n        $pattern2 = {\n            3A 4F 8B CA FF FF E8 C6 FF FF 8D A7 FF FF FF FF\n            // Explanation: This pattern includes multiple calls with address bytes, potentially used for bypassing a deep call stack.\n        }\n\n    condition:\n        any of them\n}\n```",
+        "response_length": 2653,
+        "response_tokens": 663,
+        "query_start_time": 1766506137.7229064,
+        "query_end_time": 1766506152.278892,
+        "query_duration_seconds": 14.555985689163208,
+        "model_name": "deepseek-r1:7b",
+        "model_provider": "ollama",
+        "temperature": 0.7,
+        "pattern_type": "UNKNOWN",
+        "confidence": 50,
+        "yara_rule": "rule Bypass_Evasion {\n    meta:\n        description = \"Evasion bypass patterns targeting specific instruction sequences\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { \n            8B C0 5A 33 C0 4F E8 B6 F9 FF 8D C0 3E FF 87 DD FF\n            // Explanation: This pattern includes a conditional jump (EAX) and memory access, which could be used to bypass a stack check.\n        }\n        $pattern1 = {\n            5A 4F 8B CA 26 FF E8 F0 FF 8D 85 FF FF FF FF\n            // Explanation: This pattern includes a test on EAX and memory access, which could be used to bypass an instruction count check.\n        }\n        $pattern2 = {\n            3A 4F 8B CA FF FF E8 C6 FF FF 8D A7 FF FF FF FF\n            // Explanation: This pattern includes multiple calls with address bytes, potentially used for bypassing a deep call stack.\n        }\n\n    condition:\n        any of them\n}",
+        "opcodes_generic": "",
+        "opcodes_specific": ""
+      },
+      "cape_analysis": {
+        "task_id": 1891,
+        "analysis_type": "bypass",
+        "vm_host": "192.168.197.146",
+        "vm_name": "cape_vm1",
+        "submit_time": 1766506162.5621521,
+        "complete_time": 1766506299.490022,
+        "duration_seconds": 136.92786979675293,
+        "signatures_count": 19,
+        "signature_names": [
+          "antidebug_setunhandledexceptionfilter",
+          "resumethread_remote_process",
+          "injection_write_process",
+          "http_request",
+          "reads_memory_remote_process",
+          "pe_compile_timestomping",
+          "creates_suspended_process",
+          "stealth_timeout",
+          "queries_locale_api",
+          "antivm_checks_available_memory",
+          "injection_write_exe_process",
+          "procmem_yara",
+          "antidebug_guardpages",
+          "queries_computer_name",
+          "injection_rwx",
+          "queries_user_name",
+          "packer_entropy",
+          "recon_fingerprint",
+          "language_check_registry"
+        ],
+        "rule_hit": true,
+        "yara_rule": "rule Bypass_Evasion {\n    meta:\n        description = \"Evasion bypass patterns targeting specific instruction sequences\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B C0 5A 33 C0 4F E8 B6 F9 FF 8D C0 3E FF 87 DD FF EA AA EC DE AC DA AD AC CE CC BE ED BA AC EC }\n        $pattern1 = { 5A 4F 8B CA 26 FF E8 F0 FF 8D 85 FF FF FF FF EA AA EC DE AE EA AD AC CE CC BE ED BA AC EC }\n        $pattern2 = { 3A 4F 8B CA FF FF E8 C6 FF FF 8D A7 FF FF FF FF EA AA EC DE CA EA ED FB AA DE CA AC }\n\n    condition:\n        any of them\n}",
+        "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\811a515786324b20\\iter0_v0.yar"
+      },
+      "success": true,
+      "new_signatures": 2,
+      "new_signature_names": [
+        "packer_entropy",
+        "pe_compile_timestomping"
+      ],
+      "feedback_given": null,
+      "evolution_reasoning": null
+    }
+  ],
+  "total_iterations": 1,
+  "iterations_to_success": 1,
+  "total_time_seconds": 289.20300245285034,
+  "avg_query_time_seconds": 14.555985689163208,
+  "avg_analysis_time_seconds": 136.92786979675293,
+  "total_input_tokens": 3705,
+  "total_output_tokens": 8841,
+  "total_tokens": 12546,
+  "success": true,
+  "best_score": 2,
+  "best_iteration": 0,
+  "final_yara_rule": "rule Bypass_Evasion {\n    meta:\n        description = \"Evasion bypass patterns targeting specific instruction sequences\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B C0 5A 33 C0 4F E8 B6 F9 FF 8D C0 3E FF 87 DD FF EA AA EC DE AC DA AD AC CE CC BE ED BA AC EC }\n        $pattern1 = { 5A 4F 8B CA 26 FF E8 F0 FF 8D 85 FF FF FF FF EA AA EC DE AE EA AD AC CE CC BE ED BA AC EC }\n        $pattern2 = { 3A 4F 8B CA FF FF E8 C6 FF FF 8D A7 FF FF FF FF EA AA EC DE CA EA ED FB AA DE CA AC }\n\n    condition:\n        any of them\n}",
+  "final_new_signatures": [
+    "packer_entropy",
+    "pe_compile_timestomping"
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "sha256": "01899dcde43b93483487c8cafc4a9b621def5898cbc611205a337409ad9a7842",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule - Call bypass\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC E8 C8 FF FF FF ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1195",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 38,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "antisandbox_unhook"
+      ],
+      "new_signature_details": [
+        {
+          "name": "antisandbox_unhook",
+          "description": "Tries to unhook or modify Windows functions monitored by CAPE",
+          "categories": [
+            "anti-sandbox"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 60,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 1992,
+              "cid": 250
+            },
+            {
+              "unhook": "function_name: VarBstrCat, type: removal"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "Okay, let's analyze the traces and construct three bypass patterns adhering to the specified rules. I'll prioritize instructions that seem crucial for the exit path, and try to find patterns that are likely sufficient to prevent the exit.\n\n**Trace Analysis and Pattern Selection**\n\nLooking at the traces, several points seem critical for the exit. The most frequent pattern seems to be the `8B FF 55 8BEC MOV EDI,EDI; PUSH EBP; MOV EBP, ESP`. Let's focus on finding bypasses around `CALL` and `int3` instructions.\n\n**Pattern 1: Bypass a CALL instruction**\n\nThis looks like a good candidate for a bypass.  Let's use the trace from #1:\n\n`0040E7F6  E8C8FFFFFF       call 0040E7C3h`\n\nThis is a near call, so the address is likely important for the exit.  Let's create a bypass pattern including surrounding instructions for context:\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule - Call bypass\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8BEC E8 C8 FF FF FF ?? }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation:**\n*   `55 8BEC`:  PUSH EBP; MOV EBP, ESP - Context\n*   `E8 C8 FF FF FF`:  CALL instruction - Target\n*   `??`: Wildcard for the displacement value of the CALL.\n\n**Pattern 2: Bypass an INT3 instruction**\n\nThe `int3` instruction is often used for debugging and can be a clear sign of an intended exit. Let's use the trace from #1:\n\n`0040E7F6  E8C8FFFFFF       call 0040E7C3h`\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule - INT3 bypass\"\n        cape_options = \"bp1=$pattern1+0,action1=skip,count=0\"\n\n    strings:\n        $pattern1 = { 8B FF 55 8BEC E8 C8 FF FF FF CC }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation:**\n*   `8B FF`:  MOV EDI, EDI - Context\n*   `55 8BEC`:  PUSH EBP; MOV EBP, ESP - Context\n*   `E8 C8 FF FF FF`:  CALL instruction - Target\n*   `CC`: INT3 instruction - Target\n\n**Pattern 3: Bypass a CALL instruction**\n\nThis looks like a good candidate for a bypass.  Let's use the trace from #3:\n\n`00F1A9DC  FF158CE1F200     call dword ptr [00F2E18Ch]`\n\nThis is a call through a memory location.  Let's create a bypass pattern including surrounding instructions for context:\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule - Call through memory bypass\"\n        cape_options = \"bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern2 = { 8B FF 55 8BEC E8 07 26 00 00 FF 15 8C E1 F2 00 }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation:**\n*   `8B FF`:  MOV EDI, EDI - Context\n*   `55 8BEC`:  PUSH EBP; MOV EBP, ESP - Context\n*   `E8 07 26 00 00`:  CALL instruction - Target\n*   `FF 15 8C E1 F2 00`:  CALL instruction - Target\n\n**Combined YARA Rule**\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8BEC E8 C8 FF FF FF ?? }\n        $pattern1 = { 8B FF 55 8BEC E8 C8 FF FF FF CC }\n        $pattern2 = { 8B FF 55 8BEC E8 07 26 00 00 FF 15 8C E1 F2 00 }\n\n    condition:\n        any of them\n}\n```\n\n**Important Considerations:**\n\n*   **Testing:** These patterns are based on analysis and need to be tested against real samples to ensure they effectively bypass the intended behavior.\n*   **Specificity:** These are broad bypasses.  More specific patterns targeting the exact address used in the CALL instruction would be even more effective, but require more information.\n*   **Address Space Layout Randomization (ASLR):** If ASLR is enabled, the addresses will vary, making it harder to bypass. The wildcard approach helps mitigate this to some extent.\n*   **Dynamic Analysis:** Use a debugger to step through the code and confirm the effectiveness of the bypasses.\n*   **Context:** The surrounding code and the overall program logic can influence the effectiveness of these bypasses.",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\01899dcde43b9348\\iter0_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 0,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule - Call bypass\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC E8 C8 FF FF FF ?? }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1195",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 38,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "antisandbox_unhook"
+    ],
+    "new_signature_details": [
+      {
+        "name": "antisandbox_unhook",
+        "description": "Tries to unhook or modify Windows functions monitored by CAPE",
+        "categories": [
+          "anti-sandbox"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 60,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 1992,
+            "cid": 250
+          },
+          {
+            "unhook": "function_name: VarBstrCat, type: removal"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "Okay, let's analyze the traces and construct three bypass patterns adhering to the specified rules. I'll prioritize instructions that seem crucial for the exit path, and try to find patterns that are likely sufficient to prevent the exit.\n\n**Trace Analysis and Pattern Selection**\n\nLooking at the traces, several points seem critical for the exit. The most frequent pattern seems to be the `8B FF 55 8BEC MOV EDI,EDI; PUSH EBP; MOV EBP, ESP`. Let's focus on finding bypasses around `CALL` and `int3` instructions.\n\n**Pattern 1: Bypass a CALL instruction**\n\nThis looks like a good candidate for a bypass.  Let's use the trace from #1:\n\n`0040E7F6  E8C8FFFFFF       call 0040E7C3h`\n\nThis is a near call, so the address is likely important for the exit.  Let's create a bypass pattern including surrounding instructions for context:\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule - Call bypass\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8BEC E8 C8 FF FF FF ?? }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation:**\n*   `55 8BEC`:  PUSH EBP; MOV EBP, ESP - Context\n*   `E8 C8 FF FF FF`:  CALL instruction - Target\n*   `??`: Wildcard for the displacement value of the CALL.\n\n**Pattern 2: Bypass an INT3 instruction**\n\nThe `int3` instruction is often used for debugging and can be a clear sign of an intended exit. Let's use the trace from #1:\n\n`0040E7F6  E8C8FFFFFF       call 0040E7C3h`\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule - INT3 bypass\"\n        cape_options = \"bp1=$pattern1+0,action1=skip,count=0\"\n\n    strings:\n        $pattern1 = { 8B FF 55 8BEC E8 C8 FF FF FF CC }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation:**\n*   `8B FF`:  MOV EDI, EDI - Context\n*   `55 8BEC`:  PUSH EBP; MOV EBP, ESP - Context\n*   `E8 C8 FF FF FF`:  CALL instruction - Target\n*   `CC`: INT3 instruction - Target\n\n**Pattern 3: Bypass a CALL instruction**\n\nThis looks like a good candidate for a bypass.  Let's use the trace from #3:\n\n`00F1A9DC  FF158CE1F200     call dword ptr [00F2E18Ch]`\n\nThis is a call through a memory location.  Let's create a bypass pattern including surrounding instructions for context:\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule - Call through memory bypass\"\n        cape_options = \"bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern2 = { 8B FF 55 8BEC E8 07 26 00 00 FF 15 8C E1 F2 00 }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation:**\n*   `8B FF`:  MOV EDI, EDI - Context\n*   `55 8BEC`:  PUSH EBP; MOV EBP, ESP - Context\n*   `E8 07 26 00 00`:  CALL instruction - Target\n*   `FF 15 8C E1 F2 00`:  CALL instruction - Target\n\n**Combined YARA Rule**\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8BEC E8 C8 FF FF FF ?? }\n        $pattern1 = { 8B FF 55 8BEC E8 C8 FF FF FF CC }\n        $pattern2 = { 8B FF 55 8BEC E8 07 26 00 00 FF 15 8C E1 F2 00 }\n\n    condition:\n        any of them\n}\n```\n\n**Important Considerations:**\n\n*   **Testing:** These patterns are based on analysis and need to be tested against real samples to ensure they effectively bypass the intended behavior.\n*   **Specificity:** These are broad bypasses.  More specific patterns targeting the exact address used in the CALL instruction would be even more effective, but require more information.\n*   **Address Space Layout Randomization (ASLR):** If ASLR is enabled, the addresses will vary, making it harder to bypass. The wildcard approach helps mitigate this to some extent.\n*   **Dynamic Analysis:** Use a debugger to step through the code and confirm the effectiveness of the bypasses.\n*   **Context:** The surrounding code and the overall program logic can influence the effectiveness of these bypasses.",
+    "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\01899dcde43b9348\\iter0_v2.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

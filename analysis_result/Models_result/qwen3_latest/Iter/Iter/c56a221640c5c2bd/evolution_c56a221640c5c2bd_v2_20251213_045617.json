@@ -1,0 +1,157 @@
+{
+  "sha256": "c56a221640c5c2bdc86b73762659626cee2ecbbbdf2a48489966aedc7c3f4e38",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule ExitProcessCall\n{\n    meta:\n        description = \"Call to ExitProcess\"\n        cape_options = \"bp0=$call+0,action0=skip,bp1=$address+0,action1=skip,count=0\"\n        author = \"Your Name\"\n        date = \"2025-04-05\"\n\n    strings:\n        $call = { FF 14 24 }  // \"call eax\" (assuming 32-bit architecture)\n        $address = { 77 78 36 40 }  // Example address for ExitProcess in Windows 10\n\n    condition:\n        $call and $address\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "782",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 13,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To identify and target the critical instructions that lead to the execution of the `ExitProcess` call, we focus on the sequence of instructions that set up the call and ensure the correct register is loaded with the address of `ExitProcess`.\n\nHere are the three YARA rules that capture the relevant patterns in the code flow:\n\n---\n\n### **Rule 1: Call to `ExitProcess`**\nThis rule targets the actual call to the `ExitProcess` function, which is the final step in terminating the process. The call is made using the `eax` register, which should point to the address of `ExitProcess`.\n\n```yara\nrule ExitProcessCall\n{\n    meta:\n        description = \"Call to ExitProcess\"\n        author = \"Your Name\"\n        date = \"2025-04-05\"\n\n    strings:\n        $call = { 0xff 0x14 0x24 }  // \"call eax\" (assuming 32-bit architecture)\n        $address = { 0x77 0x78 0x36 0x40 }  // Example address for ExitProcess (0x77783640) in Windows 10\n\n    condition:\n        $call and $address\n}\n```\n\n---\n\n### **Rule 2: Load Address of `ExitProcess` into `eax`**\nThis rule captures the instruction that loads the address of `ExitProcess` into the `eax` register. This is typically done using a memory read from a register (e.g., `esi`) or a known pointer.\n\n```yara\nrule LoadExitProcessAddress\n{\n    meta:\n        description = \"Load address of ExitProcess into EAX\"\n        author = \"Your Name\"\n        date = \"2025-04-05\"\n\n    strings:\n        $load = { 0x8b 0x06 }  // \"mov eax, [esi]\"\n        $esi = { 0x26 }        // \"esi\" register operand\n\n    condition:\n        $load and $esi\n}\n```\n\n---\n\n### **Rule 3: Stack Adjustment Before Call**\nThis rule identifies the stack adjustment instruction (`add esp, 14h`) that occurs immediately before the `ExitProcess` call. This is often used to align the stack or clean up parameters before the function call.\n\n```yara\nrule StackAdjustmentBeforeExit\n{\n    meta:\n        description = \"Stack adjustment before ExitProcess call\"\n        author = \"Your Name\"\n        date = \"2025-04-05\"\n\n    strings:\n        $adjust = { 0x83 0xc4 0x14 }  // \"add esp, 14h\"\n\n    condition:\n        $adjust\n}\n```\n\n---\n\n### **Summary**\nThese three YARA rules collectively identify the key instructions involved in the execution of the `ExitProcess` function. They can be used to detect the presence of a process termination routine in memory or to analyze the behavior of malware that attempts to terminate itself or other processes.\n\nEach rule is designed to detect a specific step in the function call chain, ensuring that any attempt to terminate a process is flagged for further analysis.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\c56a221640c5c2bd\\iter0_v2.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule AssemblyPatternDetection\n{\n    meta:\n        description = \"Detects specific assembly patterns involving function calls and register manipulation\"\n        cape_options = \"bp0=$p0+0,action0=skip,bp1=$p1+0,action1=skip,bp2=$p3+0,action2=skip,count=0\"\n    \n    strings:\n        // Pattern 0: Add ESP and Push/Call sequence\n        $p0 = { 83 C4 04 83 C4 14 52 FF D0 }  // 8 bytes\n\n        // Pattern 1: Call instruction with offset followed by MOV\n        $p1 = { E8 ?? ?? ?? ?? 8B 45 FC }  // 8 bytes\n\n        // Pattern 2: MOV and Add ESP, then Call\n        $p3 = { 8B 45 FC 83 C4 04 FF D2 }  // 7 bytes\n\n    condition:\n        any of ($p0, $p1, $p3)\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "783",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 13,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Adjust the skip offset to avoid skipping critical instructions, and refine the pattern to account for variable offsets."
+      ],
+      "debugger_log": "=== 3172.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 18:47:22 2025\nBreakpoint 1 hit by instruction at 0x0041FF16 (thread 8812) EAX=0x4665020 EBX=0x44bf110 \"PE\" ECX=0x11f800 EDX=0x44bf420 L\"\u0016\u0018\" ESI=0x4664020 \"MZ\" EDI=0x44bf020 \"MZ\" ESP=0xcfe940 \" Pf\" *ESP=0x4665020 EBP=0xcfe95c\nBreak at 0x0041FF16 in c56a221640c5c2bdc86b.exe (RVA 0x1ff16, thread 8812, Stack 0x00CF1000-0x00D00000, ImageBase 0x00400000)\n0x0041FF16  E878010000               CALL      0x17d                         \nActionDispatcher: skipping instruction.\n0x0041FF1B  8B45FC                   MOV       EAX, [EBP-0x4]                \nBreakpoint 1 hit by instruction at 0x0041FF16 (thread 8812) EAX=0x4785020 EBX=0x44bf110 \"PE\" ECX=0x600 EDX=0x45dec20 ESI=0x4664020 \"MZ\" EDI=0x44bf020 \"MZ\" ESP=0xcfe940 \" Px\" *ESP=0x4785020 EBP=0xcfe95c\n0x0041FF16  E878010000               CALL      0x17d                         \nActionDispatcher: skipping instruction.\n0x0041FF1B  8B45FC                   MOV       EAX, [EBP-0x4]                \nBreakpoint 1 hit by instruction at 0x0041FF16 (thread 8812) EAX=0x4786020 EBX=0x44bf110 \"PE\" ECX=0x200 EDX=0x45df220 ESI=0x4664020 \"MZ\" EDI=0x44bf020 \"MZ\" ESP=0xcfe940 \" `x\" *ESP=0x4786020 EBP=0xcfe95c\n0x0041FF16  E878010000               CALL      0x17d                         \nActionDispatcher: skipping instruction.\n0x0041FF1B  8B45FC                   MOV       EAX, [EBP-0x4]                \nBreakpoint 1 hit by instruction at 0x0041FF16 (thread 8812) EAX=0x4664280 \".data\" EBX=0x44bf110 \"PE\" ECX=0x45df420 EDX=0x4787020 ESI=0x4664020 \"MZ\" EDI=0x44bf020 \"MZ\" ESP=0xcfe940 \" px\" *ESP=0x4787020 EBP=0xcfe95c\n0x0041FF16  E878010000               CALL      0x17d                         \nActionDispatcher: skipping instruction.\n0x0041FF1B  8B45FC                   MOV       EAX, [EBP-0x4]                \nBreakpoint 1 hit by instruction at 0x0041FF16 (thread 8812) EAX=0x478d020 EBX=0x44bf110 \"PE\" ECX=0x2400 EDX=0x45e0220 \"pH/K\" ESI=0x4664020 \"MZ\" EDI=0x44bf020 \"MZ\" ESP=0xcfe940 *ESP=0x478d020 EBP=0xcfe95c\n0x0041FF16  E878010000               CALL      0x17d                         \nActionDispatcher: skipping instruction.\n0x0041FF1B  8B45FC                   MOV       EAX, [EBP-0x4]                \nBreakpoint 1 hit by instruction at 0x0041FF16 (thread 8812) EAX=0x4790020 EBX=0x44bf110 \"PE\" ECX=0x200 EDX=0x45e2620 ESI=0x4664020 \"MZ\" EDI=0x44bf020 \"MZ\" ESP=0xcfe940 *ESP=0x4790020 EBP=0xcfe95c\n0x0041FF16  E878010000               CALL      0x17d                         \nActionDispatcher: skipping instruction.\n0x0041FF1B  8B45FC                   MOV       EAX, [EBP-0x4]                \nBreakpoint 1 hit by instruction at 0x0041FF16 (thread 8812) EAX=0x4791020 EBX=0x44bf110 \"PE\" ECX=0x6fe00 EDX=0x45e2820 ESI=0x4664020 \"MZ\" EDI=0x44bf020 \"MZ\" ESP=0xcfe940 \" \u0010y\" *ESP=0x4791020 EBP=0xcfe95c\n0x0041FF16  E878010000               CALL      0x17d                         \nActionDispatcher: skipping instruction.\n0x0041FF1B  8B45FC                   MOV       EAX, [EBP-0x4]                \nBreakpoint 1 hit by instruction at 0x0041FF16 (thread 8812) EAX=0x4801020 EBX=0x44bf110 \"PE\" ECX=0x5200 EDX=0x4652620 ESI=0x4664020 \"MZ\" EDI=0x44bf020 \"MZ\" ESP=0xcfe940 \" \u0010\" *ESP=0x4801020 EBP=0xcfe95c\n0x0041FF16  E878010000               CALL      0x17d                         \nActionDispatcher: skipping instruction.\n0x0041FF1B  8B45FC                   MOV       EAX, [EBP-0x4]                \n\n\n=== 5980.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 18:46:32 2025\nBreakpoint 1 hit by instruction at 0x079D080E (thread 8992) EAX=0x5364f60 EBX=0xcfecc8 ECX=0x5364f60 EDX=0xe31ac0 \"TL\" EDI=0xcfec18 ESP=0xcfebf4 *ESP=0x0 EBP=0xcfec00\n0x079D080E  E85DCEEBFF               CALL      0xffebce62                    \nActionDispatcher: skipping instruction.\n0x079D0813  8B45FC                   MOV       EAX, [EBP-0x4]                \n",
+      "raw_response": "To construct a YARA rule that captures specific patterns of assembly code, we need to focus on identifying sequences of instructions that are indicative of certain behaviors, such as function calls, memory manipulation, or register usage. Below is a well-structured YARA rule that captures three distinct patterns, each with a minimum of 6 bytes and up to 12 bytes in length, while ensuring that offset bytes (like those in `call` instructions) are replaced with wildcards (`??`) as required.\n\n---\n\n### ✅ Final YARA Rule\n\n```yara\nrule AssemblyPatternDetection\n{\n    meta:\n        description = \"Detects specific assembly patterns involving function calls and register manipulation\"\n    \n    strings:\n        // Pattern 0: Add ESP and Push/Call sequence\n        $p0 = { 83 C4 04 83 C4 14 52 FFD0 }  // 8 bytes\n\n        // Pattern 1: Call instruction with offset followed by MOV\n        $p1 = { E8 ?? ?? ?? ?? 8B 45 FC }  // 8 bytes\n\n        // Pattern 2: MOV and Add ESP, then Call\n        $p3 = { 8B 45 FC 83 C4 04 FFD2 }  // 7 bytes\n\n    condition:\n        any of ($p0, $p1, $p3)\n}\n```\n\n---\n\n### 🔍 Explanation of Each Pattern\n\n#### **Pattern 0: `83 C4 04 83 C4 14 52 FFD0`**  \n- **Instruction Sequence:**  \n  - `83 C4 04` → `add esp, 4`  \n  - `83 C4 14` → `add esp, 14`  \n  - `52` → `push edx`  \n  - `FFD0` → `call eax`  \n- **Purpose:** This sequence represents a series of stack adjustments and a call to a register (`eax`), often seen in function prologues or cleanup routines.\n\n#### **Pattern 1: `E8 ?? ?? ?? ?? 8B 45 FC`**  \n- **Instruction Sequence:**  \n  - `E8 ?? ?? ?? ??` → `call` with 4-byte offset (wildcard for address)  \n  - `8B 45 FC` → `mov eax, [ebp-04]`  \n- **Purpose:** This pattern captures a function call to an external address, followed by loading a value from the stack into `eax`, which is a common pattern in function prologues or data access.\n\n#### **Pattern 2: `8B 45 FC 83 C4 04 FFD2`**  \n- **Instruction Sequence:**  \n  - `8B 45 FC` → `mov eax, [ebp-04]`  \n  - `83 C4 04` → `add esp, 4`  \n  - `FFD2` → `call edx`  \n- **Purpose:** This pattern shows a register load, stack adjustment, and a call to a register (`edx`), which could indicate a function call to a local variable or pointer.\n\n---\n\n### 📌 Notes\n\n- **Wildcard Usage (`??`):** Only the offset bytes of the `call` instruction are masked with `??`, as they are not relevant for pattern matching.\n- **Byte Lengths:** All patterns fall within the acceptable range of 6 to 12 bytes.\n- **Flexibility:** The use of wildcards allows for variations in the actual address values, while the concrete parts (like `8B 45 FC`) ensure precise matching of instruction sequences.\n\n---\n\n### 🧠 Conclusion\n\nThis YARA rule is designed to detect patterns that are often associated with function calls, register usage, and stack manipulation in assembly code. It is suitable for use in malware analysis or reverse engineering to identify potential hooks, API calls, or code injection points. You can extend this rule by adding more patterns or refining the conditions based on your analysis needs.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\c56a221640c5c2bd\\iter1_v2.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 8B 55 14 }  // Call to 0041F143h followed by mov edx\n        $pattern1 = { 8B 16 50 51 FF D0 }          // Dynamic call to RtlFreeHeap\n        $pattern2 = { 83 C4 14 52 FF D0 }          // Dynamic call to ExitProcess\n\n    condition:\n        any of them\n}",
+      "pattern_type": "`CALL_TEST_JE` (for dynamic API calls and register manipulation)",
+      "confidence": 75,
+      "opcodes": "",
+      "task_id": "784",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 13,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "new_signature_details": [
+        {
+          "name": "terminates_remote_process",
+          "description": "Terminates another process",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 8148,
+              "cid": 2663
+            },
+            {
+              "process": "c56a221640c5c2bdc86b.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 3136.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 17:34:33 2025\nBreakpoint 0 hit by instruction at 0x0041F1B2 (thread 9092) EAX=0x28 EBX=0x113f854 ECX=0x77271e33 EDX=0x113ed74 ESI=0x113ede8 EDI=0x77670000 \"MZ\" ntdll.dll ESP=0x113ec80 *ESP=0x113ede8 EBP=0x113ec98\nBreak at 0x0041F1B2 in c56a221640c5c2bdc86b.exe (RVA 0x1f1b2, thread 9092, Stack 0x01131000-0x01140000, ImageBase 0x00400000)\n0x0041F1B2  E82CA3FFFF               CALL      0xffffa331                    \nActionDispatcher: skipping instruction.\n0x0041F1B7  8B5514                   MOV       EDX, [EBP+0x14]               \n",
+      "raw_response": "**EVOLUTION STRATEGY**:  \nThe previous attempts likely targeted the `ExitProcess` call directly (`FFD0`), which is a common detection point. However, the analysis suggests that the evasion logic may involve earlier checks, such as dynamic API resolution (`call edx`/`call eax`) or conditional flow control. To improve, I focus on **three distinct patterns** from the trace:  \n1. A call to an external function (`0041F143h`) followed by register manipulation.  \n2. A dynamic call to `RtlFreeHeap` (`FFD0`) with preceding stack adjustments.  \n3. A dynamic call to `ExitProcess` (`FFD0`) preceded by stack and register setup.  \nEach pattern includes wildcards for address/offset bytes to account for variability while retaining core opcode sequences.  \n\n---\n\n**YARA_RULE**:  \n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 8B 55 14 }  // Call to 0041F143h followed by mov edx\n        $pattern1 = { 8B 16 50 51 FFD0 }          // Dynamic call to RtlFreeHeap\n        $pattern2 = { 83 C4 14 52 FFD0 }          // Dynamic call to ExitProcess\n\n    condition:\n        any of them\n}\n```  \n\n---\n\n**PATTERN_TYPE**:  \n`CALL_TEST_JE` (for dynamic API calls and register manipulation)  \n`API_CHECK` (for RtlFreeHeap/ExitProcess resolution)  \n`DEBUG_CHECK` (for stack-based control flow)  \n\n**CONFIDENCE**: 75  \n\n**REASONING**:  \n1. **Pattern0** targets the initial call to `0041F143h` (likely a hook or evasion routine) followed by register manipulation (`mov edx`), which is critical for bypassing checks.  \n2. **Pattern1** focuses on the dynamic call to `RtlFreeHeap` (`FFD0`), a common anti-debugging/anti-analysis technique.  \n3. **Pattern2** captures the final `ExitProcess` call, but with preceding stack adjustments (`add esp`), ensuring it matches the exact flow of the sample.  \nWildcards (`??`) allow flexibility for address/offset variations while preserving opcode sequences, improving detection robustness.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\c56a221640c5c2bd\\iter2_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 8B 55 14 }  // Call to 0041F143h followed by mov edx\n        $pattern1 = { 8B 16 50 51 FF D0 }          // Dynamic call to RtlFreeHeap\n        $pattern2 = { 83 C4 14 52 FF D0 }          // Dynamic call to ExitProcess\n\n    condition:\n        any of them\n}",
+    "pattern_type": "`CALL_TEST_JE` (for dynamic API calls and register manipulation)",
+    "confidence": 75,
+    "opcodes": "",
+    "task_id": "784",
+    "status": "bypass_crashed",
+    "rule_hit": true,
+    "baseline_signatures": 13,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "terminates_remote_process"
+    ],
+    "new_signature_details": [
+      {
+        "name": "terminates_remote_process",
+        "description": "Terminates another process",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 8148,
+            "cid": 2663
+          },
+          {
+            "process": "c56a221640c5c2bdc86b.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": "Rule caused crash: ['exec_crash']",
+    "improvement_suggestions": [],
+    "debugger_log": "=== 3136.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 17:34:33 2025\nBreakpoint 0 hit by instruction at 0x0041F1B2 (thread 9092) EAX=0x28 EBX=0x113f854 ECX=0x77271e33 EDX=0x113ed74 ESI=0x113ede8 EDI=0x77670000 \"MZ\" ntdll.dll ESP=0x113ec80 *ESP=0x113ede8 EBP=0x113ec98\nBreak at 0x0041F1B2 in c56a221640c5c2bdc86b.exe (RVA 0x1f1b2, thread 9092, Stack 0x01131000-0x01140000, ImageBase 0x00400000)\n0x0041F1B2  E82CA3FFFF               CALL      0xffffa331                    \nActionDispatcher: skipping instruction.\n0x0041F1B7  8B5514                   MOV       EDX, [EBP+0x14]               \n",
+    "raw_response": "**EVOLUTION STRATEGY**:  \nThe previous attempts likely targeted the `ExitProcess` call directly (`FFD0`), which is a common detection point. However, the analysis suggests that the evasion logic may involve earlier checks, such as dynamic API resolution (`call edx`/`call eax`) or conditional flow control. To improve, I focus on **three distinct patterns** from the trace:  \n1. A call to an external function (`0041F143h`) followed by register manipulation.  \n2. A dynamic call to `RtlFreeHeap` (`FFD0`) with preceding stack adjustments.  \n3. A dynamic call to `ExitProcess` (`FFD0`) preceded by stack and register setup.  \nEach pattern includes wildcards for address/offset bytes to account for variability while retaining core opcode sequences.  \n\n---\n\n**YARA_RULE**:  \n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 8B 55 14 }  // Call to 0041F143h followed by mov edx\n        $pattern1 = { 8B 16 50 51 FFD0 }          // Dynamic call to RtlFreeHeap\n        $pattern2 = { 83 C4 14 52 FFD0 }          // Dynamic call to ExitProcess\n\n    condition:\n        any of them\n}\n```  \n\n---\n\n**PATTERN_TYPE**:  \n`CALL_TEST_JE` (for dynamic API calls and register manipulation)  \n`API_CHECK` (for RtlFreeHeap/ExitProcess resolution)  \n`DEBUG_CHECK` (for stack-based control flow)  \n\n**CONFIDENCE**: 75  \n\n**REASONING**:  \n1. **Pattern0** targets the initial call to `0041F143h` (likely a hook or evasion routine) followed by register manipulation (`mov edx`), which is critical for bypassing checks.  \n2. **Pattern1** focuses on the dynamic call to `RtlFreeHeap` (`FFD0`), a common anti-debugging/anti-analysis technique.  \n3. **Pattern2** captures the final `ExitProcess` call, but with preceding stack adjustments (`add esp`), ensuring it matches the exact flow of the sample.  \nWildcards (`??`) allow flexibility for address/offset variations while preserving opcode sequences, improving detection robustness.",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\c56a221640c5c2bd\\iter2_v2.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

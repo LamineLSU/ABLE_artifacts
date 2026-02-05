@@ -1,0 +1,232 @@
+{
+  "sha256": "cac51ba553fe90013a100bdd9733d92a4ed2ded72513369b54fa9e7791637c16",
+  "prompt_version": "v0",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v0",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "```plaintext\n{\n  \"pattern0\": \"85 C0 0F 84 ?? ?? ?? ?? 50 FF 15 88 A0 0B 01\",\n  \"pattern1\": \"33 FF 8B C7 EB 03 FF 15 2C A1 0B 01\",\n  \"pattern2\": \"BA 04 01 00 00 03 C1 B9 42 8C 0B 01 50 E8 E3 FA FF FF\"\n}\n```\n\n**Explanation:**  \n1. **Pattern0** captures the sandbox evasion check involving `test eax, eax`, a conditional jump to a sandbox detection routine (`je ??`), and a call to `CloseHandle` (with address replaced by `??`).  \n2. **Pattern1** targets the direct call to `ExitProcess` (`FF 15 2C A1 0B 01`) preceded by register manipulation (`xor edi, edi`, `mov eax, edi`) and a jump.  \n3. **Pattern2** identifies a sequence of arithmetic operations and a call to an internal routine (`E8 E3 FA FF FF`), likely part of sandbox detection logic.  \n\nEach pattern uses `??` to mask memory addresses, ensuring flexibility for different sandbox detection implementations.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 6A 5B 5A 8B CE E8 ?? ?? ?? ?? }\n        $pattern1 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern2 = { E8 ?? ?? ?? ?? 50 8B 45 ?? 01 45 ?? E9 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "919",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 37,
+      "new_signatures": 3,
+      "new_signature_names": [
+        "enumerates_physical_drives",
+        "antisandbox_unhook",
+        "physical_drive_access"
+      ],
+      "new_signature_details": [
+        {
+          "name": "antisandbox_unhook",
+          "description": "Tries to unhook or modify Windows functions monitored by CAPE",
+          "categories": [
+            "anti-sandbox"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 60,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 4304,
+              "cid": 403
+            },
+            {
+              "type": "call",
+              "pid": 8912,
+              "cid": 362
+            },
+            {
+              "unhook": "function_name: VarBstrCat, type: removal"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "enumerates_physical_drives",
+          "description": "Enumerates physical drives",
+          "categories": [
+            "bootkit",
+            "rootkit",
+            "wiper"
+          ],
+          "severity": 3,
+          "weight": 4,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "physical drive access": "\\??\\PHYSICALDRIVE0"
+            },
+            {
+              "physical drive access": "\\??\\PhysicalDrive0"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "physical_drive_access",
+          "description": "Attempted to write directly to a physical drive",
+          "categories": [
+            "bootkit",
+            "rootkit",
+            "wiper"
+          ],
+          "severity": 3,
+          "weight": 4,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "physical drive write attempt": "\\??\\PHYSICALDRIVE0"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": "=== 3000.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 21:09:52 2025\nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x3bfa84 EDX=0x1 ESI=0x93283a L\"/Create\" EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\nBreak at 0x00A4DADC in schtasks.exe (RVA 0x1dadc, thread 3268, Stack 0x003B2000-0x003C0000, ImageBase 0x00A30000)\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733c20 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733ae0 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733c00 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733be0 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733a20 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733b20 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733b40 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733c40 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733ca0 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x1f ECX=0x3bfa20 EDX=0x1 ESI=0x93283a L\"/Create\" EDI=0x3bcbb8 \"PARSER2\" ESP=0x3bcb08 *ESP=0x3bfa24 EBP=0x3bcb50\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x93284a L\"/SC\" EDI=0x3bcbb8 \"PARSER2\" ESP=0x3bcb08 *ESP=0x3bfa24 EBP=0x3bcb50\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x932860 L\"/MO\" EDI=0x3bcbb8 \"PARSER2\" ESP=0x3bcb08 *ESP=0x3bfa24 EBP=0x3bcb50\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x93286c L\"/TN\" EDI=0x3bcbb8 \"PARSER2\" ESP=0x3bcb08 *ESP=0x3bfa24 EBP=0x3bcb50\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x93288a L\"/TR\" EDI=0x3bcbb8 \"PARSER2\" ESP=0x3bcb08 *ESP=0x3bfa24 EBP=0x3bcb50\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x1f ECX=0x3bfa3c EDX=0x2 ESI=0x932902 L\"/F\" EDI=0x3bcbb8 \"PARSER2\" ESP=0x3bcb08 *ESP=0x3bfa24 EBP=0x3bcb50\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \n\n\n=== 7100.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 21:09:03 2025\nBreakpoint 1 hit by instruction at 0x043171C8 (thread 8252) EAX=0x1 EBX=0x4345300 ECX=0x19ddb8 EDX=0x3c3450c ESI=0x19ddd8 EDI=0x19ddb8 ESP=0x19dd58 *ESP=0x0 EBP=0x19de08\n0x043171C8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x043171CA  0F8409020000             JZ        0x20f                         \nBreakpoint 1 hit by instruction at 0x043171C8 (thread 8252) EAX=0x1 EBX=0x43455d4 ECX=0x19ddb8 EDX=0x3f767d8 ESI=0x19ddd8 EDI=0x19ddb8 ESP=0x19dd58 *ESP=0x0 EBP=0x19de08\n0x043171C8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x043171CA  0F8409020000             JZ        0x20f                         \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 6A 5B 5A 8B CE E8 ?? ?? ?? ?? }\n        $pattern1 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern2 = { E8 ?? ?? ?? ?? 50 8B 45 ?? 01 45 ?? E9 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\cac51ba553fe9001\\iter1_v0.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v0",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 6A 5B 5A 8B CE E8 ?? ?? ?? ?? }\n        $pattern1 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern2 = { E8 ?? ?? ?? ?? 50 8B 45 ?? 01 45 ?? E9 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "919",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 37,
+    "new_signatures": 3,
+    "new_signature_names": [
+      "enumerates_physical_drives",
+      "antisandbox_unhook",
+      "physical_drive_access"
+    ],
+    "new_signature_details": [
+      {
+        "name": "antisandbox_unhook",
+        "description": "Tries to unhook or modify Windows functions monitored by CAPE",
+        "categories": [
+          "anti-sandbox"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 60,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 4304,
+            "cid": 403
+          },
+          {
+            "type": "call",
+            "pid": 8912,
+            "cid": 362
+          },
+          {
+            "unhook": "function_name: VarBstrCat, type: removal"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "enumerates_physical_drives",
+        "description": "Enumerates physical drives",
+        "categories": [
+          "bootkit",
+          "rootkit",
+          "wiper"
+        ],
+        "severity": 3,
+        "weight": 4,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "physical drive access": "\\??\\PHYSICALDRIVE0"
+          },
+          {
+            "physical drive access": "\\??\\PhysicalDrive0"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "physical_drive_access",
+        "description": "Attempted to write directly to a physical drive",
+        "categories": [
+          "bootkit",
+          "rootkit",
+          "wiper"
+        ],
+        "severity": 3,
+        "weight": 4,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "physical drive write attempt": "\\??\\PHYSICALDRIVE0"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": "=== 3000.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 21:09:52 2025\nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x3bfa84 EDX=0x1 ESI=0x93283a L\"/Create\" EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\nBreak at 0x00A4DADC in schtasks.exe (RVA 0x1dadc, thread 3268, Stack 0x003B2000-0x003C0000, ImageBase 0x00A30000)\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733c20 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733ae0 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733c00 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733be0 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733a20 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733b20 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733b40 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733c40 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x9 ECX=0x733ca0 EDX=0x1 EDI=0x3bf718 \"PARSER2\" ESP=0x3bf698 *ESP=0x3bfa98 EBP=0x3bf6e0\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x1f ECX=0x3bfa20 EDX=0x1 ESI=0x93283a L\"/Create\" EDI=0x3bcbb8 \"PARSER2\" ESP=0x3bcb08 *ESP=0x3bfa24 EBP=0x3bcb50\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x93284a L\"/SC\" EDI=0x3bcbb8 \"PARSER2\" ESP=0x3bcb08 *ESP=0x3bfa24 EBP=0x3bcb50\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x932860 L\"/MO\" EDI=0x3bcbb8 \"PARSER2\" ESP=0x3bcb08 *ESP=0x3bfa24 EBP=0x3bcb50\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x93286c L\"/TN\" EDI=0x3bcbb8 \"PARSER2\" ESP=0x3bcb08 *ESP=0x3bfa24 EBP=0x3bcb50\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x93288a L\"/TR\" EDI=0x3bcbb8 \"PARSER2\" ESP=0x3bcb08 *ESP=0x3bfa24 EBP=0x3bcb50\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \nBreakpoint 1 hit by instruction at 0x00A4DADC (thread 3268) EAX=0x1 EBX=0x1f ECX=0x3bfa3c EDX=0x2 ESI=0x932902 L\"/F\" EDI=0x3bcbb8 \"PARSER2\" ESP=0x3bcb08 *ESP=0x3bfa24 EBP=0x3bcb50\n0x00A4DADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00A4DADE  0F847F010000             JZ        0x185                         \n\n\n=== 7100.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 21:09:03 2025\nBreakpoint 1 hit by instruction at 0x043171C8 (thread 8252) EAX=0x1 EBX=0x4345300 ECX=0x19ddb8 EDX=0x3c3450c ESI=0x19ddd8 EDI=0x19ddb8 ESP=0x19dd58 *ESP=0x0 EBP=0x19de08\n0x043171C8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x043171CA  0F8409020000             JZ        0x20f                         \nBreakpoint 1 hit by instruction at 0x043171C8 (thread 8252) EAX=0x1 EBX=0x43455d4 ECX=0x19ddb8 EDX=0x3f767d8 ESI=0x19ddd8 EDI=0x19ddb8 ESP=0x19dd58 *ESP=0x0 EBP=0x19de08\n0x043171C8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x043171CA  0F8409020000             JZ        0x20f                         \n",
+    "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 6A 5B 5A 8B CE E8 ?? ?? ?? ?? }\n        $pattern1 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern2 = { E8 ?? ?? ?? ?? 50 8B 45 ?? 01 45 ?? E9 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\cac51ba553fe9001\\iter1_v0.yar"
+  },
+  "best_score": 3,
+  "optimization_history": [
+    "Iteration 2: SUCCESS - 3 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

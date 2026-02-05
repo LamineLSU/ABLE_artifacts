@@ -1,0 +1,128 @@
+{
+  "sha256": "3b125dc1fd36bdf734ac83445795ec66bf7e826d86c536c6f0a54e435896ecfd",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To identify the code responsible for the exit (i.e., the call to `ExitProcess`), we focus on the final call in the trace:\n\n```\n004067E4  FF15 28A24100  call dword ptr [0041A228h]\n```\n\nThis is a direct call to the `ExitProcess` function, which terminates the process. The preceding instruction is:\n\n```\n004067E3  56              push esi\n```\n\nThese two instructions form a sequence that leads to the process termination. The `push esi` may be part of passing parameters or preparing for the call, and the `call` is the actual exit point.\n\n---\n\n### ✅ **Pattern 1: Direct Exit Call**\n\n**Hex Pattern:**\n```\n56 FF 15 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `56` is the `push esi` instruction.\n- `FF 15 ?? ?? ?? ??` is the `call` instruction, where the last four bytes are the address of the `ExitProcess` function (which will be replaced with `??` in the pattern as it's variable across builds).\n\nThis pattern identifies the exact sequence of instructions that lead to the process exit.\n\n---\n\n### ✅ **Pattern 2: Extended Exit Flow (Including Previous Call)**\n\nIf you want to capture the full flow that leads to the exit, you can include the call to `0040684Dh` and the `mov esi, eax` instruction:\n\n**Hex Pattern:**\n```\nE8 ?? ?? ?? ?? 8B F0 56 FF 15 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `E8 ?? ?? ?? ??` is the `call` instruction to an unknown address (possibly a function that checks for sandboxing).\n- `8B F0` is the `mov esi, eax` instruction.\n- `56` is the `push esi`.\n- `FF 15 ?? ?? ?? ??` is the `call` to `ExitProcess`.\n\nThis pattern captures the full sequence of instructions that could be part of a sandbox detection flow, followed by the actual exit.\n\n---\n\n### 📌 Summary\n\n- **Main Exit Point:** The `call` to `ExitProcess` at `004067E4` is the direct exit point.\n- **Pattern 1:** `56 FF 15 ?? ?? ?? ??` (6 bytes) — captures the immediate exit.\n- **Pattern 2:** `E8 ?? ?? ?? ?? 8B F0 56 FF 15 ?? ?? ?? ??` (12 bytes) — captures the broader flow leading to exit.\n\nThese patterns are useful for detecting sandbox evasion or exit behavior in malware analysis.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 15 C0 A0 41 00 E8 47 00 00 00 }  // GetStartupInfoA + conditional check\n        $pattern1 = { FF 15 44 A2 41 00 51 51 E8 5A 29 01 00 }  // GetModuleHandleA + hook detection\n        $pattern2 = { E8 6A 00 00 00 FF 15 28 A2 41 00 }  // Conditional exit decision before ExitProcess\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE | API_CHECK | EXIT_CONDITION",
+      "confidence": 75,
+      "opcodes": "",
+      "task_id": "982",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 25,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "stealth_timeout"
+      ],
+      "new_signature_details": [
+        {
+          "name": "stealth_timeout",
+          "description": "Possible date expiration check, exits too soon after checking local time",
+          "categories": [
+            "stealth"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 40,
+          "references": [],
+          "data": [
+            {
+              "process": "dllhost.exe, PID 5548"
+            },
+            {
+              "type": "call",
+              "pid": 5548,
+              "cid": 733
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": "=== 2624.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 09:13:24 2025\nBreakpoint 0 hit by instruction at 0x004067B3 (thread 2688) EAX=0xbdf930 EBX=0xd60000 ECX=0x40679e EDX=0x40679e ESI=0x40679e EDI=0x40679e ESP=0xbdf928 *ESP=0xbdf930 EBP=0xbdf978\nBreak at 0x004067B3 in 3b125dc1fd36bdf734ac.exe (RVA 0x67b3, thread 2688, Stack 0x00BD2000-0x00BE0000, ImageBase 0x00400000)\n0x004067B3  FF15C0A04100             CALL      DWORD [0x41a0c0]              \nActionDispatcher: skipping instruction.\n0x004067B9  E847000000               CALL      0x00406805                    \nBreakpoint 1 hit by instruction at 0x004067CF (thread 2688) EAX=0xfb5270 EBX=0xd60000 ECX=0xe EDX=0xc ESI=0x40679e EDI=0x40679e ESP=0xbdf924 *ESP=0x0 EBP=0xbdf978\n0x004067CF  FF1544A24100             CALL      DWORD [0x41a244]              \nActionDispatcher: skipping instruction.\n0x004067D5  51                       PUSH      ECX                           \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to insufficient specificity in patterns. By analyzing the original trace, I identified three distinct code sequences that align with evasion checks (Strategy A) and exit decision logic (Strategy B). These patterns target critical points in the execution flow, ensuring specificity while avoiding false positives.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | EXIT_CONDITION\n\n**CONFIDENCE**: 75\n\n**REASONING**:  \n1. **Pattern 0** captures the call to `GetStartupInfoA` followed by a conditional jump (indirectly via `call 00406805h`), which likely checks for debugger presence or environment flags.  \n2. **Pattern 1** targets the `GetModuleHandleA` call with hardcoded module name (`00420000h`), a common technique for API hooking detection.  \n3. **Pattern 2** focuses on the conditional exit logic before `ExitProcess`, where the decision to terminate is made. These patterns are concrete and derived directly from the trace, avoiding wildcards except for address offsets.  \n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 15 C0 A0 41 00 E8 47 00 00 00 }  // GetStartupInfoA + conditional check\n        $pattern1 = { FF 15 44 A2 41 00 51 51 E8 5A 29 01 00 }  // GetModuleHandleA + hook detection\n        $pattern2 = { E8 6A 00 00 00 FF 15 28 A2 41 00 }  // Conditional exit decision before ExitProcess\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\3b125dc1fd36bdf7\\iter1_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 15 C0 A0 41 00 E8 47 00 00 00 }  // GetStartupInfoA + conditional check\n        $pattern1 = { FF 15 44 A2 41 00 51 51 E8 5A 29 01 00 }  // GetModuleHandleA + hook detection\n        $pattern2 = { E8 6A 00 00 00 FF 15 28 A2 41 00 }  // Conditional exit decision before ExitProcess\n\n    condition:\n        any of them\n}",
+    "pattern_type": "CALL_TEST_JE | API_CHECK | EXIT_CONDITION",
+    "confidence": 75,
+    "opcodes": "",
+    "task_id": "982",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 25,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "stealth_timeout"
+    ],
+    "new_signature_details": [
+      {
+        "name": "stealth_timeout",
+        "description": "Possible date expiration check, exits too soon after checking local time",
+        "categories": [
+          "stealth"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 40,
+        "references": [],
+        "data": [
+          {
+            "process": "dllhost.exe, PID 5548"
+          },
+          {
+            "type": "call",
+            "pid": 5548,
+            "cid": 733
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": "=== 2624.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 09:13:24 2025\nBreakpoint 0 hit by instruction at 0x004067B3 (thread 2688) EAX=0xbdf930 EBX=0xd60000 ECX=0x40679e EDX=0x40679e ESI=0x40679e EDI=0x40679e ESP=0xbdf928 *ESP=0xbdf930 EBP=0xbdf978\nBreak at 0x004067B3 in 3b125dc1fd36bdf734ac.exe (RVA 0x67b3, thread 2688, Stack 0x00BD2000-0x00BE0000, ImageBase 0x00400000)\n0x004067B3  FF15C0A04100             CALL      DWORD [0x41a0c0]              \nActionDispatcher: skipping instruction.\n0x004067B9  E847000000               CALL      0x00406805                    \nBreakpoint 1 hit by instruction at 0x004067CF (thread 2688) EAX=0xfb5270 EBX=0xd60000 ECX=0xe EDX=0xc ESI=0x40679e EDI=0x40679e ESP=0xbdf924 *ESP=0x0 EBP=0xbdf978\n0x004067CF  FF1544A24100             CALL      DWORD [0x41a244]              \nActionDispatcher: skipping instruction.\n0x004067D5  51                       PUSH      ECX                           \n",
+    "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to insufficient specificity in patterns. By analyzing the original trace, I identified three distinct code sequences that align with evasion checks (Strategy A) and exit decision logic (Strategy B). These patterns target critical points in the execution flow, ensuring specificity while avoiding false positives.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | EXIT_CONDITION\n\n**CONFIDENCE**: 75\n\n**REASONING**:  \n1. **Pattern 0** captures the call to `GetStartupInfoA` followed by a conditional jump (indirectly via `call 00406805h`), which likely checks for debugger presence or environment flags.  \n2. **Pattern 1** targets the `GetModuleHandleA` call with hardcoded module name (`00420000h`), a common technique for API hooking detection.  \n3. **Pattern 2** focuses on the conditional exit logic before `ExitProcess`, where the decision to terminate is made. These patterns are concrete and derived directly from the trace, avoiding wildcards except for address offsets.  \n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 15 C0 A0 41 00 E8 47 00 00 00 }  // GetStartupInfoA + conditional check\n        $pattern1 = { FF 15 44 A2 41 00 51 51 E8 5A 29 01 00 }  // GetModuleHandleA + hook detection\n        $pattern2 = { E8 6A 00 00 00 FF 15 28 A2 41 00 }  // Conditional exit decision before ExitProcess\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\3b125dc1fd36bdf7\\iter1_v2.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 2: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

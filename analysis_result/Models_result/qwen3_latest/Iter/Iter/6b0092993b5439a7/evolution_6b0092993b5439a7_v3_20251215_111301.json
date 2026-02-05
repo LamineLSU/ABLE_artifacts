@@ -1,0 +1,79 @@
+{
+  "sha256": "6b0092993b5439a7682d6792454cb23f5ceb414728ac8caf1ee9ffe44e786e93",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 6A 5B }  // Test EAX + JNE + PUSH\n        $pattern1 = { 85 C0 74 ?? 8B CE }  // Test EAX + JNE + MOV\n        $pattern2 = { E8 ?? ?? ?? ?? 85 C0 74 ?? }  // CALL + Test EAX + JNE\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1689",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Adjust the pattern to target specific, safe instructions in the original trace and refine the skip offset to avoid invalid jumps."
+      ],
+      "debugger_log": "=== 6148.log ===\nCAPE Sandbox - Debugger log: Mon Dec 15 23:42:16 2025\nBreakpoint 2 hit by instruction at 0x00CA6FD0 (thread 3928) EAX=0xca0000 \"MZ\" 6b0092993b5439a7682d.exe ECX=0xe0 EDX=0x10b ESI=0xca10bc 6b0092993b5439a7682d.exe EDI=0xca69b0 6b0092993b5439a7682d.exe ESP=0x2fff6f0 *ESP=0xca0000 \"MZ\" 6b0092993b5439a7682d.exe EBP=0x2fff6f4\nBreak at 0x00CA6FD0 in 6b0092993b5439a7682d.exe (RVA 0x6fd0, thread 3928, Stack 0x02FF2000-0x03000000, ImageBase 0x00CA0000)\n0x00CA6FD0  E87FFFFFFF               CALL      0xffffff84                    \nActionDispatcher: skipping instruction.\n0x00CA6FD5  85C0                     TEST      EAX, EAX                      \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 6A 5B }  // Test EAX + JNE + PUSH\n        $pattern1 = { 85 C0 74 ?? 8B CE }  // Test EAX + JNE + MOV\n        $pattern2 = { E8 ?? ?? ?? ?? 85 C0 74 ?? }  // CALL + Test EAX + JNE\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\6b0092993b5439a7\\iter0_v3.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 8B 45 FC }  // test eax, eax + je + mov (early check)\n        $pattern1 = { E8 ?? ?? ?? ?? 8B 45 FC }  // call to check function + mov (indirect logic)\n        $pattern2 = { 85 C0 0F 84 33 FD FF FF }  // test eax, eax + je with offset (later check)\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "1690",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 7824.log ===\nCAPE Sandbox - Debugger log: Mon Dec 15 23:45:15 2025\nBreakpoint 1 hit by instruction at 0x0407FD87 (thread 7652) EAX=0x4212444 EBX=0x6fe548 ECX=0x421247c EDX=0x9 EDI=0x6fe498 ESP=0x6fe478 \"`$!\" *ESP=0x4212460 EBP=0x6fe480\n0x0407FD87  E8F4A1B266               CALL      0x66b2a1f9                    \nActionDispatcher: skipping instruction.\n0x0407FD8C  8B45FC                   MOV       EAX, [EBP-0x4]                \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule likely targeted the ExitProcess call directly, causing a crash. To avoid this, I focused on evasion checks before termination. I selected three distinct patterns from the trace: (1) a test+je+mov sequence (early check), (2) a call to a check function (indirect logic), and (3) a later test+je with offset (another validation). These patterns target the check logic, not the termination point, reducing crash risk while maintaining specificity.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 95\n\n**REASONING**: These patterns are derived directly from the trace and target critical check logic before termination. By avoiding the ExitProcess call and focusing on conditional checks, they reduce the likelihood of incorrect matches. Specific byte sequences ensure precision, while wildcards handle variable offsets. This approach aligns with Strategy A (evasion checks) and avoids the crash-prone ExitProcess target.\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 8B 45 FC }  // test eax, eax + je + mov (early check)\n        $pattern1 = { E8 ?? ?? ?? ?? 8B 45 FC }  // call to check function + mov (indirect logic)\n        $pattern2 = { 85 C0 0F 84 33 FD FF FF }  // test eax, eax + je with offset (later check)\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\6b0092993b5439a7\\iter1_v3.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v3",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To meet the requirement of forming valid instruction patterns with **offset bytes replaced by `??`**, and ensuring that the patterns are of sufficient length (at least 6 bytes), we derive the following three patterns from the provided instruction sequence. These patterns are constructed by combining multiple consecutive instructions, with **offset bytes (e.g., displacement values)** replaced by `??`, and **opcode bytes kept as-is**.\n\n---\n\n### ✅ **Pattern 0 (6 bytes)**  \n**Instruction Sequence**:  \n- `85 C0` (test eax, eax)  \n- `74 ??` (je with offset)  \n- `6A 5B` (push 0x5B)  \n\n**Constructed Pattern**:  \n```\n85 C0 74 ?? 6A 5B\n```\n\n---\n\n### ✅ **Pattern 1 (9 bytes)**  \n**Instruction Sequence**:  \n- `E8 ?? ?? ?? ??` (call with offset)  \n- `83 C4 04` (add esp, 4)  \n- `85 C0` (test eax, eax)  \n\n**Constructed Pattern**:  \n```\nE8 ?? ?? ?? ?? 83 C4 04 85 C0\n```\n\n---\n\n### ✅ **Pattern 2 (10 bytes)**  \n**Instruction Sequence**:  \n- `E8 ?? ?? ?? ??` (call with offset)  \n- `8B 45 ??` (mov eax, [ebp + offset])  \n- `83 C4 04` (add esp, 4)  \n\n**Constructed Pattern**:  \n```\nE8 ?? ?? ?? ?? 8B 45 ?? 83 C4 04\n```\n\n---\n\n### 📌 Summary of Patterns\n\n| Pattern | Bytes | Description |\n|--------|-------|-------------|\n| 0      | 6     | Combines test, je, and push |\n| 1      | 9     | Combines call, add, and test |\n| 2      | 10    | Combines call, mov, and add |\n\nThese patterns are suitable for use in static analysis or disassembly contexts where offset-based addressing is not of interest, and only the opcode and instruction structure are relevant.",
+      "yara_file": null
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 2: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

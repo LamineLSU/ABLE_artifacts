@@ -1,0 +1,159 @@
+{
+  "sha256": "5a7eee6544891c81cbeb11840147702208d7af4b076aa850e1d0adcfdbcfd338",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC FF 75 08 E8 C1 FF FF FF 59 FF 75 08 }\n        $pattern1 = { FF 75 08 FF 15 5C C2 4C 00 }\n        $pattern2 = { 59 FF 75 08 FF 15 5C C2 4C 00 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1483",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 27,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Adjust the skip offset to avoid jumping to invalid memory addresses.  It's possible the offset is too large or too small, depending on the specific code being bypassed. A more robust approach would be to analyze the disassembled code around the target instruction and calculate a skip offset that avoids jumping into other functions or data."
+      ],
+      "debugger_log": "=== 1748.log ===\nCAPE Sandbox - Debugger log: Tue Dec 23 10:09:43 2025\nBreakpoint 0 hit by instruction at 0x00427B0B (thread 1724) EBX=0x7557f8 ECX=0x8 EDX=0x730000 \"71\" ESI=0x776d4d90 RtlDecodePointer  EDI=0x7557f4 \"o\n\" ESP=0x19fed8 *ESP=0x427f28 EBP=0x19ff1c\nBreak at 0x00427B0B in 5a7eee6544891c81cbeb.exe (RVA 0x27b0b, thread 1724, Stack 0x00192000-0x001A0000, ImageBase 0x00400000)\n0x00427B0B  55                       PUSH      EBP                           \nActionDispatcher: skipping instruction.\n0x00427B0C  8BEC                     MOV       EBP, ESP                      \nBreakpoint 2 hit by instruction at 0x00427B16 (thread 1724) EBX=0x7557f8 ECX=0xe23802a3 ESI=0x776d4d90 RtlDecodePointer  EDI=0x7557f4 \"o\n\" ESP=0x19fed4 \"04e\" *ESP=0xe8653430 EBP=0x19fed8\n0x00427B16  59                       POP       ECX                           \nActionDispatcher: skipping instruction.\n0x00427B17  FF7508                   PUSH      DWORD [EBP+0x8]               \n\n\n=== 7952.log ===\nCAPE Sandbox - Debugger log: Tue Dec 23 09:37:21 2025\nBreakpoint 0 hit by instruction at 0x00427B0B (thread 7940) EBX=0x6804c8 ECX=0x8 EDX=0x680000 ESI=0x776d4d90 RtlDecodePointer  EDI=0x6804c4 ESP=0x19fed8 *ESP=0x427f28 EBP=0x19ff1c\nBreak at 0x00427B0B in 5a7eee6544891c81cbeb.exe (RVA 0x27b0b, thread 7940, Stack 0x00192000-0x001A0000, ImageBase 0x00400000)\n0x00427B0B  55                       PUSH      EBP                           \nActionDispatcher: skipping instruction.\n0x00427B0C  8BEC                     MOV       EBP, ESP                      \nBreakpoint 2 hit by instruction at 0x00427B16 (thread 7940) EBX=0x6804c8 ECX=0xbde2a077 ESI=0x776d4d90 RtlDecodePointer  EDI=0x6804c4 ESP=0x19fed4 *ESP=0x23b39889 EBP=0x19fed8\n0x00427B16  59                       POP       ECX                           \nActionDispatcher: skipping instruction.\n0x00427B17  FF7508                   PUSH      DWORD [EBP+0x8]               \n",
+      "raw_response": "Okay, let's analyze the trace and craft some bypass patterns.\n\n**Phase 1: Attacker's Perspective**\n\nThe malware likely aims to detect sandboxes or VMs. The presence of `ExitProcess` being called early suggests a check that fails in the sandbox environment. The checks likely involve looking for virtualization artifacts or debugging environments.\n\n*   `00427B11  E8C1FFFFFF       call 00427AD7h`: This is a call to a subroutine. It's highly probable that the evasion check is located within this subroutine. The `E8` indicates a near call, so the offset `C1FFFFFF` is crucial.\n*   `00427B1A  FF155CC24C00     call dword ptr [004CC25Ch]`: This is an indirect call. The address of the function being called is stored in memory at `004CC25Ch`. This is another strong candidate for an evasion check, as the malware might be resolving the function dynamically based on the environment.\n\n**Phase 2: Defender's Perspective**\n\nThe key is to manipulate these instructions to prevent the malware from detecting the sandbox.\n\n*   **Skipping the subroutine call (00427B11):** If we skip the call to `00427AD7h`, the malware might not perform the evasion check and continue execution.\n*   **Skipping the indirect call (00427B1A):** If we skip the indirect call, the malware might not be able to resolve the evasion check and continue execution.\n*   **Modifying the offset in the indirect call (00427B1A):**  Changing the memory address at `004CC25Ch` could point to a benign address, bypassing the evasion check.  This is harder to do without more context.\n\n**Phase 3: Adversarial Game Analysis**\n\nSkipping the calls seems like the easiest and most reliable bypasses. Modifying memory is more complex and might be detected as tampering.\n\n**Phase 4: Bypass Points Selection**\n\n1.  Skip `call 00427AD7h` (00427B11)\n2.  Skip `call dword ptr [004CC25Ch]` (00427B1A)\n3.  Skip the push and call sequence (00427B17 - 00427B1A)\n\n**Phase 5: Pattern Generation**\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8BEC FF7508 E8C1FFFFFF 59 FF7508 }\n        $pattern1 = { FF7508 FF155CC24C00 }\n        $pattern2 = { 59 FF7508 FF155CC24C00 }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation of Patterns:**\n\n*   **$pattern0:**  Combines `push ebp`, `mov ebp, esp`, `push dword ptr [ebp+08h]`, `call 00427AD7h`, `pop ecx`, `push dword ptr [ebp+08h]` from the first trace.  This represents skipping the first call.\n*   **$pattern1:**  Combines `push dword ptr [ebp+08h]` and `call dword ptr [004CC25Ch]` from the second trace. This represents skipping the indirect call.\n*   **$pattern2:**  Combines `pop ecx`, `push dword ptr [ebp+08h]` and `call dword ptr [004CC25Ch]` from the second trace. This represents skipping the pop and call sequence.\n\nThese patterns are within the 6-20 byte length requirement and use wildcards where appropriate. They are also distinct sequences.  The `cape_options` correctly references the patterns.\n",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\5a7eee6544891c81\\iter0_v3.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC FF 75 08 E8 C1 FF FF FF 59 FF 75 08 }\n        $pattern1 = { 55 8B EC FF 75 08 E8 C1 FF FF FF 59 FF 75 08 FF 15 5C C2 4C 00 }\n        $pattern2 = { 6A 10 5A 8B CE E8 00 00 00 00 85 C0 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1484",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 27,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Instead of a fixed skip offset, consider using a more generic pattern that accounts for slight variations in the surrounding code.  The skip offset should be removed entirely, and the pattern should be adjusted to include the instruction"
+      ],
+      "debugger_log": "=== 8012.log ===\nCAPE Sandbox - Debugger log: Tue Dec 23 06:21:49 2025\nBreakpoint 0 hit by instruction at 0x00427B0B (thread 3768) EBX=0x794eb8 \"pX\" ECX=0x8 EDX=0x790000 ESI=0x776d4d90 RtlDecodePointer  EDI=0x794eb4 ESP=0x19fed8 *ESP=0x427f28 EBP=0x19ff1c\nBreak at 0x00427B0B in 5a7eee6544891c81cbeb.exe (RVA 0x27b0b, thread 3768, Stack 0x00192000-0x001A0000, ImageBase 0x00400000)\n0x00427B0B  55                       PUSH      EBP                           \nActionDispatcher: skipping instruction.\n0x00427B0C  8BEC                     MOV       EBP, ESP                      \n\n\n=== 8632.log ===\nCAPE Sandbox - Debugger log: Tue Dec 23 06:01:58 2025\nBreakpoint 0 hit by instruction at 0x00427B0B (thread 8236) EBX=0x7d04c8 \"7U\" ECX=0x8 EDX=0x7d0000 ESI=0x776d4d90 RtlDecodePointer  EDI=0x7d04c4 ESP=0x19fed8 *ESP=0x427f28 EBP=0x19ff1c\nBreak at 0x00427B0B in 5a7eee6544891c81cbeb.exe (RVA 0x27b0b, thread 8236, Stack 0x00192000-0x001A0000, ImageBase 0x00400000)\n0x00427B0B  55                       PUSH      EBP                           \nActionDispatcher: skipping instruction.\n0x00427B0C  8BEC                     MOV       EBP, ESP                      \n",
+      "raw_response": "```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8BEC FF7508 E8C1FFFFFF 59 FF7508 }\n        $pattern1 = { 55 8BEC FF7508 E8C1FFFFFF 59 FF7508 FF155CC24C00 }\n        $pattern2 = { 6A 10 5A 8B CE E8 00 00 00 00 85 C0 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\5a7eee6544891c81\\iter1_v3.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC FF 75 08 E8 C1 FF FF FF 59 FF 75 08 }\n        $pattern1 = { FF 15 5C C2 4C 00 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 55 8B EC FF 75 08 8B 45 ?? 8B CE E8 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1485",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 27,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "new_signature_details": [
+        {
+          "name": "terminates_remote_process",
+          "description": "Terminates another process",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 1056,
+              "cid": 24
+            },
+            {
+              "process": "svchost.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": "=== 5080.log ===\nCAPE Sandbox - Debugger log: Tue Dec 23 09:49:14 2025\nBreakpoint 0 hit by instruction at 0x00427B0B (thread 9048) EBX=0x7e4dc8 \"`\u001b)n`\u001b)n`\u001b)n`\u001b)n`\u001b)n`\u001b)n`\u001b)n`\u001b)n`\u001b)n\" ECX=0x8 EDX=0x7c0000 ESI=0x776d4d90 RtlDecodePointer  EDI=0x7e4dc4 ESP=0x19fed8 *ESP=0x427f28 EBP=0x19ff1c\nBreak at 0x00427B0B in 5a7eee6544891c81cbeb.exe (RVA 0x27b0b, thread 9048, Stack 0x00192000-0x001A0000, ImageBase 0x00400000)\n0x00427B0B  55                       PUSH      EBP                           \nActionDispatcher: skipping instruction.\n0x00427B0C  8BEC                     MOV       EBP, ESP                      \n\n\n=== 7652.log ===\nCAPE Sandbox - Debugger log: Tue Dec 23 09:29:22 2025\nBreakpoint 0 hit by instruction at 0x00427B0B (thread 7616) EBX=0x6e4c48 ECX=0x8 EDX=0x6e0000 ESI=0x776d4d90 RtlDecodePointer  EDI=0x6e4c44 ESP=0x19fed8 *ESP=0x427f28 EBP=0x19ff1c\nBreak at 0x00427B0B in 5a7eee6544891c81cbeb.exe (RVA 0x27b0b, thread 7616, Stack 0x00192000-0x001A0000, ImageBase 0x00400000)\n0x00427B0B  55                       PUSH      EBP                           \nActionDispatcher: skipping instruction.\n0x00427B0C  8BEC                     MOV       EBP, ESP                      \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8BEC FF7508 E8C1FFFFFF 59 FF7508 }\n        $pattern1 = { FF155CC24C00 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 55 8BEC FF7508 8B 45 ?? 8B CE E8 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\5a7eee6544891c81\\iter2_v3.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v3",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC FF 75 08 E8 C1 FF FF FF 59 FF 75 08 }\n        $pattern1 = { FF 15 5C C2 4C 00 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 55 8B EC FF 75 08 8B 45 ?? 8B CE E8 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1485",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 27,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "terminates_remote_process"
+    ],
+    "new_signature_details": [
+      {
+        "name": "terminates_remote_process",
+        "description": "Terminates another process",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 1056,
+            "cid": 24
+          },
+          {
+            "process": "svchost.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": "=== 5080.log ===\nCAPE Sandbox - Debugger log: Tue Dec 23 09:49:14 2025\nBreakpoint 0 hit by instruction at 0x00427B0B (thread 9048) EBX=0x7e4dc8 \"`\u001b)n`\u001b)n`\u001b)n`\u001b)n`\u001b)n`\u001b)n`\u001b)n`\u001b)n`\u001b)n\" ECX=0x8 EDX=0x7c0000 ESI=0x776d4d90 RtlDecodePointer  EDI=0x7e4dc4 ESP=0x19fed8 *ESP=0x427f28 EBP=0x19ff1c\nBreak at 0x00427B0B in 5a7eee6544891c81cbeb.exe (RVA 0x27b0b, thread 9048, Stack 0x00192000-0x001A0000, ImageBase 0x00400000)\n0x00427B0B  55                       PUSH      EBP                           \nActionDispatcher: skipping instruction.\n0x00427B0C  8BEC                     MOV       EBP, ESP                      \n\n\n=== 7652.log ===\nCAPE Sandbox - Debugger log: Tue Dec 23 09:29:22 2025\nBreakpoint 0 hit by instruction at 0x00427B0B (thread 7616) EBX=0x6e4c48 ECX=0x8 EDX=0x6e0000 ESI=0x776d4d90 RtlDecodePointer  EDI=0x6e4c44 ESP=0x19fed8 *ESP=0x427f28 EBP=0x19ff1c\nBreak at 0x00427B0B in 5a7eee6544891c81cbeb.exe (RVA 0x27b0b, thread 7616, Stack 0x00192000-0x001A0000, ImageBase 0x00400000)\n0x00427B0B  55                       PUSH      EBP                           \nActionDispatcher: skipping instruction.\n0x00427B0C  8BEC                     MOV       EBP, ESP                      \n",
+    "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8BEC FF7508 E8C1FFFFFF 59 FF7508 }\n        $pattern1 = { FF155CC24C00 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 55 8BEC FF7508 8B 45 ?? 8B CE E8 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\5a7eee6544891c81\\iter2_v3.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

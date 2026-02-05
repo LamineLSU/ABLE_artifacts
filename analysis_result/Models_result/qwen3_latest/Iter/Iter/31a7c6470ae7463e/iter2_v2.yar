@@ -1,0 +1,7 @@
+rule bypass1
+{
+    meta:
+        description = "Bypass by skipping the call to ExitProcess"
+    condition:
+        (0x8B 0x06 0x83 0xC4 0x14 0x52 0xFF 0xD0) at (0x0041A0C2-0x0041A0C8)
+}

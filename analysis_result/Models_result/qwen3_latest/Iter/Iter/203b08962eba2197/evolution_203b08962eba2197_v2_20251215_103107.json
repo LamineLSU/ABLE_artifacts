@@ -1,0 +1,428 @@
+{
+  "sha256": "203b08962eba219761690043281f81fc2d6e1fa26702bfa4ad30d9849b267309",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To bypass the evasion mechanism that triggers an exit via `ExitProcess`, we need to identify and target the critical points in the code flow leading to the exit. The key is to detect and potentially skip the sequence of instructions that ultimately result in the call to `ExitProcess`. Here are three distinct YARA patterns that can be used to identify and potentially bypass this behavior:\n\n---\n\n### **Pattern 1: Test Instruction (Conditional Check)**\nThis pattern targets the `test eax, eax` instruction, which is often used to check the return value of a function like `VirtualAllocExNuma`. If this check fails (i.e., the result is non-zero), it may trigger the exit.\n\n**Pattern:**\n```\n85 C0\n```\n\n**Explanation:**\n- `85 C0` is the machine code for `test eax, eax`.\n- This instruction is used to check if the result of a previous function call (like `VirtualAllocExNuma`) was successful.\n- If the result is non-zero, the code proceeds to call `ExitProcess`.\n\n---\n\n### **Pattern 2: Jump to Exit (Conditional Branch)**\nThis pattern captures the `jne` instruction that redirects execution to the exit point. If the `test` instruction returns a non-zero value, this `jne` will jump to the exit code.\n\n**Pattern:**\n```\n75 ?? \n```\n\n**Explanation:**\n- `75 ??` is the machine code for `jne` with an offset (the `??` represents the variable offset).\n- This instruction is used to redirect execution to the exit point if the previous `test` instruction returns a non-zero result.\n\n---\n\n### **Pattern 3: Call to ExitProcess**\nThis pattern identifies the actual `call` instruction to `ExitProcess`. By detecting this call, we can potentially skip or modify it to prevent the process from exiting.\n\n**Pattern:**\n```\nE8 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `E8 ?? ?? ?? ??` is the machine code for a `call` instruction with a relative offset.\n- This instruction directly calls the `ExitProcess` function, which terminates the process.\n\n---\n\n### **Summary of Patterns**\n| Pattern | Description |\n|--------|-------------|\n| `85 C0` | `test eax, eax` – conditional check for function success |\n| `75 ??` | `jne` – conditional jump to exit code |\n| `E8 ?? ?? ?? ??` | `call` to `ExitProcess` – direct exit |\n\nThese patterns can be used in a YARA rule to detect the code flow leading to an exit and potentially bypass it by modifying or skipping these instructions. The use of wildcards (`??`) allows flexibility in matching different memory addresses or offsets, making the patterns robust across different environments.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To address the problem, we are constructing three distinct byte patterns that represent different sequences of machine instructions in a memory dump. Each pattern must contain **at least one placeholder (`??`)** to represent unknown or variable address/offset values, and the total length of each pattern should be between **6 to 20 bytes**.\n\n---\n\n### ✅ Pattern 0:\n**Sequence:**  \n`FF 15 ?? ?? ?? ?? 85 C0 75 ?? 50 FF 15 ?? ?? ?? ??`  \n**Length:** 15 bytes  \n**Explanation:**  \n- `FF 15 ?? ?? ?? ??` → Call instruction to a function (address replaced with ??)  \n- `85 C0` → `test eax, eax`  \n- `75 ??` → `jne` with offset (replaced with ??)  \n- `50` → `push eax`  \n- `FF 15 ?? ?? ?? ??` → Another call instruction (address replaced with ??)\n\nThis pattern captures the sequence of a call, a test, a conditional jump, a push, and another call.\n\n---\n\n### ✅ Pattern 1:\n**Sequence:**  \n`85 C0 75 ?? 50 FF 15 ?? ?? ?? ??`  \n**Length:** 11 bytes  \n**Explanation:**  \n- `85 C0` → `test eax, eax`  \n- `75 ??` → `jne` with offset (replaced with ??)  \n- `50` → `push eax`  \n- `FF 15 ?? ?? ?? ??` → Call instruction (address replaced with ??)\n\nThis pattern is a subset of the first, capturing a test, a conditional jump, a push, and a call.\n\n---\n\n### ✅ Pattern 2:\n**Sequence:**  \n`56 FF 15 ?? ?? ?? ?? 83 C4 0C`  \n**Length:** 10 bytes  \n**Explanation:**  \n- `56` → `push esi`  \n- `FF 15 ?? ?? ?? ??` → Call instruction (address replaced with ??)  \n- `83 C4 0C` → `add esp, 0C` (concrete value preserved)\n\nThis pattern captures a push, a call, and an add instruction, with the call address replaced by `??`.\n\n---\n\n### ✅ Final Answer:\n```plaintext\nPattern 0: FF 15 ?? ?? ?? ?? 85 C0 75 ?? 50 FF 15 ?? ?? ?? ??\nPattern 1: 85 C0 75 ?? 50 FF 15 ?? ?? ?? ??\nPattern 2: 56 FF 15 ?? ?? ?? ?? 83 C4 0C\n```\n\nThese patterns are valid and distinct, and each meets the length requirement of **6 to 20 bytes**. They can be used for pattern matching in reverse engineering, malware analysis, or similar tasks.",
+      "yara_file": null
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 15 ?? 44 60 08 83 F8 11 74 05 }\n        $pattern1 = { FF 15 ?? 44 60 00 85 C0 75 07 }\n        $pattern2 = { FF 15 50 60 44 00 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE | API_CHECK | OTHER",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "935",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 8,
+      "new_signatures": 7,
+      "new_signature_names": [
+        "queries_computer_name",
+        "static_pe_anomaly",
+        "packer_entropy",
+        "procmem_yara",
+        "injection_rwx",
+        "binary_yara",
+        "contains_pe_overlay"
+      ],
+      "new_signature_details": [
+        {
+          "name": "queries_computer_name",
+          "description": "Queries computer hostname",
+          "categories": [
+            "system_discovery"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 9044,
+              "cid": 42
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "packer_entropy",
+          "description": "The binary likely contains encrypted or compressed data",
+          "categories": [
+            "packer"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [
+            "http://www.forensickb.com/2013/03/file-entropy-explained.html",
+            "http://virii.es/U/Using%20Entropy%20Analysis%20to%20Find%20Encrypted%20and%20Packed%20Malware.pdf"
+          ],
+          "data": [
+            {
+              "section": {
+                "name": ".text",
+                "raw_address": "0x00000200",
+                "virtual_address": "0x00002000",
+                "virtual_size": "0x0008066f",
+                "size_of_data": "0x00080800",
+                "characteristics": "IMAGE_SCN_CNT_CODE|IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ",
+                "characteristics_raw": "0x60000020",
+                "entropy": "7.74"
+              }
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "contains_pe_overlay",
+          "description": "The PE file contains an overlay",
+          "categories": [
+            "static"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "overlay": "Contains overlay at offset 0x000cbc00 with size: 759680 bytes"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "injection_rwx",
+          "description": "Creates RWX memory",
+          "categories": [
+            "injection"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 50,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 3952,
+              "cid": 226
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "binary_yara",
+          "description": "Binary file triggered YARA rule",
+          "categories": [
+            "static"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 80,
+          "references": [],
+          "data": [
+            {
+              "Binary triggered YARA rule": "INDICATOR_EXE_Packed_SmartAssembly"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "procmem_yara",
+          "description": "Yara detections observed in process dumps, payloads or dropped files",
+          "categories": [
+            "malware"
+          ],
+          "severity": 3,
+          "weight": 4,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "Hit": "PID 3952 triggered the Yara rule 'INDICATOR_Binary_Embedded_Cryptocurrency_Wallet_Browser_Extension_IDs' with data '['jnlgamecbpmbajjfhmmmlhejkemejdma', 'kkpllkodjeloidieedojogacfhpaihoh', 'mcohilncbfahbmgdjkbpemcciiolgcge', 'gjagmgiddbbciopjhllkdnddhcglnemk', 'kmhcihpebfmpgmihbkipmjlmmioameka', 'phkbamefinggmakgklpkljjmgibohnba', 'cjmkndjhnagcfbpiemnkdpomccnjblmj', 'aijcbedoijmgnlmjeegjaglmepbmpkpi', 'efbglgofoippbgcjepnhiblaibcnclgk', 'ejjladinnckdgjemekebdpeokbikhfci', 'bgpipimickeadkjlklgciifhnalhdjhe', 'epapihdplajcdnnkdeiahlgigofloibg', 'aholpfdialjgjfhomihkjbmgjidlcdno', 'egjidjbpglichdcondbcbdnbeeppgdph', 'pnndplcbkakcplkjnolgbkdgjikjednm', 'gojhcdgcpbpfigcaejpfhfegekdgiblk']'"
+            },
+            {
+              "Hit": "PID 3952 triggered the Yara rule 'INDICATOR_SUSPICIOUS_EXE_NoneWindowsUA' with data '['Mozilla/5.0 (Macintosh; Intel Mac OS']'"
+            },
+            {
+              "Hit": "PID 3952 triggered the Yara rule 'INDICATOR_Binary_Embedded_Cryptocurrency_Wallet_Browser_Extension_IDs' with data '['jnlgamecbpmbajjfhmmmlhejkemejdma', 'kkpllkodjeloidieedojogacfhpaihoh', 'mcohilncbfahbmgdjkbpemcciiolgcge', 'gjagmgiddbbciopjhllkdnddhcglnemk', 'kmhcihpebfmpgmihbkipmjlmmioameka', 'phkbamefinggmakgklpkljjmgibohnba', 'cjmkndjhnagcfbpiemnkdpomccnjblmj', 'aijcbedoijmgnlmjeegjaglmepbmpkpi', 'efbglgofoippbgcjepnhiblaibcnclgk', 'ejjladinnckdgjemekebdpeokbikhfci', 'bgpipimickeadkjlklgciifhnalhdjhe', 'epapihdplajcdnnkdeiahlgigofloibg', 'aholpfdialjgjfhomihkjbmgjidlcdno', 'egjidjbpglichdcondbcbdnbeeppgdph', 'pnndplcbkakcplkjnolgbkdgjikjednm', 'gojhcdgcpbpfigcaejpfhfegekdgiblk']'"
+            },
+            {
+              "Hit": "PID 3952 triggered the Yara rule 'Vidar' with data '['{ 0F B6 96 71 AF 01 00 C1 E0 05 33 D0 81 E2 FF 7F 00 00 5F 89 96 7C AF 06 }', 'screenshot.jpg', 'Content-Disposition: form-data; name=\"', 'CC\\\\%s_%s.txt', 'History\\\\%s_%s.txt', 'Autofill\\\\%s_%s.txt', 'Downloads\\\\%s_%s.txt']'"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "static_pe_anomaly",
+          "description": "Anomalous binary characteristics",
+          "categories": [
+            "static"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 80,
+          "references": [],
+          "data": [
+            {
+              "anomaly": "Actual checksum does not match that reported in PE header"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt likely failed due to overly generic patterns or incorrect focus on the ExitProcess call itself rather than the preceding checks. By targeting the VirtualAlloc allocation check (cmp eax, 11h + je), the VirtualAllocExNuma return value check (test eax, eax + jne), and the direct ExitProcess call, we ensure specificity to the evasion logic while avoiding false positives. These patterns are derived directly from the original trace, ensuring accuracy.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | OTHER\n\n**CONFIDENCE**: 95\n\n**REASONING**: The first pattern captures the VirtualAlloc allocation check (cmp eax, 11h + je) which likely verifies successful memory allocation. The second pattern targets the VirtualAllocExNuma return value check (test eax, eax + jne), which decides whether to terminate. The third pattern directly matches the ExitProcess call, ensuring coverage of the termination logic. All patterns are concrete byte sequences from the trace, minimizing false matches.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = FF15??446008 83F811 7405\n        $pattern1 = FF15??446000 85C0 7507\n        $pattern2 = FF1550604400\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\203b08962eba2197\\iter2_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 15 ?? 44 60 08 83 F8 11 74 05 }\n        $pattern1 = { FF 15 ?? 44 60 00 85 C0 75 07 }\n        $pattern2 = { FF 15 50 60 44 00 }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "CALL_TEST_JE | API_CHECK | OTHER",
+    "confidence": 95,
+    "opcodes": "",
+    "task_id": "935",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 8,
+    "new_signatures": 7,
+    "new_signature_names": [
+      "queries_computer_name",
+      "static_pe_anomaly",
+      "packer_entropy",
+      "procmem_yara",
+      "injection_rwx",
+      "binary_yara",
+      "contains_pe_overlay"
+    ],
+    "new_signature_details": [
+      {
+        "name": "queries_computer_name",
+        "description": "Queries computer hostname",
+        "categories": [
+          "system_discovery"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 9044,
+            "cid": 42
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "packer_entropy",
+        "description": "The binary likely contains encrypted or compressed data",
+        "categories": [
+          "packer"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [
+          "http://www.forensickb.com/2013/03/file-entropy-explained.html",
+          "http://virii.es/U/Using%20Entropy%20Analysis%20to%20Find%20Encrypted%20and%20Packed%20Malware.pdf"
+        ],
+        "data": [
+          {
+            "section": {
+              "name": ".text",
+              "raw_address": "0x00000200",
+              "virtual_address": "0x00002000",
+              "virtual_size": "0x0008066f",
+              "size_of_data": "0x00080800",
+              "characteristics": "IMAGE_SCN_CNT_CODE|IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ",
+              "characteristics_raw": "0x60000020",
+              "entropy": "7.74"
+            }
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "contains_pe_overlay",
+        "description": "The PE file contains an overlay",
+        "categories": [
+          "static"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "overlay": "Contains overlay at offset 0x000cbc00 with size: 759680 bytes"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "injection_rwx",
+        "description": "Creates RWX memory",
+        "categories": [
+          "injection"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 50,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 3952,
+            "cid": 226
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "binary_yara",
+        "description": "Binary file triggered YARA rule",
+        "categories": [
+          "static"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 80,
+        "references": [],
+        "data": [
+          {
+            "Binary triggered YARA rule": "INDICATOR_EXE_Packed_SmartAssembly"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "procmem_yara",
+        "description": "Yara detections observed in process dumps, payloads or dropped files",
+        "categories": [
+          "malware"
+        ],
+        "severity": 3,
+        "weight": 4,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "Hit": "PID 3952 triggered the Yara rule 'INDICATOR_Binary_Embedded_Cryptocurrency_Wallet_Browser_Extension_IDs' with data '['jnlgamecbpmbajjfhmmmlhejkemejdma', 'kkpllkodjeloidieedojogacfhpaihoh', 'mcohilncbfahbmgdjkbpemcciiolgcge', 'gjagmgiddbbciopjhllkdnddhcglnemk', 'kmhcihpebfmpgmihbkipmjlmmioameka', 'phkbamefinggmakgklpkljjmgibohnba', 'cjmkndjhnagcfbpiemnkdpomccnjblmj', 'aijcbedoijmgnlmjeegjaglmepbmpkpi', 'efbglgofoippbgcjepnhiblaibcnclgk', 'ejjladinnckdgjemekebdpeokbikhfci', 'bgpipimickeadkjlklgciifhnalhdjhe', 'epapihdplajcdnnkdeiahlgigofloibg', 'aholpfdialjgjfhomihkjbmgjidlcdno', 'egjidjbpglichdcondbcbdnbeeppgdph', 'pnndplcbkakcplkjnolgbkdgjikjednm', 'gojhcdgcpbpfigcaejpfhfegekdgiblk']'"
+          },
+          {
+            "Hit": "PID 3952 triggered the Yara rule 'INDICATOR_SUSPICIOUS_EXE_NoneWindowsUA' with data '['Mozilla/5.0 (Macintosh; Intel Mac OS']'"
+          },
+          {
+            "Hit": "PID 3952 triggered the Yara rule 'INDICATOR_Binary_Embedded_Cryptocurrency_Wallet_Browser_Extension_IDs' with data '['jnlgamecbpmbajjfhmmmlhejkemejdma', 'kkpllkodjeloidieedojogacfhpaihoh', 'mcohilncbfahbmgdjkbpemcciiolgcge', 'gjagmgiddbbciopjhllkdnddhcglnemk', 'kmhcihpebfmpgmihbkipmjlmmioameka', 'phkbamefinggmakgklpkljjmgibohnba', 'cjmkndjhnagcfbpiemnkdpomccnjblmj', 'aijcbedoijmgnlmjeegjaglmepbmpkpi', 'efbglgofoippbgcjepnhiblaibcnclgk', 'ejjladinnckdgjemekebdpeokbikhfci', 'bgpipimickeadkjlklgciifhnalhdjhe', 'epapihdplajcdnnkdeiahlgigofloibg', 'aholpfdialjgjfhomihkjbmgjidlcdno', 'egjidjbpglichdcondbcbdnbeeppgdph', 'pnndplcbkakcplkjnolgbkdgjikjednm', 'gojhcdgcpbpfigcaejpfhfegekdgiblk']'"
+          },
+          {
+            "Hit": "PID 3952 triggered the Yara rule 'Vidar' with data '['{ 0F B6 96 71 AF 01 00 C1 E0 05 33 D0 81 E2 FF 7F 00 00 5F 89 96 7C AF 06 }', 'screenshot.jpg', 'Content-Disposition: form-data; name=\"', 'CC\\\\%s_%s.txt', 'History\\\\%s_%s.txt', 'Autofill\\\\%s_%s.txt', 'Downloads\\\\%s_%s.txt']'"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "static_pe_anomaly",
+        "description": "Anomalous binary characteristics",
+        "categories": [
+          "static"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 80,
+        "references": [],
+        "data": [
+          {
+            "anomaly": "Actual checksum does not match that reported in PE header"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "**EVOLUTION_REASONING**: The previous attempt likely failed due to overly generic patterns or incorrect focus on the ExitProcess call itself rather than the preceding checks. By targeting the VirtualAlloc allocation check (cmp eax, 11h + je), the VirtualAllocExNuma return value check (test eax, eax + jne), and the direct ExitProcess call, we ensure specificity to the evasion logic while avoiding false positives. These patterns are derived directly from the original trace, ensuring accuracy.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | OTHER\n\n**CONFIDENCE**: 95\n\n**REASONING**: The first pattern captures the VirtualAlloc allocation check (cmp eax, 11h + je) which likely verifies successful memory allocation. The second pattern targets the VirtualAllocExNuma return value check (test eax, eax + jne), which decides whether to terminate. The third pattern directly matches the ExitProcess call, ensuring coverage of the termination logic. All patterns are concrete byte sequences from the trace, minimizing false matches.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = FF15??446008 83F811 7405\n        $pattern1 = FF15??446000 85C0 7507\n        $pattern2 = FF1550604400\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\203b08962eba2197\\iter2_v2.yar"
+  },
+  "best_score": 7,
+  "optimization_history": [
+    "Iteration 3: SUCCESS - 7 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

@@ -1,0 +1,4203 @@
+{
+  "sha256": "fd2fef13a5977859cd31b711618355eaba32082e0863a7e7b2770afff8d7a1fb",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample {\n    meta:\n        description = \"Evasion bypass for function calls and conditional jumps\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip\"\n    \n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { 64 A1 5A 8B CE E8 ?? ?? ?? ?? 83 F8 00 }\n        $pattern2 = { 64 A1 5A 8B CE E8 ?? ?? ?? ?? FF 15 08 }\n    \n    condition:\n        any_of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "250",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 26,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nAlright, so I'm trying to analyze this malware trace data to figure out how it's evading detection. The goal is to find bypass patterns that could be used by the malware to exit without being caught.\n\nLooking at the data provided, there are two traces, both ending with an ExitProcess call at 0041B93C. Each trace has a series of instructions leading up to this point. My first step is to identify suspicious instructions as per the reasoning strategy.\n\nSuspicious instructions likely include conditional jumps and function calls because they might be part of evasion tactics. For example, JE (Jump If Condition Met), JNE (Jump Not Equals), and CALL (call instruction) could be used for bypassing checks.\n\nStarting with Step 1: Identify all suspicious instructions.\n\nLooking at the trace:\n- Line numbers are in hex format like 0041B901. The first instruction is a mov, then push ebp, mov ebp, call an address, cmp eax, je, and so on.\n- The key instructions near the exit seem to be:\n  - The call at 0041DF02h\n  - The shr (shift right) at 0041B919\n  - The test al instruction at 0041B91C, which tests the AL register.\n  - The jne at 0041B91E, jumping to 0041B930h if not equal.\n  \nThese seem like potential points of control flow that could be bypassed.\n\nStep 2: Trace the exit path backwards. Starting from the exit point (0041B93C), what led to it?\n\nLooking at the trace, before the exit call, there's a jne instruction jumping to 0041B930h if not equal. So, the exit is taken when AL != 01.\n\nBut in the code, after jne, there are some function calls: FF153CF14200 and another FF15A0F14200. These seem to be CALL instructions that might bypass some checks.\n\nSo, the path before the exit involves:\n- A shr (shift right) at 0041B919\n- A test al instruction checking if AL is not equal to 1.\n- Then jne jumping to another address, which then calls two functions and ends up taking the non-zero branch.\n\nSo, the bypass likely happened when the AL register was set in a way that caused the jne to jump past these calls.\n\nNow, Step 3: Select 3 different bypass candidates. I need to find three different ways this could have been bypassed. Each candidate should be an instruction or sequence of instructions that can cause the exit path.\n\nLooking at possible points:\n1. The shr and test al before jne.\n2. The jne itself, if it's bypassed by a conditional skip.\n3. The function calls (CALLs) before the exit could have been bypassed with jumps.\n\nBut since we need three different patterns, I'll focus on three distinct sequences:\n\nFirst pattern: The shr and test al instruction that set AL to 1. If this is bypassed, then jne would jump, but if it's not, the code proceeds normally. So a bypass could involve moving AL to 01 without using these instructions.\n\nSecond pattern: The jne instruction at 0041B91E can be bypassed with a conditional skip or a different jump that leads directly to 0041B93C.\n\nThird pattern: One of the function calls before the exit could have been bypassed. Maybe replacing the call with a jump.\n\nBut I need to create patterns based on the trace, so let's consider combining the relevant instructions.\n\nFor each candidate:\n\nPattern 1: The shr and test al. Instead of using these, perhaps an OR instruction that sets AL directly. For example, setting AL to 01 without going through shr or test.\n\nPattern 2: The jne itself could be replaced with a jmp, effectively bypassing the condition.\n\nPattern 3: One of the function calls (like FF153CF14200) could be replaced with a jump. Maybe replacing the call with a jump to another address.\n\nBut I need to ensure that each pattern is made up of consecutive instructions from the trace and then apply wildcards appropriately.\n\nLet me try constructing patterns for each candidate:\n\nPattern 1: The shr, test al, jne.\nLooking at the trace:\nAt 0041B919: shr eax, 08h\nThen 0041B91C: test al, 01h\nThen 0041B91E: jne 0041B930h\n\nSo the sequence is:\nshr, test, jne.\n\nBut to bypass, maybe we can replace this with an OR instruction that sets AL directly. For example:\n\nmov al, 01 (instead of shr and test)\nthen jmp 0041B930h (but wait, in the trace, after shr/test/jne comes a push, then two calls.)\n\nWait, perhaps another approach is to bypass the jne by moving AL directly. So maybe:\n\nAfter shr, instead of test al and jne, set AL with an OR or something.\n\nAlternatively, since the exit path requires that AL != 01h (because it's jne), if we can make AL = 02h or higher without going through the jne condition, then the jump would be taken. So perhaps a bypass for AL to be non-01.\n\nBut maybe another way is to skip the shr and test al instructions by using a different instruction that sets AL directly.\n\nSo the first pattern could be combining the shr, test al, and jne into one sequence, but since each of these is separate, it's hard. Alternatively, just focus on one instruction: like the shr or the test.\n\nWait, perhaps another approach is to look for function calls before the exit that can be bypassed with a jump instead of a call.\n\nLooking at the trace:\n\nAfter 0041B930h (the jne), there are two function calls:\nFirst call: FF153CF14200, which is a call to [0042F13Ch]\nSecond call: FF1540F14200, which is a call to [0042F140h]\n\nThen the exit occurs. So these two calls might have been bypassed.\n\nSo perhaps one of these calls can be replaced with a jump instruction that leads directly into the code after the function returns.\n\nAlternatively, maybe the first call (FF153CF14200) could be replaced by a jump to 0042F1A0h where the second call is made. But in this case, we're trying to bypass both calls and then exit early.\n\nBut perhaps each of these function calls can be targeted for bypassing with different patterns.\n\nAlternatively, maybe one or two of them are used in the actual execution, but since it's a bypass, all could have been replaced.\n\nHmm, I'm getting a bit confused here. Maybe focusing on three specific points to create three distinct patterns is better.\n\nLet me try:\n\nPattern 1: The shr and test al (0041B919-0041B91C). These two instructions can be bypassed by setting AL directly with something like mov al, 02h or another value that would make jne jump. So a possible pattern could be:\n\n8b al (mov al) followed by jne.\n\nBut wait, the shr and test are at 0041B919-0041B91C. If we can bypass them with mov al, then jne would not be executed because AL is already set to a non-zero value.\n\nSo for Pattern 1: The sequence could be (shr + test) replaced by (mov al, 02h; jmp). But in hex:\n\n8b al\n50\n\nWhich are two instructions. So the pattern would be \"8bal50\" which is 4 bytes? Wait, but each instruction takes multiple bytes.\n\nWait, no: mov al, 02h is 6 bytes (8B 31 02), and jmp is 4 bytes. But perhaps we can combine this into a single pattern that includes the shr, test, jne, etc., so it's more specific.\n\nAlternatively, just take the shr, test, and jne as part of the bypass:\n\nshr, test al, jne\n\nBut each instruction has multiple bytes, so combining them would be longer than necessary. Alternatively, maybe replace the shr with another instruction that sets AL directly without going through shr or test.\n\nWait, perhaps using an OR instruction to set AL. For example:\n\n0041B91A: or al, 02h\n\nThis would set AL to a non-zero value without using shr and test. Then jne could be omitted because the condition is already met.\n\nBut in the trace, after shr comes test al, then jne. So if we can replace the shr and test with an OR that sets AL directly, followed by a jmp instead of jne?\n\nWait, maybe:\n\nAfter 0041B91A: or al, 02h\nThen, since AL is now non-zero, we don't need to do test and jne.\n\nBut in the trace, after shr comes test, then jne. So if we can replace those three instructions with a single OR instruction, that's possible.\n\nSo Pattern1 could be:\n\nor al, 02h (3 bytes)\nthen skip the next two instructions (shr and test) by not including them?\n\nWait, but I think it's better to include all three in the pattern because they are consecutive. So maybe:\n\n0041B91A: or al, 02h\n0041B91B: shr eax, 08h (original)\n0041B91C: test al, 01h (original)\n0041B91D: jne ... (original)\n\nBut if we can replace the original sequence with just or al, then the next instruction could be a jmp. Hmm.\n\nAlternatively, perhaps create a pattern that includes the OR and the following instructions but skips some.\n\nWait, this is getting too complicated. Maybe I should think about each function call before the exit as possible bypass points.\n\nLooking back at the trace:\n\nAfter 0041B930h (jne), there are two function calls:\nFirst: FF153CF14200 -> call [0042F13Ch]\nSecond: FF1540F14200 -> call [0042F140h]\n\nSo maybe these can be bypassed with jumps. So:\n\nPattern 2 could involve replacing the first function call (FF153CF14200) with a jump to 0042F1A0h, which is where the second function call is made.\n\nBut if we make that jump, then after executing it, the code would proceed normally. So perhaps:\n\nBefore FF153CF14200: add a jump instruction to 0042F1A0h\n\nSo Pattern2 could be:\n\nFF153CF14200 (original call) replaced by FF7508 (push dword ptr [ebp+08h]) and then a jmp 0042F1A0h.\n\nBut wait, the original sequence is:\nFF153CF14200 -> push\nThen FF1540F14200 -> call\n\nIf we replace FF153CF14200 with a jump to where the second function call starts, that would be:\n\nInstead of FF153CF14200, do:\npush (maybe not needed if we're jumping)\nthen jmp 0042F1A0h\n\nBut in terms of bytes, it's tricky. Alternatively, maybe replace the entire first function call with a single jump.\n\nAlternatively, another approach: If both function calls are bypassed by jumps to their respective destinations, then each could be part of different patterns.\n\nSo Pattern3: Replacing FF153CF14200 with a jump instruction that leads directly into [0042F1A0h], which is the target address for the second call.\n\nPutting it all together:\n\nPattern 1: Or al, non-zero value and then jmp (to bypass shr/test/jne)\n\nPattern 2: Replace FF153CF14200 with a jump to its destination\n\nPattern3: Replace FF1540F14200 with another jump.\n\nBut I need each pattern to be exactly 6-20 bytes. So for Pattern1, combining or al and then the next instructions may not fit. Alternatively, perhaps include shr, test, jne in one pattern but replace them with a different instruction set that achieves the same effect without going through those steps.\n\nAlternatively, maybe use a conditional jump like JE or JZ instead of JNE if possible.\n\nWait, another idea: The jne at 0041B91E could be bypassed by making AL == 02h (so it's non-zero), thus jumping. To do that without going through shr and test:\n\nPattern1: mov al, 02h followed by jmp instead of jne.\n\nBut in the trace, after shr is test al, then jne. So perhaps replace shr with an OR instruction to set AL first, then skip test al and jump directly.\n\nSo the sequence would be:\nOR AL, 02 (3 bytes)\nThen skip test al\nThen skip jne\n\nWait, but how do you skip those instructions? Without including them in the pattern?\n\nAlternatively, create a single pattern that includes OR AL, 02h followed by jmp 0041B93C.\n\nBut wait, after or al, we still need to process the next instruction. Hmm.\n\nThis is getting complicated. Maybe it's better to focus on the two function calls as potential bypass points and create patterns for each.\n\nSo Pattern1: Bypassing FF153CF14200 (first call) with a jump.\n\nPattern2: Bypassing FF1540F14200 (second call) with a jump to 0042F1A0h\n\nPattern3: Maybe the jne itself can be replaced by a different conditional jump or a jmp without condition.\n\nAlternatively, another idea is that after bypassing the function calls, there's still a jne instruction. So maybe if we bypass both function calls and ensure that AL is non-zero (so jne jumps), but how?\n\nI think focusing on the two function call sequences would give three distinct patterns.\n\nSo:\n\nPattern1: Replacing FF153CF14200 with a jump to 0042F1A0h\n\nPattern2: Replacing FF1540F14200 with a jump to ... (but where? It's called from 0042F140h, so we can replace it with a jump there)\n\nPattern3: Maybe the jne at 0041B91E could be replaced by jmp.\n\nBut wait, in this case, the jne is conditional. So replacing it with jmp would effectively change the condition from \"if not equal\" to always jump, which might bypass if AL was set properly earlier.\n\nSo Pattern3: Replace jne 0041B930h with a jump (e.g., jmp 0041B930h)\n\nPutting this together:\n\nPattern1:\nStarts at the address of FF153CF14200, replaces it with a push and then jumps to 0042F1A0h.\n\nWait, but how? The original call is made with [ebp+08h], which would have been pushed earlier. If we bypass that by just jumping, perhaps:\n\nBefore the function call, instead of pushing, do a jump.\n\nAlternatively, in terms of instructions:\nInstead of FF153CF14200 (push dword ptr [ebp+08h]), do jmp 0042F1A0h\n\nSo Pattern1 could be represented as:\n\nFF7508 (push) is skipped, replaced by a jump.\n\nWait, but the push instruction was at 0041B923. So if we can replace that with a jump to 0041B92C (where FF15A0F14200 starts), then it would bypass both function calls.\n\nAlternatively, maybe just replacing the entire first function call sequence with a single jmp.\n\nBut this is getting too fuzzy. Maybe instead of trying to represent each instruction step, I should create patterns based on byte sequences that match specific conditions.\n\nSo, for Pattern1: Replacing FF153CF14200 (the first call) with a jump:\n\nPattern1 could be:\nFF7508 is replaced by the target address. So maybe:\n\nBefore 0041B923, instead of push dword ptr..., do jmp.\n\nSo Pattern1 would start at 0041B923 and go to ... hmm, it's unclear.\n\nAlternatively, perhaps each pattern can be constructed as a sequence that includes the relevant instruction and the target address.\n\nWait, maybe using wildcards for all address bytes. So in each pattern, any byte involved in an address is replaced with ??.\n\nFor example:\n\nPattern1: The first function call (FF153CF14200) can be bypassed by moving a value to [ebp+08h] and then jumping there.\n\nSo the sequence would be:\n- mov ebp, ... (to set the offset)\n- push ebp\n- jump to 0041B92C\n\nBut in terms of bytes:\n\nThe original code is:\nFF7508: push dword ptr [ebp+08h]\nThen FF153CF14200: call dword ptr [ebp+08h]\n\nSo replacing the first part (before 0041B923) with a jump.\n\nBut how? Maybe:\n\nInstead of FF7508, do a jump to 0041B92C.\n\nSo Pattern1 would be:\n0041B923: instead of FF7508, do jmp 0041B92C\n\nWait, that might not fit because the push is at 0041B923. Hmm.\n\nAlternatively, maybe:\n\nThe sequence before 0041B923 is:\nFF7508 (push)\n0041B923: FF153CF14200\n\nSo to bypass this, we can replace FF7508 with a jump instruction that goes directly from 0041B923 to the target.\n\nBut I'm not sure how to represent that in a pattern. Maybe:\n\nPattern1 could be: \"FF7508\" replaced by \"jmp 0041B92C\"\n\nSo Pattern1 would look like:\nAt address 0041B923, instead of FF7508 (push), do jmp to 0041B92C\n\nBut in terms of bytes:\n\nFF7508 is four bytes: 0xFF, 0x75, 0x08. Replacing this with a single byte instruction like jmp would be difficult because it's longer.\n\nWait, perhaps the pattern should include both the original instruction and the new one to create a specific sequence that can match when bypassing occurs.\n\nBut I'm getting stuck here. Maybe another approach is better: each pattern will consist of 3-4 consecutive instructions (6-20 bytes) that represent a possible bypass path.\n\nGiven that, perhaps:\n\nPattern1: shr, test al, jne\n\nInstead of these three, do an OR to set AL and then jmp.\n\nSo the original sequence is:\nshr, test al, jne\nWhich is 3 instructions. The new pattern would be shorter if we can replace them with two instructions (OR and jmp), but it needs to fit into a specific pattern length.\n\nAlternatively, perhaps each bypass pattern will consist of four bytes that include the relevant instruction and the target address.\n\nFor example:\n\nPattern1: shr, test al, jne, then the next function call is skipped. But I'm not sure.\n\nI think at this point, it's better to outline three distinct patterns based on possible bypass points in the trace.\n</think>\n\nTo analyze the given malware traces, we'll identify critical instructions that could be part of an evasion strategy and construct three specific bypass patterns using wildcards for address/offset bytes.\n\n### Step-by-Step Explanation:\n\n1. **Identify Critical Instructions:**\n   - **shr eax, 08h**: Shifting right by 8 bits.\n   - **test al, 01h**: Testing AL register against 0x01.\n   - **jne 0041B930h**: Jump if not equal to address 0041B930h.\n\n2. **Trace Exit Path:**\n   The exit process involves the following steps:\n   - `shr` and `test al`.\n   - Conditional jump (`jne`) based on AL value.\n   - Two function calls (FF153CF14200 and FF1540F14200).\n   \n   The goal is to bypass these steps, likely by manipulating the AL register or conditional jumps.\n\n3. **Select Bypass Candidates:**\n   - **Candidate 1:** Bypass `shr` and `test al` using an OR instruction to set a non-zero value in AL.\n   - **Candidate 2:** Replace the first function call (FF153CF14200) with a jump directly into its target location.\n   - **Candidate 3:** Replace the second function call (FF1540F14200) with a jump to its target.\n\n### Constructing Patterns:\n\n**Pattern 1: Bypass shr/test/jne**\n- Instead of using `shr`, `test al`, and `jne`, replace these with an OR instruction followed by a conditional skip.\n```\n8b al (mov al, non-zero value)\n59                ; test al is skipped\n74 00            ; jne is replaced with a jump\n```\n\n**Pattern 2: Bypass First Function Call**\n- Replace the call at FF153CF14200 with a direct jump to its target.\n```\nFF7508                ; push dword ptr [ebp+08h] removed\n5B                 ; jmp added instead of call\n```\n\n**Pattern 3: Bypass Second Function Call**\n- Replace the call at FF1540F14200 with a direct jump to its target.\n```\nFF7508                ; push dword ptr [ebp+08h] removed\nC1E80               ; jmp added instead of call\n```\n\n### Final YARA Rules:\n\n```yara\nrule Bypass_Sample {\n    meta:\n        description = \"Evasion bypass for function calls and conditional jumps\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip\"\n    \n    strings:\n        $pattern0 = {85 C0 0F 84 ?? ?? ?? ?? 8B 45 ??}\n        $pattern1 = {64 A1 5A 8B CE E8 ?? ?? ?? ?? 83 F8 00}\n        $pattern2 = {64 A1 5A 8B CE E8 ?? ?? ?? ?? FF 15 08}\n    \n    condition:\n        any_of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\fd2fef13a5977859\\iter0_v1.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample {\n    meta:\n        description = \"Evasion bypass rule targeting check functions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 74 ?C }\n        $pattern1 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? C4 ?D }\n        $pattern2 = { 0F 84 ?? ?? ?? ?? ?A 0C }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "251",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 26,
+      "new_signatures": 4,
+      "new_signature_names": [
+        "antisandbox_unhook",
+        "reads_memory_remote_process",
+        "process_interest",
+        "enumerates_running_processes"
+      ],
+      "new_signature_details": [
+        {
+          "name": "reads_memory_remote_process",
+          "description": "Reads from the memory of another process",
+          "categories": [
+            "memory scraping",
+            "injection"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "read_memory": "Process microsoftedgeupdate.exe with process ID 6700 read from the memory of process handle 0x00000324"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1662
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1663
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1664
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "enumerates_running_processes",
+          "description": "Enumerates running processes",
+          "categories": [
+            "discovery"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "process": "System with pid 4"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1093
+            },
+            {
+              "process": "Registry with pid 92"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1094
+            },
+            {
+              "process": "smss.exe with pid 336"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1095
+            },
+            {
+              "process": "csrss.exe with pid 448"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1096
+            },
+            {
+              "process": "wininit.exe with pid 524"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1097
+            },
+            {
+              "process": "csrss.exe with pid 536"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1098
+            },
+            {
+              "process": "winlogon.exe with pid 616"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1099
+            },
+            {
+              "process": "services.exe with pid 656"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1100
+            },
+            {
+              "process": "lsass.exe with pid 680"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1101
+            },
+            {
+              "process": "svchost.exe with pid 776"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1102
+            },
+            {
+              "process": "fontdrvhost.exe with pid 808"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1103
+            },
+            {
+              "process": "fontdrvhost.exe with pid 816"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1104
+            },
+            {
+              "process": "svchost.exe with pid 896"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1105
+            },
+            {
+              "process": "svchost.exe with pid 956"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1106
+            },
+            {
+              "process": "dwm.exe with pid 320"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1107
+            },
+            {
+              "process": "svchost.exe with pid 404"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1108
+            },
+            {
+              "process": "svchost.exe with pid 540"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1109
+            },
+            {
+              "process": "svchost.exe with pid 396"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1110
+            },
+            {
+              "process": "svchost.exe with pid 800"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1111
+            },
+            {
+              "process": "svchost.exe with pid 1056"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1112
+            },
+            {
+              "process": "svchost.exe with pid 1100"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1113
+            },
+            {
+              "process": "svchost.exe with pid 1108"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1114
+            },
+            {
+              "process": "svchost.exe with pid 1140"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1115
+            },
+            {
+              "process": "svchost.exe with pid 1164"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1116
+            },
+            {
+              "process": "svchost.exe with pid 1196"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1117
+            },
+            {
+              "process": "svchost.exe with pid 1264"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1118
+            },
+            {
+              "process": "svchost.exe with pid 1360"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1119
+            },
+            {
+              "process": "svchost.exe with pid 1432"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1120
+            },
+            {
+              "process": "svchost.exe with pid 1444"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1121
+            },
+            {
+              "process": "svchost.exe with pid 1464"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1122
+            },
+            {
+              "process": "svchost.exe with pid 1528"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1123
+            },
+            {
+              "process": "Memory Compression with pid 1572"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1124
+            },
+            {
+              "process": "svchost.exe with pid 1588"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1125
+            },
+            {
+              "process": "svchost.exe with pid 1632"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1126
+            },
+            {
+              "process": "svchost.exe with pid 1640"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1127
+            },
+            {
+              "process": "svchost.exe with pid 1676"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1128
+            },
+            {
+              "process": "svchost.exe with pid 1780"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1129
+            },
+            {
+              "process": "svchost.exe with pid 1884"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1130
+            },
+            {
+              "process": "svchost.exe with pid 1892"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1131
+            },
+            {
+              "process": "svchost.exe with pid 1924"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1132
+            },
+            {
+              "process": "svchost.exe with pid 1944"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1133
+            },
+            {
+              "process": "svchost.exe with pid 1960"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1134
+            },
+            {
+              "process": "svchost.exe with pid 2020"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1135
+            },
+            {
+              "process": "svchost.exe with pid 2032"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1136
+            },
+            {
+              "process": "svchost.exe with pid 2044"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1137
+            },
+            {
+              "process": "spoolsv.exe with pid 2236"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1138
+            },
+            {
+              "process": "svchost.exe with pid 2336"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1139
+            },
+            {
+              "process": "svchost.exe with pid 2396"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1140
+            },
+            {
+              "process": "svchost.exe with pid 2404"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1141
+            },
+            {
+              "process": "svchost.exe with pid 2460"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1142
+            },
+            {
+              "process": "svchost.exe with pid 2468"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1143
+            },
+            {
+              "process": "svchost.exe with pid 2480"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1144
+            },
+            {
+              "process": "svchost.exe with pid 2496"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1145
+            },
+            {
+              "process": "svchost.exe with pid 2616"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1146
+            },
+            {
+              "process": "svchost.exe with pid 2648"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1147
+            },
+            {
+              "process": "MsMpEng.exe with pid 2672"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1148
+            },
+            {
+              "process": "svchost.exe with pid 2680"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1149
+            },
+            {
+              "process": "svchost.exe with pid 2720"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1150
+            },
+            {
+              "process": "svchost.exe with pid 760"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1151
+            },
+            {
+              "process": "svchost.exe with pid 3088"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1152
+            },
+            {
+              "process": "NisSrv.exe with pid 3380"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1153
+            },
+            {
+              "process": "svchost.exe with pid 3568"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1154
+            },
+            {
+              "process": "svchost.exe with pid 3608"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1155
+            },
+            {
+              "process": "svchost.exe with pid 3640"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1156
+            },
+            {
+              "process": "svchost.exe with pid 3648"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1157
+            },
+            {
+              "process": "sihost.exe with pid 3784"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1158
+            },
+            {
+              "process": "svchost.exe with pid 3820"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1159
+            },
+            {
+              "process": "svchost.exe with pid 3868"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1160
+            },
+            {
+              "process": "MicrosoftEdgeUpdate.exe with pid 3936"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1161
+            },
+            {
+              "process": "taskhostw.exe with pid 3972"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1162
+            },
+            {
+              "process": "svchost.exe with pid 1008"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1163
+            },
+            {
+              "process": "pyw.exe with pid 3256"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1164
+            },
+            {
+              "process": "ctfmon.exe with pid 3244"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1165
+            },
+            {
+              "process": "svchost.exe with pid 3544"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1166
+            },
+            {
+              "process": "explorer.exe with pid 3176"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1167
+            },
+            {
+              "process": "SearchIndexer.exe with pid 4112"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1168
+            },
+            {
+              "process": "svchost.exe with pid 4284"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1169
+            },
+            {
+              "process": "svchost.exe with pid 4364"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1170
+            },
+            {
+              "process": "svchost.exe with pid 4436"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1171
+            },
+            {
+              "process": "StartMenuExperienceHost.exe with pid 4932"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1172
+            },
+            {
+              "process": "RuntimeBroker.exe with pid 5092"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1173
+            },
+            {
+              "process": "pythonw.exe with pid 5100"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1174
+            },
+            {
+              "process": "SearchApp.exe with pid 4760"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1175
+            },
+            {
+              "process": "RuntimeBroker.exe with pid 5240"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1176
+            },
+            {
+              "process": "svchost.exe with pid 5300"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1177
+            },
+            {
+              "process": "dllhost.exe with pid 5416"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1178
+            },
+            {
+              "process": "SettingSyncHost.exe with pid 5684"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1179
+            },
+            {
+              "process": "LockApp.exe with pid 5856"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1180
+            },
+            {
+              "process": "RuntimeBroker.exe with pid 5932"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1181
+            },
+            {
+              "process": "RuntimeBroker.exe with pid 6020"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1182
+            },
+            {
+              "process": "svchost.exe with pid 6104"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1183
+            },
+            {
+              "process": "smartscreen.exe with pid 6280"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1184
+            },
+            {
+              "process": "SecurityHealthSystray.exe with pid 6328"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1185
+            },
+            {
+              "process": "SecurityHealthService.exe with pid 6356"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1186
+            },
+            {
+              "process": "msedge.exe with pid 6424"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1187
+            },
+            {
+              "process": "OneDrive.exe with pid 6444"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1188
+            },
+            {
+              "process": "msedge.exe with pid 6528"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1189
+            },
+            {
+              "process": "TextInputHost.exe with pid 6592"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1190
+            },
+            {
+              "process": "msedge.exe with pid 6800"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1191
+            },
+            {
+              "process": "msedge.exe with pid 6808"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1192
+            },
+            {
+              "process": "msedge.exe with pid 6824"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1193
+            },
+            {
+              "process": "svchost.exe with pid 7060"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1194
+            },
+            {
+              "process": "dllhost.exe with pid 5564"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1195
+            },
+            {
+              "process": "svchost.exe with pid 552"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1196
+            },
+            {
+              "process": "msedge.exe with pid 3232"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1197
+            },
+            {
+              "process": "msedge.exe with pid 7332"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1198
+            },
+            {
+              "process": "svchost.exe with pid 7492"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1199
+            },
+            {
+              "process": "svchost.exe with pid 7564"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1200
+            },
+            {
+              "process": "ApplicationFrameHost.exe with pid 8116"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1201
+            },
+            {
+              "process": "WinStore.App.exe with pid 8140"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1202
+            },
+            {
+              "process": "RuntimeBroker.exe with pid 7396"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1203
+            },
+            {
+              "process": "svchost.exe with pid 828"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1204
+            },
+            {
+              "process": "audiodg.exe with pid 3476"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1205
+            },
+            {
+              "process": "SkypeApp.exe with pid 532"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1206
+            },
+            {
+              "process": "RuntimeBroker.exe with pid 1352"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1207
+            },
+            {
+              "process": "SkypeBackgroundHost.exe with pid 2748"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1208
+            },
+            {
+              "process": "svchost.exe with pid 3796"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1209
+            },
+            {
+              "process": "svchost.exe with pid 4040"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1210
+            },
+            {
+              "process": "svchost.exe with pid 8072"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1211
+            },
+            {
+              "process": "svchost.exe with pid 5272"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1212
+            },
+            {
+              "process": "svchost.exe with pid 7624"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1213
+            },
+            {
+              "process": "SgrmBroker.exe with pid 6292"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1214
+            },
+            {
+              "process": "svchost.exe with pid 388"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1215
+            },
+            {
+              "process": "MoUsoCoreWorker.exe with pid 8092"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1216
+            },
+            {
+              "process": "svchost.exe with pid 1452"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1217
+            },
+            {
+              "process": "svchost.exe with pid 2068"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1218
+            },
+            {
+              "process": "TrustedInstaller.exe with pid 8240"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1219
+            },
+            {
+              "process": "TiWorker.exe with pid 8320"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1220
+            },
+            {
+              "process": "svchost.exe with pid 8508"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1221
+            },
+            {
+              "process": "svchost.exe with pid 8516"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1222
+            },
+            {
+              "process": "svchost.exe with pid 8568"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1223
+            },
+            {
+              "process": "svchost.exe with pid 8636"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1224
+            },
+            {
+              "process": "dasHost.exe with pid 8672"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1225
+            },
+            {
+              "process": "upfc.exe with pid 596"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1226
+            },
+            {
+              "process": "CompatTelRunner.exe with pid 1224"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1227
+            },
+            {
+              "process": "OneDriveStandaloneUpdater.exe with pid 7872"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1228
+            },
+            {
+              "process": "OneDriveStandaloneUpdater.exe with pid 6288"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1229
+            },
+            {
+              "process": "conhost.exe with pid 8652"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1230
+            },
+            {
+              "process": "svchost.exe with pid 4900"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1231
+            },
+            {
+              "process": "svchost.exe with pid 5112"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1232
+            },
+            {
+              "process": "rovwer.exe with pid 5312"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1233
+            },
+            {
+              "process": "msedge.exe with pid 4200"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1234
+            },
+            {
+              "process": "MicrosoftEdgeUpdate.exe with pid 6700"
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1235
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "process_interest",
+          "description": "Expresses interest in specific running processes",
+          "categories": [
+            "generic"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1093
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1094
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1095
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1096
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1097
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1098
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1099
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1100
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1101
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1102
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1103
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1104
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1105
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1106
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1107
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1108
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1109
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1110
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1111
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1112
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1113
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1114
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1115
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1116
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1117
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1118
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1119
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1120
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1121
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1122
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1123
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1124
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1125
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1126
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1127
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1128
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1129
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1130
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1131
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1132
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1133
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1134
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1135
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1136
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1137
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1138
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1139
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1140
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1141
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1142
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1143
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1144
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1145
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1146
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1147
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1148
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1149
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1150
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1151
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1152
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1153
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1154
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1155
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1156
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1157
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1158
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1159
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1160
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1161
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1162
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1163
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1164
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1165
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1166
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1167
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1168
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1169
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1170
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1171
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1172
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1173
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1174
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1175
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1176
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1177
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1178
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1179
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1180
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1181
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1182
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1183
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1184
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1185
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1186
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1187
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1188
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1189
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1190
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1191
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1192
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1193
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1194
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1195
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1196
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1197
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1198
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1199
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1200
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1201
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1202
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1203
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1204
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1205
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1206
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1207
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1208
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1209
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1210
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1211
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1212
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1213
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1214
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1215
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1216
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1217
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1218
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1219
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1220
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1221
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1222
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1223
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1224
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1225
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1226
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1227
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1228
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1229
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1230
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1231
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1232
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1233
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1234
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 1235
+            },
+            {
+              "process": "MicrosoftEdgeUpdate.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "antisandbox_unhook",
+          "description": "Tries to unhook or modify Windows functions monitored by CAPE",
+          "categories": [
+            "anti-sandbox"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 60,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 368
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 369
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 370
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 371
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 372
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 373
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 374
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 375
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 376
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 377
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 378
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 379
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 380
+            },
+            {
+              "type": "call",
+              "pid": 6700,
+              "cid": 381
+            },
+            {
+              "unhook": "function_name: CryptHashData, type: removal"
+            },
+            {
+              "unhook": "function_name: CryptEnumProvidersW, type: removal"
+            },
+            {
+              "unhook": "function_name: CryptDecrypt, type: removal"
+            },
+            {
+              "unhook": "function_name: CryptEnumProvidersA, type: removal"
+            },
+            {
+              "unhook": "function_name: CryptHashSessionKey, type: removal"
+            },
+            {
+              "unhook": "function_name: CryptEncrypt, type: removal"
+            },
+            {
+              "unhook": "function_name: CryptExportKey, type: removal"
+            },
+            {
+              "unhook": "function_name: CryptAcquireContextA, type: removal"
+            },
+            {
+              "unhook": "function_name: CryptGenRandom, type: removal"
+            },
+            {
+              "unhook": "function_name: CryptImportKey, type: removal"
+            },
+            {
+              "unhook": "function_name: CryptCreateHash, type: removal"
+            },
+            {
+              "unhook": "function_name: CryptGenKey, type: removal"
+            },
+            {
+              "unhook": "function_name: CryptAcquireContextW, type: removal"
+            },
+            {
+              "unhook": "function_name: VarBstrCat, type: removal"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nOkay, I need to help correct the Yara rule based on the provided information. The user mentioned that their previous rule was missing the `cape_options` part because it wasn't a detection rule but a bypass rule.\n\nLooking at the error analysis, they had an invalid `cape_options`. They also provided some trace data which shows function calls and conditional jumps, suggesting that these could be potential evasion methods. \n\nThe task is to generate 3 different patterns from the traces, each 6-20 bytes long with wildcards for address/offsets. The patterns should target specific instructions like conditional jumps, function calls, etc.\n\nI'll start by identifying three distinct sequences in the trace. Each pattern will include the instruction and surrounding context, using wildcards where necessary.\n\nFirst pattern: Maybe a conditional jump followed by a test. Looking at the trace, after E8F7250000 comes cmp eax, 01h, then je or jne. So perhaps something like `E8 ?? ?? ?? ?? ?A 0C` which represents the call and then a compare.\n\nSecond pattern: A function call to 0042F13Ch. In the trace, it's called with E8F7250000 followed by 0042F13Ch. So maybe `E8 ?? ?? ?? ?? ?A C4` where C4 is a displacement.\n\nThird pattern: Another jump or function call. Looking at the instructions after E8F7250000, there's an A8 test and then jne. Maybe something like `0F 84 ?? ?? ?? ?? ?C` which includes the test and jump.\n\nI need to make sure each pattern is different and within the byte length requirement. Also, all address/offset bytes should be replaced with `??`.\n\nFinally, I'll structure the meta section with `cape_options`, ensuring it references each pattern correctly.\n</think>\n\n```yara\nrule Bypass_Sample {\n    meta:\n        description = \"Evasion bypass rule targeting check functions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 74 ?C }\n        $pattern1 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? C4 ?D }\n        $pattern2 = { 0F 84 ?? ?? ?? ?? ?A 0C }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\fd2fef13a5977859\\iter1_v1.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v1",
+    "yara_rule": "rule Bypass_Sample {\n    meta:\n        description = \"Evasion bypass rule targeting check functions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 74 ?C }\n        $pattern1 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? C4 ?D }\n        $pattern2 = { 0F 84 ?? ?? ?? ?? ?A 0C }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "251",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 26,
+    "new_signatures": 4,
+    "new_signature_names": [
+      "antisandbox_unhook",
+      "reads_memory_remote_process",
+      "process_interest",
+      "enumerates_running_processes"
+    ],
+    "new_signature_details": [
+      {
+        "name": "reads_memory_remote_process",
+        "description": "Reads from the memory of another process",
+        "categories": [
+          "memory scraping",
+          "injection"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "read_memory": "Process microsoftedgeupdate.exe with process ID 6700 read from the memory of process handle 0x00000324"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1662
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1663
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1664
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "enumerates_running_processes",
+        "description": "Enumerates running processes",
+        "categories": [
+          "discovery"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "process": "System with pid 4"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1093
+          },
+          {
+            "process": "Registry with pid 92"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1094
+          },
+          {
+            "process": "smss.exe with pid 336"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1095
+          },
+          {
+            "process": "csrss.exe with pid 448"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1096
+          },
+          {
+            "process": "wininit.exe with pid 524"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1097
+          },
+          {
+            "process": "csrss.exe with pid 536"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1098
+          },
+          {
+            "process": "winlogon.exe with pid 616"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1099
+          },
+          {
+            "process": "services.exe with pid 656"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1100
+          },
+          {
+            "process": "lsass.exe with pid 680"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1101
+          },
+          {
+            "process": "svchost.exe with pid 776"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1102
+          },
+          {
+            "process": "fontdrvhost.exe with pid 808"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1103
+          },
+          {
+            "process": "fontdrvhost.exe with pid 816"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1104
+          },
+          {
+            "process": "svchost.exe with pid 896"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1105
+          },
+          {
+            "process": "svchost.exe with pid 956"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1106
+          },
+          {
+            "process": "dwm.exe with pid 320"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1107
+          },
+          {
+            "process": "svchost.exe with pid 404"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1108
+          },
+          {
+            "process": "svchost.exe with pid 540"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1109
+          },
+          {
+            "process": "svchost.exe with pid 396"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1110
+          },
+          {
+            "process": "svchost.exe with pid 800"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1111
+          },
+          {
+            "process": "svchost.exe with pid 1056"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1112
+          },
+          {
+            "process": "svchost.exe with pid 1100"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1113
+          },
+          {
+            "process": "svchost.exe with pid 1108"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1114
+          },
+          {
+            "process": "svchost.exe with pid 1140"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1115
+          },
+          {
+            "process": "svchost.exe with pid 1164"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1116
+          },
+          {
+            "process": "svchost.exe with pid 1196"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1117
+          },
+          {
+            "process": "svchost.exe with pid 1264"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1118
+          },
+          {
+            "process": "svchost.exe with pid 1360"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1119
+          },
+          {
+            "process": "svchost.exe with pid 1432"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1120
+          },
+          {
+            "process": "svchost.exe with pid 1444"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1121
+          },
+          {
+            "process": "svchost.exe with pid 1464"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1122
+          },
+          {
+            "process": "svchost.exe with pid 1528"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1123
+          },
+          {
+            "process": "Memory Compression with pid 1572"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1124
+          },
+          {
+            "process": "svchost.exe with pid 1588"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1125
+          },
+          {
+            "process": "svchost.exe with pid 1632"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1126
+          },
+          {
+            "process": "svchost.exe with pid 1640"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1127
+          },
+          {
+            "process": "svchost.exe with pid 1676"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1128
+          },
+          {
+            "process": "svchost.exe with pid 1780"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1129
+          },
+          {
+            "process": "svchost.exe with pid 1884"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1130
+          },
+          {
+            "process": "svchost.exe with pid 1892"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1131
+          },
+          {
+            "process": "svchost.exe with pid 1924"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1132
+          },
+          {
+            "process": "svchost.exe with pid 1944"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1133
+          },
+          {
+            "process": "svchost.exe with pid 1960"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1134
+          },
+          {
+            "process": "svchost.exe with pid 2020"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1135
+          },
+          {
+            "process": "svchost.exe with pid 2032"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1136
+          },
+          {
+            "process": "svchost.exe with pid 2044"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1137
+          },
+          {
+            "process": "spoolsv.exe with pid 2236"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1138
+          },
+          {
+            "process": "svchost.exe with pid 2336"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1139
+          },
+          {
+            "process": "svchost.exe with pid 2396"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1140
+          },
+          {
+            "process": "svchost.exe with pid 2404"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1141
+          },
+          {
+            "process": "svchost.exe with pid 2460"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1142
+          },
+          {
+            "process": "svchost.exe with pid 2468"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1143
+          },
+          {
+            "process": "svchost.exe with pid 2480"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1144
+          },
+          {
+            "process": "svchost.exe with pid 2496"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1145
+          },
+          {
+            "process": "svchost.exe with pid 2616"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1146
+          },
+          {
+            "process": "svchost.exe with pid 2648"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1147
+          },
+          {
+            "process": "MsMpEng.exe with pid 2672"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1148
+          },
+          {
+            "process": "svchost.exe with pid 2680"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1149
+          },
+          {
+            "process": "svchost.exe with pid 2720"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1150
+          },
+          {
+            "process": "svchost.exe with pid 760"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1151
+          },
+          {
+            "process": "svchost.exe with pid 3088"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1152
+          },
+          {
+            "process": "NisSrv.exe with pid 3380"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1153
+          },
+          {
+            "process": "svchost.exe with pid 3568"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1154
+          },
+          {
+            "process": "svchost.exe with pid 3608"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1155
+          },
+          {
+            "process": "svchost.exe with pid 3640"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1156
+          },
+          {
+            "process": "svchost.exe with pid 3648"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1157
+          },
+          {
+            "process": "sihost.exe with pid 3784"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1158
+          },
+          {
+            "process": "svchost.exe with pid 3820"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1159
+          },
+          {
+            "process": "svchost.exe with pid 3868"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1160
+          },
+          {
+            "process": "MicrosoftEdgeUpdate.exe with pid 3936"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1161
+          },
+          {
+            "process": "taskhostw.exe with pid 3972"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1162
+          },
+          {
+            "process": "svchost.exe with pid 1008"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1163
+          },
+          {
+            "process": "pyw.exe with pid 3256"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1164
+          },
+          {
+            "process": "ctfmon.exe with pid 3244"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1165
+          },
+          {
+            "process": "svchost.exe with pid 3544"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1166
+          },
+          {
+            "process": "explorer.exe with pid 3176"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1167
+          },
+          {
+            "process": "SearchIndexer.exe with pid 4112"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1168
+          },
+          {
+            "process": "svchost.exe with pid 4284"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1169
+          },
+          {
+            "process": "svchost.exe with pid 4364"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1170
+          },
+          {
+            "process": "svchost.exe with pid 4436"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1171
+          },
+          {
+            "process": "StartMenuExperienceHost.exe with pid 4932"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1172
+          },
+          {
+            "process": "RuntimeBroker.exe with pid 5092"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1173
+          },
+          {
+            "process": "pythonw.exe with pid 5100"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1174
+          },
+          {
+            "process": "SearchApp.exe with pid 4760"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1175
+          },
+          {
+            "process": "RuntimeBroker.exe with pid 5240"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1176
+          },
+          {
+            "process": "svchost.exe with pid 5300"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1177
+          },
+          {
+            "process": "dllhost.exe with pid 5416"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1178
+          },
+          {
+            "process": "SettingSyncHost.exe with pid 5684"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1179
+          },
+          {
+            "process": "LockApp.exe with pid 5856"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1180
+          },
+          {
+            "process": "RuntimeBroker.exe with pid 5932"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1181
+          },
+          {
+            "process": "RuntimeBroker.exe with pid 6020"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1182
+          },
+          {
+            "process": "svchost.exe with pid 6104"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1183
+          },
+          {
+            "process": "smartscreen.exe with pid 6280"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1184
+          },
+          {
+            "process": "SecurityHealthSystray.exe with pid 6328"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1185
+          },
+          {
+            "process": "SecurityHealthService.exe with pid 6356"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1186
+          },
+          {
+            "process": "msedge.exe with pid 6424"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1187
+          },
+          {
+            "process": "OneDrive.exe with pid 6444"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1188
+          },
+          {
+            "process": "msedge.exe with pid 6528"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1189
+          },
+          {
+            "process": "TextInputHost.exe with pid 6592"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1190
+          },
+          {
+            "process": "msedge.exe with pid 6800"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1191
+          },
+          {
+            "process": "msedge.exe with pid 6808"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1192
+          },
+          {
+            "process": "msedge.exe with pid 6824"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1193
+          },
+          {
+            "process": "svchost.exe with pid 7060"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1194
+          },
+          {
+            "process": "dllhost.exe with pid 5564"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1195
+          },
+          {
+            "process": "svchost.exe with pid 552"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1196
+          },
+          {
+            "process": "msedge.exe with pid 3232"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1197
+          },
+          {
+            "process": "msedge.exe with pid 7332"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1198
+          },
+          {
+            "process": "svchost.exe with pid 7492"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1199
+          },
+          {
+            "process": "svchost.exe with pid 7564"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1200
+          },
+          {
+            "process": "ApplicationFrameHost.exe with pid 8116"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1201
+          },
+          {
+            "process": "WinStore.App.exe with pid 8140"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1202
+          },
+          {
+            "process": "RuntimeBroker.exe with pid 7396"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1203
+          },
+          {
+            "process": "svchost.exe with pid 828"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1204
+          },
+          {
+            "process": "audiodg.exe with pid 3476"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1205
+          },
+          {
+            "process": "SkypeApp.exe with pid 532"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1206
+          },
+          {
+            "process": "RuntimeBroker.exe with pid 1352"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1207
+          },
+          {
+            "process": "SkypeBackgroundHost.exe with pid 2748"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1208
+          },
+          {
+            "process": "svchost.exe with pid 3796"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1209
+          },
+          {
+            "process": "svchost.exe with pid 4040"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1210
+          },
+          {
+            "process": "svchost.exe with pid 8072"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1211
+          },
+          {
+            "process": "svchost.exe with pid 5272"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1212
+          },
+          {
+            "process": "svchost.exe with pid 7624"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1213
+          },
+          {
+            "process": "SgrmBroker.exe with pid 6292"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1214
+          },
+          {
+            "process": "svchost.exe with pid 388"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1215
+          },
+          {
+            "process": "MoUsoCoreWorker.exe with pid 8092"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1216
+          },
+          {
+            "process": "svchost.exe with pid 1452"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1217
+          },
+          {
+            "process": "svchost.exe with pid 2068"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1218
+          },
+          {
+            "process": "TrustedInstaller.exe with pid 8240"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1219
+          },
+          {
+            "process": "TiWorker.exe with pid 8320"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1220
+          },
+          {
+            "process": "svchost.exe with pid 8508"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1221
+          },
+          {
+            "process": "svchost.exe with pid 8516"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1222
+          },
+          {
+            "process": "svchost.exe with pid 8568"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1223
+          },
+          {
+            "process": "svchost.exe with pid 8636"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1224
+          },
+          {
+            "process": "dasHost.exe with pid 8672"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1225
+          },
+          {
+            "process": "upfc.exe with pid 596"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1226
+          },
+          {
+            "process": "CompatTelRunner.exe with pid 1224"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1227
+          },
+          {
+            "process": "OneDriveStandaloneUpdater.exe with pid 7872"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1228
+          },
+          {
+            "process": "OneDriveStandaloneUpdater.exe with pid 6288"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1229
+          },
+          {
+            "process": "conhost.exe with pid 8652"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1230
+          },
+          {
+            "process": "svchost.exe with pid 4900"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1231
+          },
+          {
+            "process": "svchost.exe with pid 5112"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1232
+          },
+          {
+            "process": "rovwer.exe with pid 5312"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1233
+          },
+          {
+            "process": "msedge.exe with pid 4200"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1234
+          },
+          {
+            "process": "MicrosoftEdgeUpdate.exe with pid 6700"
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1235
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "process_interest",
+        "description": "Expresses interest in specific running processes",
+        "categories": [
+          "generic"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1093
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1094
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1095
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1096
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1097
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1098
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1099
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1100
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1101
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1102
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1103
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1104
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1105
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1106
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1107
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1108
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1109
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1110
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1111
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1112
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1113
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1114
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1115
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1116
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1117
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1118
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1119
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1120
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1121
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1122
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1123
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1124
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1125
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1126
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1127
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1128
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1129
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1130
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1131
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1132
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1133
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1134
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1135
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1136
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1137
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1138
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1139
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1140
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1141
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1142
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1143
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1144
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1145
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1146
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1147
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1148
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1149
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1150
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1151
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1152
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1153
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1154
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1155
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1156
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1157
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1158
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1159
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1160
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1161
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1162
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1163
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1164
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1165
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1166
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1167
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1168
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1169
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1170
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1171
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1172
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1173
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1174
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1175
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1176
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1177
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1178
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1179
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1180
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1181
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1182
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1183
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1184
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1185
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1186
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1187
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1188
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1189
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1190
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1191
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1192
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1193
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1194
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1195
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1196
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1197
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1198
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1199
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1200
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1201
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1202
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1203
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1204
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1205
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1206
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1207
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1208
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1209
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1210
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1211
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1212
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1213
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1214
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1215
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1216
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1217
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1218
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1219
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1220
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1221
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1222
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1223
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1224
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1225
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1226
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1227
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1228
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1229
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1230
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1231
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1232
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1233
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1234
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 1235
+          },
+          {
+            "process": "MicrosoftEdgeUpdate.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "antisandbox_unhook",
+        "description": "Tries to unhook or modify Windows functions monitored by CAPE",
+        "categories": [
+          "anti-sandbox"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 60,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 368
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 369
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 370
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 371
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 372
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 373
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 374
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 375
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 376
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 377
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 378
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 379
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 380
+          },
+          {
+            "type": "call",
+            "pid": 6700,
+            "cid": 381
+          },
+          {
+            "unhook": "function_name: CryptHashData, type: removal"
+          },
+          {
+            "unhook": "function_name: CryptEnumProvidersW, type: removal"
+          },
+          {
+            "unhook": "function_name: CryptDecrypt, type: removal"
+          },
+          {
+            "unhook": "function_name: CryptEnumProvidersA, type: removal"
+          },
+          {
+            "unhook": "function_name: CryptHashSessionKey, type: removal"
+          },
+          {
+            "unhook": "function_name: CryptEncrypt, type: removal"
+          },
+          {
+            "unhook": "function_name: CryptExportKey, type: removal"
+          },
+          {
+            "unhook": "function_name: CryptAcquireContextA, type: removal"
+          },
+          {
+            "unhook": "function_name: CryptGenRandom, type: removal"
+          },
+          {
+            "unhook": "function_name: CryptImportKey, type: removal"
+          },
+          {
+            "unhook": "function_name: CryptCreateHash, type: removal"
+          },
+          {
+            "unhook": "function_name: CryptGenKey, type: removal"
+          },
+          {
+            "unhook": "function_name: CryptAcquireContextW, type: removal"
+          },
+          {
+            "unhook": "function_name: VarBstrCat, type: removal"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "<think>\nOkay, I need to help correct the Yara rule based on the provided information. The user mentioned that their previous rule was missing the `cape_options` part because it wasn't a detection rule but a bypass rule.\n\nLooking at the error analysis, they had an invalid `cape_options`. They also provided some trace data which shows function calls and conditional jumps, suggesting that these could be potential evasion methods. \n\nThe task is to generate 3 different patterns from the traces, each 6-20 bytes long with wildcards for address/offsets. The patterns should target specific instructions like conditional jumps, function calls, etc.\n\nI'll start by identifying three distinct sequences in the trace. Each pattern will include the instruction and surrounding context, using wildcards where necessary.\n\nFirst pattern: Maybe a conditional jump followed by a test. Looking at the trace, after E8F7250000 comes cmp eax, 01h, then je or jne. So perhaps something like `E8 ?? ?? ?? ?? ?A 0C` which represents the call and then a compare.\n\nSecond pattern: A function call to 0042F13Ch. In the trace, it's called with E8F7250000 followed by 0042F13Ch. So maybe `E8 ?? ?? ?? ?? ?A C4` where C4 is a displacement.\n\nThird pattern: Another jump or function call. Looking at the instructions after E8F7250000, there's an A8 test and then jne. Maybe something like `0F 84 ?? ?? ?? ?? ?C` which includes the test and jump.\n\nI need to make sure each pattern is different and within the byte length requirement. Also, all address/offset bytes should be replaced with `??`.\n\nFinally, I'll structure the meta section with `cape_options`, ensuring it references each pattern correctly.\n</think>\n\n```yara\nrule Bypass_Sample {\n    meta:\n        description = \"Evasion bypass rule targeting check functions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 74 ?C }\n        $pattern1 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? C4 ?D }\n        $pattern2 = { 0F 84 ?? ?? ?? ?? ?A 0C }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\fd2fef13a5977859\\iter1_v1.yar"
+  },
+  "best_score": 4,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: SUCCESS - 4 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    ""
+  ]
+}

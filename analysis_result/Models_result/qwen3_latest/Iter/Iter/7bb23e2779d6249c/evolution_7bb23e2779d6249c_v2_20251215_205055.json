@@ -1,0 +1,186 @@
+{
+  "sha256": "7bb23e2779d6249c8caf14eee7447b0dd5e9fd0149a5b7fbd87c13910557a90b",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "Here's a breakdown of the three distinct code patterns extracted from the memory dump, each with a unique context and specific wildcard usage for address offsets:\n\n---\n\n### **Pattern 0: Conditional Jump (Short)**\n- **Code:** `85 C0 74 ??`\n- **Explanation:**  \n  - `85 C0` is the `TEST EAX, EAX` instruction, which checks if the `EAX` register is zero.  \n  - `74 ??` is a short conditional jump (`JE`) with a 1-byte offset. This is typically used to branch to a label if `EAX` is zero.  \n- **Use Case:**  \n  - Used in control flow logic where a zero check is followed by a conditional branch.\n\n---\n\n### **Pattern 1: Call + Conditional Jump (Near)**\n- **Code:** `E8 ?? ?? ?? ?? 0F 84 ?? ?? ?? ??`\n- **Explanation:**  \n  - `E8 ?? ?? ?? ??` is a `CALL` instruction with a 4-byte relative offset.  \n  - `0F 84 ?? ?? ?? ??` is a `JZ` (Jump if Zero) instruction with a 4-byte offset.  \n  - This sequence represents a function call followed by a conditional jump based on the result of a previous operation.  \n- **Use Case:**  \n  - Common in function calls where a zero result triggers a branch to a different section of code.\n\n---\n\n### **Pattern 2: Push + Call + Call (Function Invocation Chain)**\n- **Code:** `50 E8 ?? ?? ?? ?? FF 15 ?? ?? ?? ??`\n- **Explanation:**  \n  - `50` is the `PUSH EAX` instruction, which pushes the `EAX` register onto the stack.  \n  - `E8 ?? ?? ?? ??` is a `CALL` instruction with a 4-byte offset.  \n  - `FF 15 ?? ?? ?? ??` is a `CALL` instruction with a 4-byte offset to a memory address.  \n  - This sequence represents a function call chain where a register is pushed, then a function is called, and another function is called via a memory address.  \n- **Use Case:**  \n  - Seen in scenarios where function calls are nested or where dynamic function pointers are used.\n\n---\n\n### **Final Answer:**\n```plaintext\nPattern 0: 85 C0 74 ??\nPattern 1: E8 ?? ?? ?? ?? 0F 84 ?? ?? ?? ??\nPattern 2: 50 E8 ?? ?? ?? ?? FF 15 ?? ?? ?? ??\n```\n\nEach pattern is unique, covers different control flow logic, and includes wildcards for address offsets to ensure flexibility in matching.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 6A 5B 5A }  // Test EAX, JE, push/pop sequence\n        $pattern1 = { E8 ?? ?? ?? ?? 85 C0 74 ?? }  // Call followed by test and JE\n        $pattern2 = { 85 C0 0F 84 ?? ?? ?? ?? }  // Test EAX, JE to ExitProcess\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "1751",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 0,
+      "new_signatures": 2,
+      "new_signature_names": [
+        "packer_entropy",
+        "static_pe_pdbpath"
+      ],
+      "new_signature_details": [
+        {
+          "name": "static_pe_pdbpath",
+          "description": "The PE file contains a PDB path",
+          "categories": [
+            "static"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 80,
+          "references": [
+            "https://www.fireeye.com/blog/threat-research/2019/08/definitive-dossier-of-devilish-debug-details-part-one-pdb-paths-malware.html"
+          ],
+          "data": [
+            {
+              "pdbpath": "wextract.pdb"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "packer_entropy",
+          "description": "The binary likely contains encrypted or compressed data",
+          "categories": [
+            "packer"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [
+            "http://www.forensickb.com/2013/03/file-entropy-explained.html",
+            "http://virii.es/U/Using%20Entropy%20Analysis%20to%20Find%20Encrypted%20and%20Packed%20Malware.pdf"
+          ],
+          "data": [
+            {
+              "section": {
+                "name": ".rsrc",
+                "raw_address": "0x00007c00",
+                "virtual_address": "0x0000c000",
+                "virtual_size": "0x0007c000",
+                "size_of_data": "0x0007b200",
+                "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ",
+                "characteristics_raw": "0x40000040",
+                "entropy": "7.85"
+              }
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 6296.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 03:49:51 2025\nBreakpoint 1 hit by instruction at 0x007D6FD0 (thread 5356) EAX=0x7d0000 \"MZ\" 7bb23e2779d6249c8caf.exe ECX=0xe0 EDX=0x10b ESI=0x7d10bc 7bb23e2779d6249c8caf.exe EDI=0x7d69b0 7bb23e2779d6249c8caf.exe ESP=0x2d4f770 *ESP=0x7d0000 \"MZ\" 7bb23e2779d6249c8caf.exe EBP=0x2d4f774\nBreak at 0x007D6FD0 in 7bb23e2779d6249c8caf.exe (RVA 0x6fd0, thread 5356, Stack 0x02D42000-0x02D50000, ImageBase 0x007D0000)\n0x007D6FD0  E87FFFFFFF               CALL      0xffffff84                    \nActionDispatcher: skipping instruction.\n0x007D6FD5  85C0                     TEST      EAX, EAX                      \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed because it focused on the ExitProcess call itself, which is not the evasion check. The correct approach is to target the evasion checks before the exit. The first test and je (0033617A-0033617C) and subsequent checks (00336188-0033618A) are likely the evasion points. By using concrete bytes from these sequences, we ensure specificity and avoid false matches.  \n\n**PATTERN_TYPE**: CALL_TEST_JE  \n\n**CONFIDENCE**: 95  \n\n**REASONING**: These patterns target the test and je instructions that likely check for specific conditions (e.g., EAX=0) to trigger evasion logic. Using exact bytes from the trace ensures they match the correct locations without false positives. The third pattern (test and je to ExitProcess) directly ties to the termination logic, making it a high-value target.  \n\n**YARA_RULE**:  \n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 6A 5B 5A }  // Test EAX, JE, push/pop sequence\n        $pattern1 = { E8 ?? ?? ?? ?? 85 C0 74 ?? }  // Call followed by test and JE\n        $pattern2 = { 85 C0 0F 84 ?? ?? ?? ?? }  // Test EAX, JE to ExitProcess\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\7bb23e2779d6249c\\iter1_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 6A 5B 5A }  // Test EAX, JE, push/pop sequence\n        $pattern1 = { E8 ?? ?? ?? ?? 85 C0 74 ?? }  // Call followed by test and JE\n        $pattern2 = { 85 C0 0F 84 ?? ?? ?? ?? }  // Test EAX, JE to ExitProcess\n\n    condition:\n        any of them\n}",
+    "pattern_type": "CALL_TEST_JE",
+    "confidence": 95,
+    "opcodes": "",
+    "task_id": "1751",
+    "status": "bypass_crashed",
+    "rule_hit": true,
+    "baseline_signatures": 0,
+    "new_signatures": 2,
+    "new_signature_names": [
+      "packer_entropy",
+      "static_pe_pdbpath"
+    ],
+    "new_signature_details": [
+      {
+        "name": "static_pe_pdbpath",
+        "description": "The PE file contains a PDB path",
+        "categories": [
+          "static"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 80,
+        "references": [
+          "https://www.fireeye.com/blog/threat-research/2019/08/definitive-dossier-of-devilish-debug-details-part-one-pdb-paths-malware.html"
+        ],
+        "data": [
+          {
+            "pdbpath": "wextract.pdb"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "packer_entropy",
+        "description": "The binary likely contains encrypted or compressed data",
+        "categories": [
+          "packer"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [
+          "http://www.forensickb.com/2013/03/file-entropy-explained.html",
+          "http://virii.es/U/Using%20Entropy%20Analysis%20to%20Find%20Encrypted%20and%20Packed%20Malware.pdf"
+        ],
+        "data": [
+          {
+            "section": {
+              "name": ".rsrc",
+              "raw_address": "0x00007c00",
+              "virtual_address": "0x0000c000",
+              "virtual_size": "0x0007c000",
+              "size_of_data": "0x0007b200",
+              "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ",
+              "characteristics_raw": "0x40000040",
+              "entropy": "7.85"
+            }
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": "Rule caused crash: ['exec_crash']",
+    "improvement_suggestions": [],
+    "debugger_log": "=== 6296.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 03:49:51 2025\nBreakpoint 1 hit by instruction at 0x007D6FD0 (thread 5356) EAX=0x7d0000 \"MZ\" 7bb23e2779d6249c8caf.exe ECX=0xe0 EDX=0x10b ESI=0x7d10bc 7bb23e2779d6249c8caf.exe EDI=0x7d69b0 7bb23e2779d6249c8caf.exe ESP=0x2d4f770 *ESP=0x7d0000 \"MZ\" 7bb23e2779d6249c8caf.exe EBP=0x2d4f774\nBreak at 0x007D6FD0 in 7bb23e2779d6249c8caf.exe (RVA 0x6fd0, thread 5356, Stack 0x02D42000-0x02D50000, ImageBase 0x007D0000)\n0x007D6FD0  E87FFFFFFF               CALL      0xffffff84                    \nActionDispatcher: skipping instruction.\n0x007D6FD5  85C0                     TEST      EAX, EAX                      \n",
+    "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed because it focused on the ExitProcess call itself, which is not the evasion check. The correct approach is to target the evasion checks before the exit. The first test and je (0033617A-0033617C) and subsequent checks (00336188-0033618A) are likely the evasion points. By using concrete bytes from these sequences, we ensure specificity and avoid false matches.  \n\n**PATTERN_TYPE**: CALL_TEST_JE  \n\n**CONFIDENCE**: 95  \n\n**REASONING**: These patterns target the test and je instructions that likely check for specific conditions (e.g., EAX=0) to trigger evasion logic. Using exact bytes from the trace ensures they match the correct locations without false positives. The third pattern (test and je to ExitProcess) directly ties to the termination logic, making it a high-value target.  \n\n**YARA_RULE**:  \n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 6A 5B 5A }  // Test EAX, JE, push/pop sequence\n        $pattern1 = { E8 ?? ?? ?? ?? 85 C0 74 ?? }  // Call followed by test and JE\n        $pattern2 = { 85 C0 0F 84 ?? ?? ?? ?? }  // Test EAX, JE to ExitProcess\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\7bb23e2779d6249c\\iter1_v2.yar"
+  },
+  "best_score": 2,
+  "optimization_history": [
+    "Iteration 2: SUCCESS - 2 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

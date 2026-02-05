@@ -1,0 +1,159 @@
+{
+  "sha256": "3bac0715b2f1f0a408c7640ea62cea43789e92dc97caad6dfa206d6d805fb266",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 55 0C 8B 06 83 C4 14 52 50 E8 74 0A 00 00 FF D0 }\n        $pattern1 = { 56 6A 36 6A 00 51 8D B0 A0 0C 00 00 56 50 E8 74 0A 00 00 FF D0 }\n        $pattern2 = { 8B 45 08 8B 88 18 0A 00 00 56 6A 36 6A 00 51 8D B0 A0 0C 00 00 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1381",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Instead of skipping the `MOV EAX, [EBP+0x8]` instruction, we should target a later instruction in the sequence that is less critical for the overall execution flow, but still indicative of the bypassed behavior. Specifically, the `CALL 0041EB37h` instruction seems like a better candidate. It's called after the address calculation and is likely part of the API call preparation."
+      ],
+      "debugger_log": "=== 4808.log ===\nCAPE Sandbox - Debugger log: Mon Dec 22 16:28:16 2025\nBreakpoint 2 hit by instruction at 0x0041E21A (thread 6152) ECX=0x77661cfc wow64cpu.dll ESI=0xcfefe4 EDI=0x776e2ed0 NtProtectVirtualMemory  ESP=0xcfe838 *ESP=0xcfefd8 EBP=0xcfe838\nBreak at 0x0041E21A in 3bac0715b2f1f0a408c7.exe (RVA 0x1e21a, thread 6152, Stack 0x00CF1000-0x00D00000, ImageBase 0x00400000)\n0x0041E21A  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041E21D  8B88180A0000             MOV       ECX, [EAX+0xa18]              \n",
+      "raw_response": "Okay, let's analyze the trace and generate three bypass patterns following the specified rules.\n\n**Phase 1 & 2 (Factual Outcome & Hypotheses)**\n\nThe program exits at `0041E23F` via a call to `eax`. The immediate preceding instruction is `FFD0` (call eax). This is our primary candidate for a bypass point.  The `call eax` is likely where the evasion check is triggered, and the malware exits to avoid analysis. We need to find ways to skip this call.\n\n**Phase 3 (Evaluation of Hypotheses)**\n\nLet's examine several instructions and consider what happens if we skip them.\n\n*   **0041E23F (FFD0 call eax):**  If skipped, the program *might* continue. This is the most promising candidate.\n*   **0041E236 (8B550C mov edx, dword ptr [ebp+0Ch]):**  Skipping this moves execution to the next instruction.  It's likely part of the setup for the call, but skipping it alone might not be sufficient.\n*   **0041E239 (8B06 mov eax, dword ptr [esi]):**  This loads the address to be called into `eax`. If skipped, `eax` would contain an unpredictable value. It's likely that the malware is designed to handle this situation by exiting or crashing, so skipping this isn't a good bypass.\n*   **0041E231 (E8740A0000 call 0041EB37h):** This is a call to another function. If skipped, it may continue execution to the next instruction.\n\n**Phase 4 (Selecting Bypass Points)**\n\nBased on the above evaluation, we'll focus on bypassing the `call eax` directly and incorporating surrounding context.\n\n**Phase 5 (Building Patterns)**\n\nHere are three bypass patterns, adhering to all the requirements:\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B550C 8B06 83C414 52 50 E8740A0000 FFD0 }\n        $pattern1 = { 56 6A36 6A00 51 8DB0A00C0000 56 50 E8740A0000 FFD0 }\n        $pattern2 = { 8B4508 8B88180A0000 56 6A36 6A00 51 8DB0A00C0000 }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation of Patterns:**\n\n*   **$pattern0:**  Includes `mov edx, dword ptr [ebp+0Ch]`, `mov eax, dword ptr [esi]`, `add esp, 14h`, `push edx`, `push eax`, and the `call eax`.  This is a wider context around the `call eax`.\n*   **$pattern1:** Includes `push esi`, `push 00000036h`, `push 00000000h`, `push ecx`, `lea esi, dword ptr [eax+00000CA0h]`, `push esi`, `push eax`, and the `call eax`. This pattern bypasses the call by skipping a longer sequence of instructions.\n*   **$pattern2:** Includes `mov eax, dword ptr [ebp+08h]`, `mov ecx, dword ptr [eax+00000A18h]`, `push esi`, `push 00000036h`, `push 00000000h`.  This pattern bypasses the call by skipping a sequence of instructions.\n\n**Important Considerations:**\n\n*   **Wildcards:**  No wildcards are needed because there are no addresses or offsets in these patterns.\n*   **Length:** All patterns are between 6 and 20 bytes, as required.\n*   **Context:**  The surrounding instructions provide context to avoid triggering new signatures.\n*   **Unpredictability:** Skipping `8B06` (mov eax, dword ptr [esi]) can lead to unpredictable behavior.  The malware may crash or exit, which is a form of evasion.\n*   **Testing:** These patterns are based on analysis. Actual testing in a sandbox environment is crucial to confirm their effectiveness.\n",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\3bac0715b2f1f0a4\\iter0_v2.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 74 0A 00 00 8B 88 18 0A 00 00 }\n        $pattern1 = { 56 6A 36 6A 00 51 8D B0 A0 0C 00 00 }\n        $pattern2 = { 8B 55 0C 8B 06 83 C4 14 52 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1382",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Broaden the YARA pattern to allow for more flexibility in the surrounding code. Specifically, introduce wildcards (`?`) in the pattern to account for potentially differing byte values.  The debugger log highlights that the crash occurs after `8B550C` and `8B06`, so the pattern should focus on the core functionality being bypassed while allowing for changes around these instructions."
+      ],
+      "debugger_log": "=== 8172.log ===\nCAPE Sandbox - Debugger log: Mon Dec 22 20:35:21 2025\nBreakpoint 1 hit by instruction at 0x0041E223 (thread 8164) EAX=0x10feaf4 ECX=0x77741737 \"gw\" ntdll.dll ESI=0x10feaf4 EDI=0x776e2ed0 NtProtectVirtualMemory  ESP=0x10fe348 *ESP=0x10feae8 EBP=0x10fe348\nBreak at 0x0041E223 in 3bac0715b2f1f0a408c7.exe (RVA 0x1e223, thread 8164, Stack 0x010F1000-0x01100000, ImageBase 0x00400000)\n0x0041E223  56                       PUSH      ESI                           \nActionDispatcher: skipping instruction.\n0x0041E224  6A36                     PUSH      0x36                          \nBreakpoint 2 hit by instruction at 0x0041E236 (thread 8164) EAX=0x77364e10 ExitProcess  ECX=0x77741737 \"gw\" ntdll.dll EDX=0x4871737 ESI=0x10ff794 \"\u0010N6w\" EDI=0x776e2ed0 NtProtectVirtualMemory  ESP=0x10fe334 *ESP=0x10feaf4 EBP=0x10fe348\n0x0041E236  8B550C                   MOV       EDX, [EBP+0xc]                \nActionDispatcher: skipping instruction.\n0x0041E239  8B06                     MOV       EAX, [ESI]                    \n",
+      "raw_response": "```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 74 0A 00 00 8B 88 18 0A 00 00 }\n        $pattern1 = { 56 6A 36 6A 00 51 8DB0 A0 0C 00 00 }\n        $pattern2 = { 8B 55 0C 8B 06 83 C4 14 52 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\3bac0715b2f1f0a4\\iter1_v2.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 08 8B 88 18 0A 00 00 56 6A 36 6A 00 51 8D B0 A0 0C 00 00 }\n        $pattern1 = { 8B 55 0C 8B 06 83 C4 14 52 }\n        $pattern2 = { 55 8B EC 8B 45 08 8B 88 18 0A 00 00 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1383",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "new_signature_details": [
+        {
+          "name": "terminates_remote_process",
+          "description": "Terminates another process",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 5296,
+              "cid": 3039
+            },
+            {
+              "process": "3bac0715b2f1f0a408c7.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 7560.log ===\nCAPE Sandbox - Debugger log: Mon Dec 22 11:42:26 2025\nBreakpoint 0 hit by instruction at 0x0041E21A (thread 3312) ECX=0x77661cfc wow64cpu.dll ESI=0xefec54 EDI=0x776e2ed0 NtProtectVirtualMemory  ESP=0xefe4a8 *ESP=0xefec48 EBP=0xefe4a8\nBreak at 0x0041E21A in 3bac0715b2f1f0a408c7.exe (RVA 0x1e21a, thread 3312, Stack 0x00EF1000-0x00F00000, ImageBase 0x00400000)\n0x0041E21A  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041E21D  8B88180A0000             MOV       ECX, [EAX+0xa18]              \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B4508 8B88180A0000 56 6A36 6A00 51 8DB0A00C0000 }\n        $pattern1 = { 8B550C 8B06 83C414 52 }\n        $pattern2 = { 55 8BEC 8B4508 8B88180A0000 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\3bac0715b2f1f0a4\\iter2_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 08 8B 88 18 0A 00 00 56 6A 36 6A 00 51 8D B0 A0 0C 00 00 }\n        $pattern1 = { 8B 55 0C 8B 06 83 C4 14 52 }\n        $pattern2 = { 55 8B EC 8B 45 08 8B 88 18 0A 00 00 }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1383",
+    "status": "bypass_crashed",
+    "rule_hit": true,
+    "baseline_signatures": 16,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "terminates_remote_process"
+    ],
+    "new_signature_details": [
+      {
+        "name": "terminates_remote_process",
+        "description": "Terminates another process",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 5296,
+            "cid": 3039
+          },
+          {
+            "process": "3bac0715b2f1f0a408c7.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": "Rule caused crash: ['exec_crash']",
+    "improvement_suggestions": [],
+    "debugger_log": "=== 7560.log ===\nCAPE Sandbox - Debugger log: Mon Dec 22 11:42:26 2025\nBreakpoint 0 hit by instruction at 0x0041E21A (thread 3312) ECX=0x77661cfc wow64cpu.dll ESI=0xefec54 EDI=0x776e2ed0 NtProtectVirtualMemory  ESP=0xefe4a8 *ESP=0xefec48 EBP=0xefe4a8\nBreak at 0x0041E21A in 3bac0715b2f1f0a408c7.exe (RVA 0x1e21a, thread 3312, Stack 0x00EF1000-0x00F00000, ImageBase 0x00400000)\n0x0041E21A  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041E21D  8B88180A0000             MOV       ECX, [EAX+0xa18]              \n",
+    "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B4508 8B88180A0000 56 6A36 6A00 51 8DB0A00C0000 }\n        $pattern1 = { 8B550C 8B06 83C414 52 }\n        $pattern2 = { 55 8BEC 8B4508 8B88180A0000 }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\3bac0715b2f1f0a4\\iter2_v2.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

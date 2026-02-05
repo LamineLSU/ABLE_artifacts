@@ -1,0 +1,14 @@
+rule Bypass_Sample_Evolved
+{
+    meta:
+        description = "Evasion bypass rule - evolved"
+        cape_options = "bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0"
+
+    strings:
+        $pattern0 = { 8B 45 FC 83 F8 01 74 12 } // CALL Test JE pattern
+        $pattern1 = { E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ?? } // Conditional Check before Exit
+        $pattern2 = { DC EE CE 0F 31 AA 00 00 00 00 } // Unique timing check
+
+    condition:
+        any of them
+}

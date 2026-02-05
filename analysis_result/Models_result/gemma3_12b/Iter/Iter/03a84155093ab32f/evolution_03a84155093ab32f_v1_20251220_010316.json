@@ -1,0 +1,126 @@
+{
+  "sha256": "03a84155093ab32f570220991ff8f30d65fa048544c4e0fd95038c730be6cec4",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 77 B8 0A 04 B6 ?? ?? ?? ?? }\n        $pattern1 = { 8B 06 83 C4 14 52 FF D0 }\n        $pattern2 = { AD 77 B8 0A 04 B6 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1215",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 17,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "new_signature_details": [
+        {
+          "name": "terminates_remote_process",
+          "description": "Terminates another process",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 8476,
+              "cid": 2961
+            },
+            {
+              "process": "03a84155093ab32f5702.exe"
+            },
+            {
+              "type": "call",
+              "pid": 8476,
+              "cid": 2976
+            },
+            {
+              "process": "03a84155093ab32f5702.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 7056.log ===\nCAPE Sandbox - Debugger log: Sat Dec 20 14:03:14 2025\nBreakpoint 1 hit by instruction at 0x0041A6C2 (thread 7400) EAX=0x4fa0000 ECX=0x773d5f90 kernel32.dll ESI=0xf3fbd0 \"\u0010N6w\" EDI=0x41f0e0 ESP=0xf3e790 *ESP=0xf3ef54 EBP=0xf3e7a8\nBreak at 0x0041A6C2 in 03a84155093ab32f5702.exe (RVA 0x1a6c2, thread 7400, Stack 0x00F31000-0x00F40000, ImageBase 0x00400000)\n0x0041A6C2  8B06                     MOV       EAX, [ESI]                    \nActionDispatcher: skipping instruction.\n0x0041A6C4  83C414                   ADD       ESP, 0x14                     \n",
+      "raw_response": "Okay, let's analyze the trace and generate three bypass patterns based on the provided requirements.\n\n**Step 1: Identify Suspicious Instructions**\n\nSeveral instructions stand out as potential evasion points:\n\n*   `0041A655 77B8 jnbe 0041A60Fh` (Conditional Jump) - Likely a check for sandbox/VM presence.\n*   `0041A65B 0A04B6 or al, byte ptr [esi+esi*4]` (Memory Access) - Could be checking for specific environment variables or registry keys.\n*   `0041A6C8 FFD0 call eax` (Indirect Call) - The target of this call is determined at runtime and could be a sandbox detection routine.\n*   The repeated sequences of instructions (e.g., `0041A666 8B4810 mov ecx, dword ptr [eax+10h]` appearing twice) are suspicious, potentially for anti-debugging.\n\n**Step 2: Trace the Exit Path Backwards**\n\nThe exit occurs at `0041A6C8 FFD0 call eax`.  Tracing back, we see the conditional jump `0041A655 77B8 jnbe 0041A60Fh` is crucial. If the jump is taken, the program likely exits.\n\n**Step 3: Bypass Candidates**\n\n1.  **Bypass the conditional jump (jnbe):**  If we can force the jump to *not* be taken, we might bypass the check.\n2.  **Bypass the indirect call:** If we can replace the address in `eax` before the `call` with a benign address, we could bypass the check.\n3.  **Bypass the memory access:** If we can manipulate the value being read from memory, we can affect the conditional jump.\n\n**Step 4: Build Patterns**\n\nHere are three patterns, following the length and wildcard rules:\n\n**Pattern 1: Bypass the conditional jump**\n\nWe'll target the `jnbe` instruction.  We'll create a pattern that includes the conditional jump and the preceding `or` instruction.\n\n```\n0041A654  77B8  jnbe 0041A60Fh\n0041A655  0A04B6  or al, byte ptr [esi+esi*4]\n```\n\nPattern: `77 B8 0A 04 B6 ?? ?? ?? ??` (10 bytes)\n\n**Pattern 2: Bypass the indirect call**\n\nWe'll target the `call eax` instruction.  We will combine the preceding `mov` and `add` instructions.\n\n```\n0041A6C2  8B 06  mov eax, dword ptr [esi]\n0041A6C4  83 C4 14  add esp, 14h\n0041A6C7  52  push edx\n0041A6C8  FF D0  call eax\n```\n\nPattern: `8B 06 83 C4 14 52 FF D0` (10 bytes)\n\n**Pattern 3: Bypass the memory access**\n\nWe'll target the `or al, byte ptr [esi+esi*4]` instruction. This pattern includes the preceding `lodsd` instruction.\n\n```\n0041A653  AD  lodsd\n0041A654  77B8  jnbe 0041A60Fh\n0041A655  0A04B6  or al, byte ptr [esi+esi*4]\n```\n\nPattern: `AD 77 B8 0A 04 B6 ?? ?? ?? ??` (10 bytes)\n\n**Step 5: YARA Rule**\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 77 B8 0A 04 B6 ?? ?? ?? ?? }\n        $pattern1 = { 8B 06 83 C4 14 52 FF D0 }\n        $pattern2 = { AD 77 B8 0A 04 B6 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\03a84155093ab32f\\iter0_v1.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 0,
+    "prompt_version": "v1",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 77 B8 0A 04 B6 ?? ?? ?? ?? }\n        $pattern1 = { 8B 06 83 C4 14 52 FF D0 }\n        $pattern2 = { AD 77 B8 0A 04 B6 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1215",
+    "status": "bypass_crashed",
+    "rule_hit": true,
+    "baseline_signatures": 17,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "terminates_remote_process"
+    ],
+    "new_signature_details": [
+      {
+        "name": "terminates_remote_process",
+        "description": "Terminates another process",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 8476,
+            "cid": 2961
+          },
+          {
+            "process": "03a84155093ab32f5702.exe"
+          },
+          {
+            "type": "call",
+            "pid": 8476,
+            "cid": 2976
+          },
+          {
+            "process": "03a84155093ab32f5702.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": "Rule caused crash: ['exec_crash']",
+    "improvement_suggestions": [],
+    "debugger_log": "=== 7056.log ===\nCAPE Sandbox - Debugger log: Sat Dec 20 14:03:14 2025\nBreakpoint 1 hit by instruction at 0x0041A6C2 (thread 7400) EAX=0x4fa0000 ECX=0x773d5f90 kernel32.dll ESI=0xf3fbd0 \"\u0010N6w\" EDI=0x41f0e0 ESP=0xf3e790 *ESP=0xf3ef54 EBP=0xf3e7a8\nBreak at 0x0041A6C2 in 03a84155093ab32f5702.exe (RVA 0x1a6c2, thread 7400, Stack 0x00F31000-0x00F40000, ImageBase 0x00400000)\n0x0041A6C2  8B06                     MOV       EAX, [ESI]                    \nActionDispatcher: skipping instruction.\n0x0041A6C4  83C414                   ADD       ESP, 0x14                     \n",
+    "raw_response": "Okay, let's analyze the trace and generate three bypass patterns based on the provided requirements.\n\n**Step 1: Identify Suspicious Instructions**\n\nSeveral instructions stand out as potential evasion points:\n\n*   `0041A655 77B8 jnbe 0041A60Fh` (Conditional Jump) - Likely a check for sandbox/VM presence.\n*   `0041A65B 0A04B6 or al, byte ptr [esi+esi*4]` (Memory Access) - Could be checking for specific environment variables or registry keys.\n*   `0041A6C8 FFD0 call eax` (Indirect Call) - The target of this call is determined at runtime and could be a sandbox detection routine.\n*   The repeated sequences of instructions (e.g., `0041A666 8B4810 mov ecx, dword ptr [eax+10h]` appearing twice) are suspicious, potentially for anti-debugging.\n\n**Step 2: Trace the Exit Path Backwards**\n\nThe exit occurs at `0041A6C8 FFD0 call eax`.  Tracing back, we see the conditional jump `0041A655 77B8 jnbe 0041A60Fh` is crucial. If the jump is taken, the program likely exits.\n\n**Step 3: Bypass Candidates**\n\n1.  **Bypass the conditional jump (jnbe):**  If we can force the jump to *not* be taken, we might bypass the check.\n2.  **Bypass the indirect call:** If we can replace the address in `eax` before the `call` with a benign address, we could bypass the check.\n3.  **Bypass the memory access:** If we can manipulate the value being read from memory, we can affect the conditional jump.\n\n**Step 4: Build Patterns**\n\nHere are three patterns, following the length and wildcard rules:\n\n**Pattern 1: Bypass the conditional jump**\n\nWe'll target the `jnbe` instruction.  We'll create a pattern that includes the conditional jump and the preceding `or` instruction.\n\n```\n0041A654  77B8  jnbe 0041A60Fh\n0041A655  0A04B6  or al, byte ptr [esi+esi*4]\n```\n\nPattern: `77 B8 0A 04 B6 ?? ?? ?? ??` (10 bytes)\n\n**Pattern 2: Bypass the indirect call**\n\nWe'll target the `call eax` instruction.  We will combine the preceding `mov` and `add` instructions.\n\n```\n0041A6C2  8B 06  mov eax, dword ptr [esi]\n0041A6C4  83 C4 14  add esp, 14h\n0041A6C7  52  push edx\n0041A6C8  FF D0  call eax\n```\n\nPattern: `8B 06 83 C4 14 52 FF D0` (10 bytes)\n\n**Pattern 3: Bypass the memory access**\n\nWe'll target the `or al, byte ptr [esi+esi*4]` instruction. This pattern includes the preceding `lodsd` instruction.\n\n```\n0041A653  AD  lodsd\n0041A654  77B8  jnbe 0041A60Fh\n0041A655  0A04B6  or al, byte ptr [esi+esi*4]\n```\n\nPattern: `AD 77 B8 0A 04 B6 ?? ?? ?? ??` (10 bytes)\n\n**Step 5: YARA Rule**\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 77 B8 0A 04 B6 ?? ?? ?? ?? }\n        $pattern1 = { 8B 06 83 C4 14 52 FF D0 }\n        $pattern2 = { AD 77 B8 0A 04 B6 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\03a84155093ab32f\\iter0_v1.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

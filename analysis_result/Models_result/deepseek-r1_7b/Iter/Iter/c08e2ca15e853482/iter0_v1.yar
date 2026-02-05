@@ -1,0 +1,13 @@
+rule Bypass_Evasion
+{
+    meta:
+        description = "Evasion bypass using three distinct patterns"
+        cape_options = "bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0"
+
+    strings:
+        $pattern0 = { 8B 4C ?? ?? ?? ?? ?? E8 CD D3 01 00 ?? ?? ?? ?? FF 15 E0 84 45 00 }
+        $pattern1 = { F5 ?? ?? ?? ?? 8D 04 24 04 ?? ?? ?? ?? 56 ?? ?? ?? ?? C7 85 F4 FE FF FF 3C 00 00 }
+        $pattern2 = { FF 15 E0 84 45 00 ?? ?? 5A 04 00 00 ?? ?? ?? ?? 8D 04 24 04 ?? ?? ?? ?? C7 85 F4 FE FF FF 3C 00 00 }
+    condition:
+        any of them
+}

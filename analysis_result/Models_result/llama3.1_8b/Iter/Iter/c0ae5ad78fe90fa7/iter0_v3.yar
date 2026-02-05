@@ -1,0 +1,12 @@
+rule Bypass_Sample {
+    meta:
+        description = "Evasion bypass rule"
+        cape_options = "bp0=$pattern1+0,action0=skip,bp2=$pattern2+0,action2=skip,count=0"
+
+    strings:
+        $pattern1 = { 55 8B EC FF 15 64 10 41 00 ?? ?? ?? }
+        $pattern2 = { E8 C8 FF FF FF 59 FF 75 08 ?? ?? ?? }
+
+    condition:
+        any of them
+}

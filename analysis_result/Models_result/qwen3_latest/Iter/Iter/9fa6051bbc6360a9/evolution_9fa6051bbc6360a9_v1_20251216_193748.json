@@ -1,0 +1,75 @@
+{
+  "sha256": "9fa6051bbc6360a9543398d476e888306b777d891348a2c2897454d34834c731",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To identify three distinct instruction sequences that could potentially be part of an evasion logic, we analyze the provided disassembly and extract patterns that are likely to be part of a function call or control flow. These patterns are then generalized using wildcards for the memory addresses, as the exact addresses may vary depending on the context.\n\n---\n\n### ✅ Pattern 1: Exit Process Call and Surrounding Instructions\n\nThis sequence represents a call to the `ExitProcess` function, which is commonly used to terminate a program. The call is preceded by a series of stack manipulations and register loads.\n\n**Pattern:**\n```\n0x????????: 8B 06          MOV EAX, [ESI]\n0x????????: 83 C4 14       ADD ESP, 14\n0x????????: 52             PUSH EDX\n0x????????: FF D0          CALL EAX\n```\n\n**Explanation:**\n- `MOV EAX, [ESI]`: Loads the address of the `ExitProcess` function into `EAX`.\n- `ADD ESP, 14`: Adjusts the stack pointer to clean up the call stack.\n- `PUSH EDX`: Pushes a value (likely a parameter) onto the stack.\n- `CALL EAX`: Jumps to the function pointed to by `EAX` (i.e., `ExitProcess`).\n\n---\n\n### ✅ Pattern 2: Indirect Call to a Function\n\nThis sequence shows an indirect function call to an external function, possibly part of a library or another module.\n\n**Pattern:**\n```\n0x????????: 56             PUSH ESI\n0x????????: 50             PUSH EAX\n0x????????: E8 ???? ???? ???? CALL 0x???????? (to another function)\n```\n\n**Explanation:**\n- `PUSH ESI` and `PUSH EAX`: Saves register values onto the stack.\n- `CALL` with an offset: Performs an indirect jump to a target address.\n\nThis pattern is typical of a function call where the target is resolved at runtime, often used in dynamic linking or plugin systems.\n\n---\n\n### ✅ Pattern 3: Stack Manipulation and Function Call\n\nThis pattern represents a more complex control flow, where multiple stack operations are performed before making a function call.\n\n**Pattern:**\n```\n0x????????: 50             PUSH EAX\n0x????????: 52             PUSH EDX\n0x????????: 83 C4 14       ADD ESP, 14\n0x????????: FF D0          CALL EAX\n```\n\n**Explanation:**\n- `PUSH EAX` and `PUSH EDX`: Saves register values onto the stack.\n- `ADD ESP, 14`: Adjusts the stack pointer.\n- `CALL EAX`: Invokes a function pointed to by `EAX`.\n\nThis sequence could be part of a function call that passes multiple parameters or prepares the stack for a function call.\n\n---\n\n### 📌 Summary\n\nThese three patterns represent different types of function calls and stack manipulations that could be part of evasion logic or control flow engineering. They are generalized using wildcards for memory addresses to account for variations in the actual execution context. Each pattern can be used to detect or analyze such sequences in a disassembled binary.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B 16 50 51 FF D2 }  // push edx, mov edx, push eax, push ecx, call edx\n        $pattern1 = { 56 56 6A 35 6A 00 51 8D B0 74 0C 00 00 }  // push esi, push esi, push 35h, push 00h, push ecx, lea esi\n        $pattern2 = { 83 C4 14 52 52 8B 16 50 }  // add esp,14h, push edx, push edx, mov edx, push eax\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE | API_CHECK | EXIT_DECISION",
+      "confidence": 85,
+      "opcodes": "",
+      "task_id": "1459",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to insufficient specificity and incorrect pattern locations. By focusing on the **evasion check** (Strategy A) and **exit decision** (Strategy B), I selected three concrete byte sequences from the trace that target the evasion logic and exit conditions. These patterns are specific to the sample’s behavior and avoid wildcards where possible to reduce false positives.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | EXIT_DECISION\n\n**CONFIDENCE**: 85\n\n**REASONING**:  \n1. **Pattern0** targets the `RtlAllocateHeap` call (FFD2) preceded by stack manipulation (pushes and movs), which is likely part of the evasion check.  \n2. **Pattern1** captures the `call 0041AF50h` (E844090000) with preceding pushes, a key step in the sample’s execution flow.  \n3. **Pattern2** focuses on the exitProcess preparation (add esp,14h + push edx/mov edx), which is critical for bypassing detection.  \n\nThese patterns are tightly coupled to the sample’s behavior and avoid overlapping with other samples.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B16 50 51 FFD2 }  // push edx, mov edx, push eax, push ecx, call edx\n        $pattern1 = { 56 56 6A35 6A00 51 8DB0740C0000 }  // push esi, push esi, push 35h, push 00h, push ecx, lea esi\n        $pattern2 = { 83C414 52 52 8B16 50 }  // add esp,14h, push edx, push edx, mov edx, push eax\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\9fa6051bbc6360a9\\iter1_v1.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v1",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "Here are three distinct hex patterns that represent parts of the code flow in the provided assembly snippet. Each pattern includes placeholders (`??`) for address or displacement values that are not explicitly known or required for the pattern matching:\n\n---\n\n### **Pattern 1:**\n```\n8B06 83C4?? 52 FFD0\n```\n**Explanation:**\n- `8B06` — `MOV EAX, [ESI]` (load EAX from memory at ESI)\n- `83C4??` — `ADD ESP, ??` (adjust stack pointer by unknown value)\n- `52` — `PUSH EDX` (push EDX onto the stack)\n- `FFD0` — `CALL EAX` (call function pointed to by EAX)\n\nThis pattern captures a sequence of operations that involve stack manipulation and function calls.\n\n---\n\n### **Pattern 2:**\n```\n50 E8 ?? ?? ?? ?? 8B55??\n```\n**Explanation:**\n- `50` — `PUSH EAX` (push EAX onto the stack)\n- `E8 ?? ?? ?? ??` — `CALL ??` (call to an unknown address)\n- `8B55??` — `MOV EDX, [EBP + ??]` (load EDX from memory at EBP + unknown offset)\n\nThis pattern represents a function call followed by a memory read from a stack variable.\n\n---\n\n### **Pattern 3:**\n```\nE8 ?? ?? ?? ?? 8B55?? 83C4??\n```\n**Explanation:**\n- `E8 ?? ?? ?? ??` — `CALL ??` (call to an unknown address)\n- `8B55??` — `MOV EDX, [EBP + ??]` (load EDX from memory at EBP + unknown offset)\n- `83C4??` — `ADD ESP, ??` (adjust stack pointer by unknown value)\n\nThis pattern captures a function call followed by a memory load and stack adjustment.\n\n---\n\nThese patterns are suitable for use in pattern matching, reverse engineering, or disassembly analysis. Each includes placeholders for unknown or variable parts of the code.",
+      "yara_file": null
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 2: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    ""
+  ]
+}

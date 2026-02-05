@@ -1,0 +1,87 @@
+{
+  "prompt_version": "v2",
+  "prompt_name": "Counterfactual Reasoning",
+  "iterations": [
+    {
+      "iteration_number": 0,
+      "prompt_version": "v2",
+      "llm_query": {
+        "query_id": "40d8e00fac67",
+        "timestamp": "2025-12-15T21:08:38.780823",
+        "iteration": 0,
+        "prompt_version": "v2",
+        "prompt_text": "# Malware Evasion Bypass Analysis\n\nYou are analyzing a malware execution trace that terminates early due to sandbox/VM evasion.\n\n## TRACE DATA\n\nSHA256: 7bdd1409b080eb8510163cea3761d694be0eaec7e22bc44736cbfbc3025a310b\nExitProcess Address: 004160B4\nInstructions: 13\n--------------------------------------------------------------------------------\nAddress      Opcode               Instruction\n--------------------------------------------------------------------------------\n    0041608B  681C274700           push 0047271Ch  # ASCII \\\n    00416090  FF15F4634500         call dword ptr [004563F4h]  # GetModuleHandleA@KERNEL32.DLL (Import, Unknown Params)\n    00416096  85C0                 test eax, eax  # Return Compare (GetModuleHandleA)\n    00416098  7416                 je 004160B0h\n    0041609A  680C274700           push 0047270Ch  # ASCII \\\n    0041609F  50                   push eax\n    004160A0  FF15F8634500         call dword ptr [004563F8h]  # GetProcAddress@KERNEL32.DLL (Import, 2 Params)\n    004160A6  85C0                 test eax, eax  # Return Compare (GetProcAddress)\n    004160A8  7416                 je 004160B0h\n    004160AA  FF742404             push dword ptr [esp+04h]\n    004160AE  FFD0                 call eax\n    004160B0  FF742404             push dword ptr [esp+04h]\n>>> 004160B4  FF158C624500         call dword ptr [0045628Ch]  # ExitProcess@KERNEL32.DLL (Import, Unknown Params)\n\n---\n\n## REASONING STRATEGY: Counterfactual Analysis\n\nAnalyze this trace using counterfactual reasoning (\"what if\" scenarios):\n\n**Phase 1: Establish the factual outcome**\n- The program exits (this is the observed fact)\n- Identify the exact instruction sequence leading to exit\n\n**Phase 2: Generate counterfactual hypotheses**\nFor each suspicious instruction, ask:\n- \"What if this instruction were skipped?\"\n- \"Would the program continue instead of exiting?\"\n\n**Phase 3: Evaluate each hypothesis**\nFor each candidate instruction:\n\n*Counterfactual 1:* [Instruction at line X]\n- Factual: This instruction executes \u2192 leads to exit\n- Counterfactual: If skipped \u2192 would execution continue?\n- Necessity: Is skipping this NECESSARY to prevent exit?\n- Sufficiency: Is skipping this SUFFICIENT to prevent exit?\n\n*Counterfactual 2:* [Different instruction at line Y]\n- Same analysis...\n\n*Counterfactual 3:* [Another instruction at line Z]\n- Same analysis...\n\n**Phase 4: Select the 3 best bypass points**\nChoose instructions where skipping is likely SUFFICIENT to bypass evasion.\n\n**Phase 5: Build patterns (6-20 bytes each)**\nFor each selected bypass point, combine it with 2-3 adjacent instructions and apply wildcards.\n\n---\n\n## PATTERN LENGTH REQUIREMENT (CRITICAL)\n\nEach pattern must be **6-20 bytes long** to be specific enough to match only the target location.\n\n**How to build patterns:**\n- Combine 2-3 consecutive instructions from the trace into one pattern\n- Include the target instruction PLUS surrounding context instructions\n- **All patterns MUST come from the TRACE DATA above** - do not invent byte sequences\n\n**Good Example:** `85 C0 0F 84 ?? ?? ?? ?? 8B 45 ??` (TEST EAX + JZ + MOV = 11 bytes)\n**Good Example:** `6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0` (PUSH + POP + MOV + CALL + TEST = 12 bytes)\n\n---\n\n## WILDCARD RULES\n\n**Wildcard principle:** Any byte that represents an address, offset, or displacement MUST be replaced with `??`\n\n**Apply wildcards to:**\n- CALL/JMP offset bytes (4 bytes after opcode)\n- Conditional jump offsets (1 or 4 bytes after opcode)\n- Memory address bytes\n- Stack offsets\n\n**Keep concrete:** All opcode bytes, register-encoding bytes\n\n---\n\n## OUTPUT FORMAT\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [6-20 bytes with wildcards] }\n        $pattern1 = { [6-20 bytes - DIFFERENT sequence] }\n        $pattern2 = { [6-20 bytes - DIFFERENT sequence] }\n\n    condition:\n        any of them\n}\n```\n\n## REQUIREMENTS\n\n1. Extract exactly 3 patterns ($pattern0, $pattern1, $pattern2)\n2. All 3 patterns must be DIFFERENT hex sequences\n3. **Each pattern must be 6-20 bytes long** (combine multiple instructions)\n4. **Add context bytes after CALL/JMP** to avoid triggering new signatures\n5. Use wildcards (??) for all address/offset bytes\n6. Keep opcode and register bytes concrete\n7. Format: spaces between hex bytes, patterns wrapped in { }\n8. cape_options references patterns as $pattern0, $pattern1, $pattern2",
+        "prompt_length": 4538,
+        "prompt_tokens": 1134,
+        "response_text": "To detect and block the sandbox evasion behavior described, we focus on the sequence of instructions that the malware uses to determine whether it is running in a sandbox. The key behavior is that the malware attempts to call the `ExitProcess` function by first obtaining its address via `GetProcAddress`, which in turn requires the `GetModuleHandleA` function to be called.\n\n---\n\n### \ud83d\udd0d **Key Observations from the Code Flow**\n\n1. **Push a string** (`push \"\\` at `0041608B`).\n2. **Call `GetModuleHandleA`** at `00416090`.\n3. **Test the return value** of `GetModuleHandleA` (`test eax, eax` at `00416096`).\n4. **Push another string** (`push \"\\` at `004160A1`).\n5. **Call `GetProcAddress`** at `004160A0` to get the address of `ExitProcess`.\n6. **Test the return value** of `GetProcAddress` (`test eax, eax` at `004160A6`).\n7. **Call `ExitProcess`** at `004160B4` if both previous steps were successful.\n\n---\n\n### \ud83d\udee1\ufe0f **YARA Rule Patterns to Detect the Behavior**\n\nEach of the following YARA patterns captures a critical part of the code flow that leads to the call to `ExitProcess`, which is the evasion mechanism.\n\n#### \u2705 **Pattern 0**: *First Call to `GetModuleHandleA`*\nThis pattern includes the push instruction and the `call` to `GetModuleHandleA`, followed by the test instruction.\n\n```yara\nrule Pattern0\n{\n    meta:\n        description = \"Detects first call to GetModuleHandleA\"\n    strings:\n        $a = { 68 1C 27 47 00 FF 15 ?? ?? ?? ?? 85 C0 }\n    condition:\n        all of them\n}\n```\n\n#### \u2705 **Pattern 1**: *Call to `GetProcAddress`*\nThis pattern captures the call to `GetProcAddress` and the subsequent test of its return value.\n\n```yara\nrule Pattern1\n{\n    meta:\n        description = \"Detects call to GetProcAddress\"\n    strings:\n        $b = { 50 FF 15 ?? ?? ?? ?? 85 C0 }\n    condition:\n        all of them\n}\n```\n\n#### \u2705 **Pattern 2**: *Final Call to `ExitProcess`*\nThis pattern detects the final call to `ExitProcess` after the earlier steps have succeeded.\n\n```yara\nrule Pattern2\n{\n    meta:\n        description = \"Detects final call to ExitProcess\"\n    strings:\n        $c = { FF 74 24 04 FF 15 ?? ?? ?? ?? }\n    condition:\n        all of them\n}\n```\n\n---\n\n### \u2705 **Final Answer**\n\n$$\n\\boxed{\n\\text{Pattern0: } \\{ 68 1C 27 47 00 FF 15 ?? ?? ?? ?? 85 C0 \\}, \\\\\n\\text{Pattern1: } \\{ 50 FF 15 ?? ?? ?? ?? 85 C0 \\}, \\\\\n\\text{Pattern2: } \\{ FF 74 24 04 FF 15 ?? ?? ?? ?? \\}\n}\n$$",
+        "response_length": 2389,
+        "response_tokens": 597,
+        "query_start_time": 1765854425.065144,
+        "query_end_time": 1765854518.7808232,
+        "query_duration_seconds": 93.71567916870117,
+        "model_name": "qwen3:latest",
+        "model_provider": "ollama",
+        "temperature": 0.7,
+        "pattern_type": "UNKNOWN",
+        "confidence": 50,
+        "yara_rule": "rule Pattern0\n{\n    meta:\n        description = \"Detects first call to GetModuleHandleA\"\n    strings:\n        $a = { 68 1C 27 47 00 FF 15 ?? ?? ?? ?? 85 C0 }\n    condition:\n        all of them\n}",
+        "opcodes_generic": "",
+        "opcodes_specific": ""
+      },
+      "cape_analysis": {
+        "task_id": 1752,
+        "analysis_type": "bypass",
+        "vm_host": "192.168.52.144",
+        "vm_name": "cape_vm3",
+        "submit_time": 1765854529.0681825,
+        "complete_time": 1765854826.3301609,
+        "duration_seconds": 297.26197838783264,
+        "signatures_count": 17,
+        "signature_names": [
+          "resumethread_remote_process",
+          "procmem_yara",
+          "antidebug_setunhandledexceptionfilter",
+          "terminates_remote_process",
+          "accesses_public_folder",
+          "deletes_self",
+          "persistence_autorun_tasks",
+          "persistence_autorun",
+          "mouse_movement_detect",
+          "accesses_recyclebin",
+          "stealth_timeout",
+          "injection_rwx",
+          "queries_computer_name",
+          "queries_keyboard_layout",
+          "removes_zoneid_ads",
+          "queries_locale_api",
+          "language_check_registry"
+        ],
+        "rule_hit": true,
+        "yara_rule": "rule Pattern0\n{\n    meta:\n        description = \"Detects first call to GetModuleHandleA\"\n        cape_options = \"bp0=$a+0,action0=skip,count=0\"\n    strings:\n        $a = { 68 1C 27 47 00 FF 15 ?? ?? ?? ?? 85 C0 }\n    condition:\n        all of them\n}",
+        "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\7bdd1409b080eb85\\iter0_v2.yar"
+      },
+      "success": true,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "feedback_given": null,
+      "evolution_reasoning": null
+    }
+  ],
+  "total_iterations": 1,
+  "iterations_to_success": 1,
+  "total_time_seconds": 401.27761793136597,
+  "avg_query_time_seconds": 93.71567916870117,
+  "avg_analysis_time_seconds": 297.26197838783264,
+  "total_input_tokens": 1134,
+  "total_output_tokens": 597,
+  "total_tokens": 1731,
+  "success": true,
+  "best_score": 1,
+  "best_iteration": 0,
+  "final_yara_rule": "rule Pattern0\n{\n    meta:\n        description = \"Detects first call to GetModuleHandleA\"\n        cape_options = \"bp0=$a+0,action0=skip,count=0\"\n    strings:\n        $a = { 68 1C 27 47 00 FF 15 ?? ?? ?? ?? 85 C0 }\n    condition:\n        all of them\n}",
+  "final_new_signatures": [
+    "terminates_remote_process"
+  ]
+}

@@ -1,0 +1,14 @@
+rule :exit
+    ignore all
+    # Updated patterns with sufficient context for operand field matching
+    pattern0:     E8  ??
+               ??  ??
+               ??  ??
+
+    pattern1:   ??  ?? 
+               E8  ??
+               ??  ??
+               ??  ??
+
+    pattern2:       ??  ??
+                     ??  ??

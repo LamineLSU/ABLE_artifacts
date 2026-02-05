@@ -1,0 +1,87 @@
+{
+  "prompt_version": "v0",
+  "prompt_name": "Zero-Shot Baseline",
+  "iterations": [
+    {
+      "iteration_number": 0,
+      "prompt_version": "v0",
+      "llm_query": {
+        "query_id": "0433734981e4",
+        "timestamp": "2025-12-17T15:02:45.939944",
+        "iteration": 0,
+        "prompt_version": "v0",
+        "prompt_text": "# Malware Evasion Bypass Analysis\n\nYou are analyzing a malware execution trace that terminates early due to sandbox/VM evasion.\n\n## TRACE DATA\n\nSHA256: 012a3979ed88347da680d58f044c3dab30440c6086324360add92a64fc3a933c\nExitProcess Address: 00E761F8\nInstructions: 53\n--------------------------------------------------------------------------------\nAddress      Opcode               Instruction\n--------------------------------------------------------------------------------\n    00E7617A  85C0                 test eax, eax\n    00E7617C  7412                 je 00E76190h\n    00E7617E  6A5B                 push 0000005Bh\n    00E76180  5A                   pop edx\n    00E76181  8BCE                 mov ecx, esi\n    00E76183  E825050000           call 00E7667Fh\n    00E76188  85C0                 test eax, eax\n    00E7618A  0F8433FDFFFF         je 00E75E83h\n    00E76190  8D95F0FEFFFF         lea edx, dword ptr [ebp-00000110h]\n    00E76196  899DF0FEFFFF         mov dword ptr [ebp-00000110h], ebx\n    00E7619C  8BCE                 mov ecx, esi\n    00E7619E  E874FAFFFF           call 00E75C17h\n    00E761A3  85C0                 test eax, eax\n    00E761A5  0F8433FDFFFF         je 00E75E83h\n    00E761AB  8B85F0FEFFFF         mov eax, dword ptr [ebp-00000110h]\n    00E761B1  8D8DF8FEFFFF         lea ecx, dword ptr [ebp-00000108h]\n    00E761B7  03C3                 add eax, ebx\n    00E761B9  BA04010000           mov edx, 00000104h\n    00E761BE  03C1                 add eax, ecx\n    00E761C0  B9428CE700           mov ecx, 00E78C42h\n    00E761C5  50                   push eax\n    00E761C6  E8E3FAFFFF           call 00E71680h\n    00E761CB  E9B5FCFFFF           jmp 00E75E85h\n    00E761D0  33DB                 xor ebx, ebx\n    00E761D2  BA21050000           mov edx, 00000521h\n    00E761D7  53                   push ebx\n    00E761D8  6A40                 push 00000040h\n    00E761DA  53                   push ebx\n    00E761DB  684011E700           push 00E71140h\n    00E761E0  33C9                 xor ecx, ecx\n    00E761E2  E8B3030000           call 00E744B9h\n    00E761E7  A18885E700           mov eax, dword ptr [00E78588h]  # 0x00000000\n    00E761EC  85C0                 test eax, eax\n    00E761EE  7407                 je 00E761F7h\n    00E761F0  50                   push eax\n    00E761F1  FF1588A0E700         call dword ptr [00E7A088h]  # CloseHandle@KERNEL32.DLL (Import, Unknown Params)\n    00E761F7  53                   push ebx\n>>> 00E761F8  FF152CA1E700         call dword ptr [00E7A12Ch]  # ExitProcess@KERNEL32.DLL (Import, Unknown Params)\n    00E761FE  33FF                 xor edi, edi\n    00E76200  8BC7                 mov eax, edi\n    00E76202  EB03                 jmp 00E76207h\n    00E76204  8D4301               lea eax, dword ptr [ebx+01h]  # 0x00000001\n    00E76207  8B4DFC               mov ecx, dword ptr [ebp-04h]\n    00E7620A  5F                   pop edi\n    00E7620B  5E                   pop esi\n    00E7620C  33CD                 xor ecx, ebp\n    00E7620E  5B                   pop ebx\n    00E7620F  E857260000           call 00E76CE0h\n    00E76214  8BE5                 mov esp, ebp\n    00E76216  5D                   pop ebp\n    00E76217  C3                   ret \n    00E76218  E80D0C0000           call 00E76E2Ah\n    00E7621D  CC                   int3 \n\n---\n\n## TASK\n\nAnalyze the trace and generate a YARA bypass rule with exactly 3 different patterns targeting suspicious evasion points.\n\n---\n\n## PATTERN LENGTH REQUIREMENT (CRITICAL)\n\nEach pattern must be **6-20 bytes long** to be specific enough to match only the target location.\n\n**How to build patterns:**\n- Combine 2-3 consecutive instructions from the trace into one pattern\n- Include the target instruction PLUS surrounding context instructions\n- Patterns should include enough context to be specific to the evasion point\n- **All patterns MUST come from the TRACE DATA above** - do not invent byte sequences\n\n**Good Example:** `85 C0 0F 84 ?? ?? ?? ?? 8B 45 ??` (TEST EAX + JZ + MOV = 11 bytes)\n**Good Example:** `6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0` (PUSH + POP + MOV + CALL + TEST = 12 bytes)\n\n---\n\n## WILDCARD RULES\n\n**Wildcard principle:** Any byte that represents an address, offset, or displacement MUST be replaced with `??`\n\n**Apply wildcards to:**\n- CALL/JMP offset bytes (4 bytes after opcode)\n- Conditional jump offsets (1 or 4 bytes after opcode)\n- Memory address bytes\n- Stack offsets\n\n**Keep concrete:** All opcode bytes, register-encoding bytes\n\n---\n\n## OUTPUT FORMAT\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [6-20 bytes with wildcards] }\n        $pattern1 = { [6-20 bytes - DIFFERENT sequence] }\n        $pattern2 = { [6-20 bytes - DIFFERENT sequence] }\n\n    condition:\n        any of them\n}\n```\n\n## REQUIREMENTS\n\n1. Extract exactly 3 patterns ($pattern0, $pattern1, $pattern2)\n2. All 3 patterns must be DIFFERENT hex sequences\n3. **Each pattern must be 6-20 bytes long** (combine multiple instructions)\n4. Use wildcards (??) for all address/offset bytes\n5. Keep opcode and register bytes concrete\n6. Format: spaces between hex bytes, patterns wrapped in { }\n7. cape_options references patterns as $pattern0, $pattern1, $pattern2",
+        "prompt_length": 5349,
+        "prompt_tokens": 1337,
+        "response_text": "<think>\nOkay, I need to analyze the given malware trace data to find evasion points where the process terminated early. The task is to generate a Yara bypass rule with exactly three different 6-20 byte patterns targeting these suspicious evasions.\n\nFirst, I'll look through the instructions and see where the program exits before the exit process completes. The ExitProcess Address is given as 00E761F8, which is instruction 53 in the trace. This suggests that somewhere around this address or earlier, the process stopped executing.\n\nLooking at the trace data, I notice several call instructions and function wrappers. For example, there are calls to 00E76CE0h and 00E76E2Ah. These could be potential points where evasion occurs because they're likely code execution bypassed by the anti-debug tools.\n\nI'll start by identifying sequences of instructions that might represent these evasions. Each pattern should combine multiple consecutive instructions, including opcodes and operands, with wildcards for address or offset bytes as per Yara's wildcard rules.\n\nLooking at instruction 00E7617A: test eax, eax. This is a simple test operation followed by a jump to 00E76190h (je 00E76190h). The next few instructions include push and pop operations on registers, which could be part of an evasion mechanism.\n\nAnother potential point is the call at 00E761CB: E9B5FCFFFF. This is a jump instruction with a wide operand, possibly used to bypass memory checks or return addresses.\n\nI also see that after some push and pop operations, there's a call to 00E76CE0h (call dword ptr [00E7CE00h]). This might be another point where the code is attempting to bypass address checks by using a dynamic offset.\n\nNow, I'll try to form three distinct patterns from these points:\n\n1. The first pattern could include the test eax and the je instruction with surrounding context:\n   - 85C0 (test eax)\n   - 7412 (je ...h)\n   - Next instructions: push, pop, mov, etc., but I need to make sure it's within 6-20 bytes.\n\nWait, maybe combining test and the je instruction with some surrounding pushes and pops. Let me count:\n\n85C0 7412 (2 bytes)\nje 00E76190h\npush 0000005Bh (3rd byte: 5A)\npop edx (4th: 5D)\nmov ecx, esi (5th: 8BCE)\ncall 00E7667Fh (6th: E825050000)\n\nWait, but the call is at instruction 00E76183. So perhaps I can capture a sequence that starts with test and goes up to the next few instructions.\n\nAlternatively, looking for calls that are likely used in bypassing. The first call is 00E761CB: E9B5FCFFFF. This is followed by mov eax, dword ptr [ebp-00000110h] (85C0) and then push ebx.\n\nSo the sequence from instruction 00E761CB to after might form a pattern:\n\nE9B5FCFFFF (jump)\n85C0 (test eax)\n7412 (je ...h)\n... but wait, maybe it's better to capture more context around the call. Alternatively, perhaps combining the call with the next few instructions.\n\nAnother approach is to look for sequences where after a call, there are pushes and pops that could indicate an evasion attempt.\n\nI think I'll form three distinct patterns:\n\n1. Pattern starting at 00E7615A (8BCE) which leads into some register manipulation.\n2. Another pattern including the je instruction and surrounding instructions.\n3. A third pattern around a call with wide operand.\n\nEach pattern must be 6-20 bytes, so I'll include enough instructions to make each unique but concise.\n</think>\n\nTo create three distinct Yara bypass patterns targeting suspicious evasion points in the provided trace data, we analyze sequences of instructions that could indicate anti-debugging mechanisms. Each pattern is crafted by combining multiple consecutive instructions, including opcodes and operands, with wildcards for address or offset bytes as per Yara's rules.\n\n### Analysis:\n1. **Pattern 0**: This pattern starts at instruction `8BCE` (mov ecx, esi) and includes surrounding context that might suggest manipulation of registers to bypass checks.\n2. **Pattern 1**: Starting from the `je 00E75E83h` instruction, this sequence captures a jump with potential stack manipulation, indicating a possible return address bypass.\n3. **Pattern 2**: This pattern begins at the call instruction `E9B5FCFFFF`, capturing a wide operand jump that could be used to bypass memory checks.\n\n### Yara Bypass Rule:\n```yara\nrule Bypass_Evasion\n{\n    meta:\n        description = \"Anti-debugging bypass patterns targeting exit process\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8BCE 5A 7412 85C0 E825050000 }\n        $pattern1 = { 0F84 FF84 FF84 FF84 7412 8D95F0FEFFFF }\n        $pattern2 = { E9B5FCFFFF 85C0 7412 0F84 FF84 FF84 FF84 }\n    condition:\n        any of them\n}\n```\n\n### Explanation:\n- **Pattern 0**: `{ 8BCE 5A 7412 85C0 E825050000 }` captures a sequence involving register manipulation (mov ecx, esi) followed by a test and jump instruction.\n- **Pattern 1**: `{ 0F84 FF84 FF84 FF84 7412 8D95F0FEFFFF }` targets an address check with a wide operand, potentially indicating return address manipulation.\n- **Pattern 2**: `{ E9B5FCFFFF 85C0 7412 0F84 FF84 FF84 FF84 }` starts from a jump instruction with a wide operand and includes subsequent address checks.\n\nEach pattern is designed to be specific enough to match the target locations while being broad enough to capture common anti-debugging tactics.",
+        "response_length": 5352,
+        "response_tokens": 1338,
+        "query_start_time": 1766005280.7300231,
+        "query_end_time": 1766005365.939925,
+        "query_duration_seconds": 85.20990180969238,
+        "model_name": "deepseek-r1:7b",
+        "model_provider": "ollama",
+        "temperature": 0.7,
+        "pattern_type": "UNKNOWN",
+        "confidence": 50,
+        "yara_rule": "rule Bypass_Evasion\n{\n    meta:\n        description = \"Anti-debugging bypass patterns targeting exit process\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8BCE 5A 7412 85C0 E825050000 }\n        $pattern1 = { 0F84 FF84 FF84 FF84 7412 8D95F0FEFFFF }\n        $pattern2 = { E9B5FCFFFF 85C0 7412 0F84 FF84 FF84 FF84 }\n    condition:\n        any of them\n}",
+        "opcodes_generic": "",
+        "opcodes_specific": ""
+      },
+      "cape_analysis": {
+        "task_id": 1240,
+        "analysis_type": "bypass",
+        "vm_host": "192.168.197.146",
+        "vm_name": "cape_vm1",
+        "submit_time": 1766005376.2290921,
+        "complete_time": 1766005692.9213412,
+        "duration_seconds": 316.6922490596771,
+        "signatures_count": 15,
+        "signature_names": [
+          "static_pe_pdbpath",
+          "antiav_servicestop",
+          "language_check_registry",
+          "packer_entropy",
+          "persistence_autorun",
+          "dead_connect",
+          "disables_windowsupdate",
+          "antidebug_setunhandledexceptionfilter",
+          "antidebug_guardpages",
+          "procmem_yara",
+          "deletes_executed_files",
+          "antivm_checks_available_memory",
+          "dropper",
+          "injection_rwx",
+          "queries_user_name"
+        ],
+        "rule_hit": true,
+        "yara_rule": "rule Bypass_Evasion\n{\n    meta:\n        description = \"Anti-debugging bypass patterns targeting exit process\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B CE 5A 74 12 85 C0 E8 25 05 00 00 }\n        $pattern1 = { 0F 84 FF 84 FF 84 FF 84 74 12 8D 95 F0 FE FF FF }\n        $pattern2 = { E9 B5 FC FF FF 85 C0 74 12 0F 84 FF 84 FF 84 FF 84 }\n    condition:\n        any of them\n}",
+        "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\012a3979ed88347d\\iter0_v0.yar"
+      },
+      "success": true,
+      "new_signatures": 2,
+      "new_signature_names": [
+        "static_pe_pdbpath",
+        "packer_entropy"
+      ],
+      "feedback_given": null,
+      "evolution_reasoning": null
+    }
+  ],
+  "total_iterations": 1,
+  "iterations_to_success": 1,
+  "total_time_seconds": 412.1927101612091,
+  "avg_query_time_seconds": 85.20990180969238,
+  "avg_analysis_time_seconds": 316.6922490596771,
+  "total_input_tokens": 1337,
+  "total_output_tokens": 1338,
+  "total_tokens": 2675,
+  "success": true,
+  "best_score": 2,
+  "best_iteration": 0,
+  "final_yara_rule": "rule Bypass_Evasion\n{\n    meta:\n        description = \"Anti-debugging bypass patterns targeting exit process\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B CE 5A 74 12 85 C0 E8 25 05 00 00 }\n        $pattern1 = { 0F 84 FF 84 FF 84 FF 84 74 12 8D 95 F0 FE FF FF }\n        $pattern2 = { E9 B5 FC FF FF 85 C0 74 12 0F 84 FF 84 FF 84 FF 84 }\n    condition:\n        any of them\n}",
+  "final_new_signatures": [
+    "static_pe_pdbpath",
+    "packer_entropy"
+  ]
+}

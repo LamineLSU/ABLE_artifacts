@@ -1,0 +1,228 @@
+{
+  "sha256": "7fe0a0c797d7098d492bdcf4be3396fee8ff08c6f9392753f67d3475d917397e",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To identify and isolate key sections of the code that lead to the call to `ExitProcess`, we analyze the sequence of instructions and extract meaningful patterns. These patterns are designed to match segments of code that may be indicative of a process termination sequence. The use of `??` represents unknown or variable address parts, which is common when analyzing disassembled code.\n\n---\n\n### ✅ **Pattern 1:**\n**Hex:** `50 FF15 ?? ?? ?? ?? 53 FF15 ?? ?? ?? ??`  \n**Description:**  \nThis pattern represents the sequence of:\n- `50` → `PUSH EAX` (pushes the contents of the EAX register onto the stack)\n- `FF15 ?? ?? ?? ??` → `CALL [address]` (a call to an external function, likely `CloseHandle`)\n- `53` → `PUSH EBX` (pushes EBX onto the stack)\n- `FF15 ?? ?? ?? ??` → `CALL [address]` (another call, likely `ExitProcess`)\n\n**Use Case:**  \nThis pattern captures the flow of pushing registers and then making calls to functions, which is often seen before a process exits.\n\n---\n\n### ✅ **Pattern 2:**\n**Hex:** `50 FF15 ?? ?? ?? ?? 53`  \n**Description:**  \nThis is a shorter version of the previous pattern, capturing:\n- `50` → `PUSH EAX`\n- `FF15 ?? ?? ?? ??` → `CALL [address]` (likely `CloseHandle`)\n- `53` → `PUSH EBX`\n\n**Use Case:**  \nThis pattern is useful for detecting the preparation phase before the actual `ExitProcess` call, where registers are pushed onto the stack.\n\n---\n\n### ✅ **Pattern 3:**\n**Hex:** `B9428C0700 E8 ?? ?? ?? ??`  \n**Description:**  \nThis pattern represents:\n- `B9428C0700` → `MOV ECX, 0x078C4242` (moves a constant value into the ECX register)\n- `E8 ?? ?? ?? ??` → `CALL [address]` (a call to a function, possibly `0x078C4242` or another function)\n\n**Use Case:**  \nThis pattern is useful for identifying a function call that may be part of a larger process termination sequence, especially when paired with register manipulation.\n\n---\n\n### 📌 Summary\n\n| Pattern | Hex Pattern | Description |\n|--------|-------------|-------------|\n| 1      | `50 FF15 ?? ?? ?? ?? 53 FF15 ?? ?? ?? ??` | Call to `CloseHandle` followed by call to `ExitProcess` |\n| 2      | `50 FF15 ?? ?? ?? ?? 53` | Preparation phase before `ExitProcess` |\n| 3      | `B9428C0700 E8 ?? ?? ?? ??` | Setup before a function call that may lead to process termination |\n\nThese patterns are useful for identifying sequences that may lead to process termination in a reverse engineering or malware analysis context.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? }  // test eax, eax + je (zero-check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? }         // call to ExitProcess (API check)\n        $pattern2 = { BA 04 01 00 00 E8 ?? ?? ?? ?? }  // mov + call (logic flow)\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE, API_CHECK, OTHER",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "1763",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 2,
+      "new_signature_names": [
+        "queries_keyboard_layout",
+        "queries_locale_api"
+      ],
+      "new_signature_details": [
+        {
+          "name": "queries_keyboard_layout",
+          "description": "Queries the keyboard layout",
+          "categories": [
+            "location_discovery"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 8224,
+              "cid": 1475
+            },
+            {
+              "type": "call",
+              "pid": 8224,
+              "cid": 1499
+            },
+            {
+              "type": "call",
+              "pid": 8224,
+              "cid": 1533
+            },
+            {
+              "type": "call",
+              "pid": 8224,
+              "cid": 1651
+            },
+            {
+              "type": "call",
+              "pid": 8224,
+              "cid": 1654
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "queries_locale_api",
+          "description": "Queries the computer locale (possible geofencing)",
+          "categories": [
+            "location_discovery",
+            "geofence"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 8224,
+              "cid": 1268
+            },
+            {
+              "type": "call",
+              "pid": 8224,
+              "cid": 1434
+            },
+            {
+              "type": "call",
+              "pid": 8224,
+              "cid": 1663
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": "=== 8224.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 07:20:02 2025\nBreakpoint 1 hit by instruction at 0x040A7683 (thread 8528) EAX=0x16 EBX=0x2d ECX=0x4551424 EDX=0x45513d2 L\"mRG05Mf.exe\" ESI=0x4551378 L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP002.TMP\\mRG05Mf.exe\" EDI=0x455141c ESP=0x19d38c *ESP=0x16 EBP=0x19d3a4\n0x040A7683  FF15C45D0B04             CALL      DWORD [0x40b5dc4]             \nActionDispatcher: skipping instruction.\n0x040A7689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x040A7683 (thread 8528) EAX=0x5a ECX=0x455149c EDX=0x4551378 L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP002.TMP\\mRG05Mf.exe\" ESI=0x4551378 L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP002.TMP\\mRG05Mf.exe\" EDI=0x4551494 ESP=0x19d38c *ESP=0x5a EBP=0x19d3a4\n0x040A7683  FF15C45D0B04             CALL      DWORD [0x40b5dc4]             \nActionDispatcher: skipping instruction.\n0x040A7689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x040A7683 (thread 8528) EAX=0x96 EBX=0x21 ECX=0x45559f0 EDX=0x45557be L\"mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5...\" ESI=0x455577c L\"System.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Cult...\" EDI=0x45559e8 ESP=0x19c670 *ESP=0x96 EBP=0x19c688\n0x040A7683  FF15C45D0B04             CALL      DWORD [0x40b5dc4]             \nActionDispatcher: skipping instruction.\n0x040A7689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x040A7683 (thread 8528) EAX=0x96 EBX=0x21 ECX=0x4556408 EDX=0x45561d6 L\"mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5...\" ESI=0x4556194 L\"System.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Cult...\" EDI=0x4556400 ESP=0x19bfa0 *ESP=0x96 EBP=0x19bfb8\n0x040A7683  FF15C45D0B04             CALL      DWORD [0x40b5dc4]             \nActionDispatcher: skipping instruction.\n0x040A7689  33D2                     XOR       EDX, EDX                      \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to insufficient specificity in patterns, leading to potential mismatches. By selecting concrete byte sequences from the trace (e.g., `test eax, eax` followed by `je`, `call ExitProcess`, and surrounding `mov` instructions), we ensure patterns are tied to critical control flow points. These sequences are likely evasion checks or exit triggers, making them high-value targets for bypass detection.\n\n**PATTERN_TYPE**: CALL_TEST_JE, API_CHECK, OTHER\n\n**CONFIDENCE**: 95\n\n**REASONING**:  \n1. **`85 C0 0F 84 ?? ?? ?? ??`** targets the `test eax, eax` followed by a conditional jump (`je`), which is likely a zero-check for evasion logic.  \n2. **`FF 15 ?? ?? ?? ??`** directly references the `call` instruction to `ExitProcess`, a clear termination point.  \n3. **`BA 04 01 00 00 E8 ?? ?? ?? ??`** captures a `mov` followed by a `call`, which may be part of the logic flow leading to termination.  \n\nThese patterns are specific to the trace, reducing false positives while targeting critical control flow points.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? }  // test eax, eax + je (zero-check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? }         // call to ExitProcess (API check)\n        $pattern2 = { BA 04 01 00 00 E8 ?? ?? ?? ?? }  // mov + call (logic flow)\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\7fe0a0c797d7098d\\iter1_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? }  // test eax, eax + je (zero-check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? }         // call to ExitProcess (API check)\n        $pattern2 = { BA 04 01 00 00 E8 ?? ?? ?? ?? }  // mov + call (logic flow)\n\n    condition:\n        any of them\n}",
+    "pattern_type": "CALL_TEST_JE, API_CHECK, OTHER",
+    "confidence": 95,
+    "opcodes": "",
+    "task_id": "1763",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 16,
+    "new_signatures": 2,
+    "new_signature_names": [
+      "queries_keyboard_layout",
+      "queries_locale_api"
+    ],
+    "new_signature_details": [
+      {
+        "name": "queries_keyboard_layout",
+        "description": "Queries the keyboard layout",
+        "categories": [
+          "location_discovery"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 8224,
+            "cid": 1475
+          },
+          {
+            "type": "call",
+            "pid": 8224,
+            "cid": 1499
+          },
+          {
+            "type": "call",
+            "pid": 8224,
+            "cid": 1533
+          },
+          {
+            "type": "call",
+            "pid": 8224,
+            "cid": 1651
+          },
+          {
+            "type": "call",
+            "pid": 8224,
+            "cid": 1654
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "queries_locale_api",
+        "description": "Queries the computer locale (possible geofencing)",
+        "categories": [
+          "location_discovery",
+          "geofence"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 8224,
+            "cid": 1268
+          },
+          {
+            "type": "call",
+            "pid": 8224,
+            "cid": 1434
+          },
+          {
+            "type": "call",
+            "pid": 8224,
+            "cid": 1663
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": "=== 8224.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 07:20:02 2025\nBreakpoint 1 hit by instruction at 0x040A7683 (thread 8528) EAX=0x16 EBX=0x2d ECX=0x4551424 EDX=0x45513d2 L\"mRG05Mf.exe\" ESI=0x4551378 L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP002.TMP\\mRG05Mf.exe\" EDI=0x455141c ESP=0x19d38c *ESP=0x16 EBP=0x19d3a4\n0x040A7683  FF15C45D0B04             CALL      DWORD [0x40b5dc4]             \nActionDispatcher: skipping instruction.\n0x040A7689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x040A7683 (thread 8528) EAX=0x5a ECX=0x455149c EDX=0x4551378 L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP002.TMP\\mRG05Mf.exe\" ESI=0x4551378 L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP002.TMP\\mRG05Mf.exe\" EDI=0x4551494 ESP=0x19d38c *ESP=0x5a EBP=0x19d3a4\n0x040A7683  FF15C45D0B04             CALL      DWORD [0x40b5dc4]             \nActionDispatcher: skipping instruction.\n0x040A7689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x040A7683 (thread 8528) EAX=0x96 EBX=0x21 ECX=0x45559f0 EDX=0x45557be L\"mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5...\" ESI=0x455577c L\"System.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Cult...\" EDI=0x45559e8 ESP=0x19c670 *ESP=0x96 EBP=0x19c688\n0x040A7683  FF15C45D0B04             CALL      DWORD [0x40b5dc4]             \nActionDispatcher: skipping instruction.\n0x040A7689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x040A7683 (thread 8528) EAX=0x96 EBX=0x21 ECX=0x4556408 EDX=0x45561d6 L\"mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5...\" ESI=0x4556194 L\"System.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Cult...\" EDI=0x4556400 ESP=0x19bfa0 *ESP=0x96 EBP=0x19bfb8\n0x040A7683  FF15C45D0B04             CALL      DWORD [0x40b5dc4]             \nActionDispatcher: skipping instruction.\n0x040A7689  33D2                     XOR       EDX, EDX                      \n",
+    "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to insufficient specificity in patterns, leading to potential mismatches. By selecting concrete byte sequences from the trace (e.g., `test eax, eax` followed by `je`, `call ExitProcess`, and surrounding `mov` instructions), we ensure patterns are tied to critical control flow points. These sequences are likely evasion checks or exit triggers, making them high-value targets for bypass detection.\n\n**PATTERN_TYPE**: CALL_TEST_JE, API_CHECK, OTHER\n\n**CONFIDENCE**: 95\n\n**REASONING**:  \n1. **`85 C0 0F 84 ?? ?? ?? ??`** targets the `test eax, eax` followed by a conditional jump (`je`), which is likely a zero-check for evasion logic.  \n2. **`FF 15 ?? ?? ?? ??`** directly references the `call` instruction to `ExitProcess`, a clear termination point.  \n3. **`BA 04 01 00 00 E8 ?? ?? ?? ??`** captures a `mov` followed by a `call`, which may be part of the logic flow leading to termination.  \n\nThese patterns are specific to the trace, reducing false positives while targeting critical control flow points.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? }  // test eax, eax + je (zero-check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? }         // call to ExitProcess (API check)\n        $pattern2 = { BA 04 01 00 00 E8 ?? ?? ?? ?? }  // mov + call (logic flow)\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\7fe0a0c797d7098d\\iter1_v2.yar"
+  },
+  "best_score": 2,
+  "optimization_history": [
+    "Iteration 2: SUCCESS - 2 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

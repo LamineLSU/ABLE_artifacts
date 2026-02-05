@@ -1,0 +1,87 @@
+{
+  "prompt_version": "v0",
+  "prompt_name": "Zero-Shot Baseline",
+  "iterations": [
+    {
+      "iteration_number": 0,
+      "prompt_version": "v0",
+      "llm_query": {
+        "query_id": "6c41190bda64",
+        "timestamp": "2025-12-15T10:01:57.542828",
+        "iteration": 0,
+        "prompt_version": "v0",
+        "prompt_text": "# Malware Evasion Bypass Analysis\n\nYou are analyzing a malware execution trace that terminates early due to sandbox/VM evasion.\n\n## TRACE DATA\n\nSHA256: 68997aa367d5b00e31b462a41dafe45cbe04b9b85ae70b4ffe7db107163f2f3f\nExitProcess Address: 0042142B\nInstructions: 14\n--------------------------------------------------------------------------------\nAddress      Opcode               Instruction\n--------------------------------------------------------------------------------\n    00421400  55                   push ebp\n    00421401  8BEC                 mov ebp, esp\n    00421403  B9F8264300           mov ecx, 004326F8h\n    00421408  E8431C0000           call 00423050h\n    0042140D  E8EE82FFFF           call 00419700h\n    00421412  E889E0FFFF           call 0041F4A0h\n    00421417  85C0                 test eax, eax  # GetUserDefaultLangID@KERNEL32.DLL (Import, Hidden, Unknown Params)\n    00421419  740E                 je 00421429h\n    0042141B  E8E0A2FFFF           call 0041B700h\n    00421420  85C0                 test eax, eax\n    00421422  740E                 je 00421429h\n    00421424  E8B7F7FFFF           call 00420BE0h\n    00421429  6A00                 push 00000000h\n>>> 0042142B  FF1514284300         call dword ptr [00432814h]  # ExitProcess@KERNEL32.DLL (Import, Unknown Params)\n\n---\n\n## TASK\n\nAnalyze the trace and generate a YARA bypass rule with exactly 3 different patterns targeting suspicious evasion points.\n\n---\n\n## PATTERN LENGTH REQUIREMENT (CRITICAL)\n\nEach pattern must be **6-20 bytes long** to be specific enough to match only the target location.\n\n**How to build patterns:**\n- Combine 2-3 consecutive instructions from the trace into one pattern\n- Include the target instruction PLUS surrounding context instructions\n- Patterns should include enough context to be specific to the evasion point\n- **All patterns MUST come from the TRACE DATA above** - do not invent byte sequences\n\n**Good Example:** `85 C0 0F 84 ?? ?? ?? ?? 8B 45 ??` (TEST EAX + JZ + MOV = 11 bytes)\n**Good Example:** `6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0` (PUSH + POP + MOV + CALL + TEST = 12 bytes)\n\n---\n\n## WILDCARD RULES\n\n**Wildcard principle:** Any byte that represents an address, offset, or displacement MUST be replaced with `??`\n\n**Apply wildcards to:**\n- CALL/JMP offset bytes (4 bytes after opcode)\n- Conditional jump offsets (1 or 4 bytes after opcode)\n- Memory address bytes\n- Stack offsets\n\n**Keep concrete:** All opcode bytes, register-encoding bytes\n\n---\n\n## OUTPUT FORMAT\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [6-20 bytes with wildcards] }\n        $pattern1 = { [6-20 bytes - DIFFERENT sequence] }\n        $pattern2 = { [6-20 bytes - DIFFERENT sequence] }\n\n    condition:\n        any of them\n}\n```\n\n## REQUIREMENTS\n\n1. Extract exactly 3 patterns ($pattern0, $pattern1, $pattern2)\n2. All 3 patterns must be DIFFERENT hex sequences\n3. **Each pattern must be 6-20 bytes long** (combine multiple instructions)\n4. Use wildcards (??) for all address/offset bytes\n5. Keep opcode and register bytes concrete\n6. Format: spaces between hex bytes, patterns wrapped in { }\n7. cape_options references patterns as $pattern0, $pattern1, $pattern2",
+        "prompt_length": 3348,
+        "prompt_tokens": 837,
+        "response_text": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? FF 15 ?? ?? ?? ?? }  // ExitProcess call + preceding call\n        $pattern1 = { E8 ?? ?? ?? ?? 85 C0 74 0E }         // Test EAX + JE (first check)\n        $pattern2 = { E8 ?? ?? ?? ?? E8 ?? ?? ?? ?? }     // Two consecutive CALLs (sandbox checks)\n\n    condition:\n        any of them\n}\n```",
+        "response_length": 543,
+        "response_tokens": 135,
+        "query_start_time": 1765814347.6860096,
+        "query_end_time": 1765814517.5428283,
+        "query_duration_seconds": 169.85681867599487,
+        "model_name": "qwen3:latest",
+        "model_provider": "ollama",
+        "temperature": 0.7,
+        "pattern_type": "UNKNOWN",
+        "confidence": 50,
+        "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? FF 15 ?? ?? ?? ?? }  // ExitProcess call + preceding call\n        $pattern1 = { E8 ?? ?? ?? ?? 85 C0 74 0E }         // Test EAX + JE (first check)\n        $pattern2 = { E8 ?? ?? ?? ?? E8 ?? ?? ?? ?? }     // Two consecutive CALLs (sandbox checks)\n\n    condition:\n        any of them\n}",
+        "opcodes_generic": "",
+        "opcodes_specific": ""
+      },
+      "cape_analysis": {
+        "task_id": 1579,
+        "analysis_type": "bypass",
+        "vm_host": "192.168.52.147",
+        "vm_name": "cape_vm1",
+        "submit_time": 1765814527.863552,
+        "complete_time": 1765814844.91546,
+        "duration_seconds": 317.05190801620483,
+        "signatures_count": 17,
+        "signature_names": [
+          "resumethread_remote_process",
+          "language_check_registry",
+          "stealth_timeout",
+          "injection_rwx",
+          "dead_connect",
+          "antidebug_guardpages",
+          "reads_memory_remote_process",
+          "queries_computer_name",
+          "antivm_checks_available_memory",
+          "injection_write_exe_process",
+          "terminates_remote_process",
+          "persistence_autorun",
+          "antidebug_setunhandledexceptionfilter",
+          "http_request",
+          "injection_write_process",
+          "virus",
+          "procmem_yara"
+        ],
+        "rule_hit": true,
+        "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? FF 15 ?? ?? ?? ?? }  // ExitProcess call + preceding call\n        $pattern1 = { E8 ?? ?? ?? ?? 85 C0 74 0E }         // Test EAX + JE (first check)\n        $pattern2 = { E8 ?? ?? ?? ?? E8 ?? ?? ?? ?? }     // Two consecutive CALLs (sandbox checks)\n\n    condition:\n        any of them\n}",
+        "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\68997aa367d5b00e\\iter0_v0.yar"
+      },
+      "success": true,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "feedback_given": null,
+      "evolution_reasoning": null
+    }
+  ],
+  "total_iterations": 1,
+  "iterations_to_success": 1,
+  "total_time_seconds": 572.0787875652313,
+  "avg_query_time_seconds": 169.85681867599487,
+  "avg_analysis_time_seconds": 317.05190801620483,
+  "total_input_tokens": 1674,
+  "total_output_tokens": 518,
+  "total_tokens": 2192,
+  "success": true,
+  "best_score": 1,
+  "best_iteration": 0,
+  "final_yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? FF 15 ?? ?? ?? ?? }  // ExitProcess call + preceding call\n        $pattern1 = { E8 ?? ?? ?? ?? 85 C0 74 0E }         // Test EAX + JE (first check)\n        $pattern2 = { E8 ?? ?? ?? ?? E8 ?? ?? ?? ?? }     // Two consecutive CALLs (sandbox checks)\n\n    condition:\n        any of them\n}",
+  "final_new_signatures": [
+    "terminates_remote_process"
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "sha256": "b10884a495070c2f9ee183bbbb6d1b8f7351fc75d094f4bb212c38c859a6e867",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To determine the three points where skipping the instruction would prevent the execution of the `ExitProcess` call, we need to analyze the control flow of the program. Based on the logic of the program and the conditional branches, the following three points are critical in preventing the final `ExitProcess` call:\n\n---\n\n### **1. Instruction: `call 004015A0h` (at address `00401F0B`)**  \n- **Description:** This is the first call in the sequence, which sets the value of the `ebx` register based on the return value of the function at `004015A0h`.\n- **Impact:** If this call is skipped, the `ebx` register will remain uninitialized or retain its previous value. When the program reaches the `test ebx, ebx` instruction, it will interpret `ebx` as 0 (assuming no prior value), and the program will jump to the return path (`00401F34`), bypassing the rest of the logic and thus **not** calling `ExitProcess`.\n- **Conclusion:** Skipping this call will **prevent** the execution of `ExitProcess`.\n\n---\n\n### **2. Instruction: `call 00401410h` (at address `00401F1F`)**  \n- **Description:** This call sets the value of `eax`, which is then tested in the next conditional check (`test eax, eax`).\n- **Impact:** If this call is skipped, `eax` will remain uninitialized or retain its previous value. The `test eax, eax` will interpret `eax` as 0, leading to a jump to `00401F39`. From there, the program may allocate memory and call another function (e.g., `0040F828h`), which may or may not lead to `ExitProcess`. However, **if the path taken after `00401F39` does not ultimately reach `ExitProcess`,** skipping this call will **prevent** the final `ExitProcess` call.\n- **Conclusion:** Skipping this call may **prevent** the `ExitProcess` call, depending on the subsequent execution flow.\n\n---\n\n### **3. Instruction: `call 004012C0h` (at address `00401F50`)**  \n- **Description:** This call is part of the final path that leads to `ExitProcess`. It sets up some internal state or prepares for the final `ExitProcess` call.\n- **Impact:** If this call is skipped, the program may still proceed to the `ExitProcess` call if the preceding logic still evaluates to true. However, **if the call at `004012C0h` is critical to enabling the `ExitProcess` call** (e.g., it sets a flag or initializes a context), then skipping it will **prevent** the `ExitProcess` call.\n- **Conclusion:** Skipping this call may **prevent** the `ExitProcess` call, depending on its role in the program flow.\n\n---\n\n### ✅ **Summary of Critical Points**\n| Instruction Address | Function | Effect on `ExitProcess` |\n|---------------------|---------|--------------------------|\n| `00401F0B`          | `call 004015A0h` | Prevents `ExitProcess` by skipping the first conditional branch |\n| `00401F1F`          | `call 00401410h` | May prevent `ExitProcess` by altering the conditional path |\n| `00401F50`          | `call 004012C0h` | May prevent `ExitProcess` if it is required for enabling the call |\n\n---\n\n### ✅ Final Answer:\n**The three instructions that, if skipped, would prevent the `ExitProcess` call are:**\n\n1. `call 004015A0h` at `00401F0B`\n2. `call 00401410h` at `00401F1F`\n3. `call 004012C0h` at `00401F50`",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 85 DB 74 ?? }  // CALL + TEST EBX + JE\n        $pattern1 = { 85 C0 75 0E }                  // TEST EAX + JNE\n        $pattern2 = { FF 15 ?? ?? ?? ?? }           // ExitProcess API call\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE | CMP_SETZ | API_CHECK",
+      "confidence": 75,
+      "opcodes": "",
+      "task_id": "1536",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 6,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 4016.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 03:29:17 2025\nBreakpoint 1 hit by instruction at 0x10001CCA (thread 9000) EBX=0x10000000 \"MZ\" ECX=0x10000000 \"MZ\" EDX=0x10000100 \"PE\" ESP=0x19f290 *ESP=0x10001de6 EBP=0x19f2ac\n0x10001CCA  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x10001CCC  750E                     JNZ       0x10                          \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to incorrect pattern selection. The trace shows critical decision points before ExitProcess: 1) A call followed by test ebx/je (Strategy A), 2) test eax/jne (Strategy B), and 3) the direct ExitProcess call (Strategy C). These patterns target evasion checks and exit logic, ensuring specificity while allowing for variant flexibility.\n\n**PATTERN_TYPE**: CALL_TEST_JE | CMP_SETZ | API_CHECK\n\n**CONFIDENCE**: 75\n\n**REASONING**: These patterns capture:  \n1. **CALL_TEST_JE** (E8 ?? ?? ?? ?? 85 DB 74 ??) - A common evasion check with conditional jump  \n2. **CMP_SETZ** (85 C0 75 0E) - Test eax/jne pattern for execution flow control  \n3. **API_CHECK** (FF 15 ?? ?? ?? ??) - Direct call to ExitProcess (KERNEL32) with address wildcarding  \n\nAll patterns are derived directly from the trace, ensuring accurate matching while allowing for address variations. The cape_options skip all three patterns to bypass detection.\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 85 DB 74 ?? }  // CALL + TEST EBX + JE\n        $pattern1 = { 85 C0 75 0E }                  // TEST EAX + JNE\n        $pattern2 = { FF 15 ?? ?? ?? ?? }           // ExitProcess API call\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\b10884a495070c2f\\iter1_v2.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 DB 74 1B }  // test ebx, ebx + je\n        $pattern1 = { 85 C0 75 0E }  // test eax, eax + jne\n        $pattern2 = { E8 90 F6 FF FF 85 DB 74 1B }  // call + test ebx, ebx + je\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 85,
+      "opcodes": "",
+      "task_id": "1537",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 6,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Modify the YARA patterns to be more generic (e.g., use wildcards for opcode variations) and adjust skip offsets to avoid invalid code execution. Prioritize targeting less common or more dynamic instruction sequences."
+      ],
+      "debugger_log": "=== 7296.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 01:12:13 2025\nBreakpoint 0 hit by instruction at 0x00401F15 (thread 868) EAX=0x53af78 EBX=0x53af78 ECX=0x19ffcc ESI=0x401fb0 b10884a495070c2f9ee1.exe EDI=0x401fb0 b10884a495070c2f9ee1.exe ESP=0x19ff5c *ESP=0x401fb0 b10884a495070c2f9ee1.exe EBP=0x19ff68\nBreak at 0x00401F15 in b10884a495070c2f9ee1.exe (RVA 0x1f15, thread 868, Stack 0x00193000-0x001A0000, ImageBase 0x00400000)\n0x00401F15  85DB                     TEST      EBX, EBX                      \nActionDispatcher: skipping instruction.\n0x00401F17  741B                     JZ        0x1d                          \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule matched the exit call but failed to identify the evasion logic. The evasion decision occurs earlier in the trace, specifically around conditional checks (test+je/jne) and function calls. By focusing on these decision points rather than the exit itself, we increase the likelihood of hitting the correct bypass location. The three patterns target distinct but related evasion checks in the trace, ensuring specificity while maintaining flexibility for variants.\n\n---\n\n**PATTERN_TYPE**: CALL_TEST_JE  \n**CONFIDENCE**: 85  \n\n**REASONING**:  \n1. **Pattern0** targets the `test ebx, ebx` followed by `je` (0x85 DB 74 1B) — a classic evasion check for non-zero values.  \n2. **Pattern1** captures the `test eax, eax` followed by `jne` (0x85 C0 75 0E) — another conditional check for non-zero results.  \n3. **Pattern2** combines a relative call to a check function (0xE8 90 F6 FF FF) with the subsequent `test ebx, ebx` and `je` — ensuring the bypass logic is tied to the evasion decision point, not the exit itself.  \n\nThese patterns avoid the exit call and focus on the actual decision logic, reducing false positives and improving specificity.\n\n---\n\n**YARA_RULE**:  \n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 DB 74 1B }  // test ebx, ebx + je\n        $pattern1 = { 85 C0 75 0E }  // test eax, eax + jne\n        $pattern2 = { E8 90 F6 FF FF 85 DB 74 1B }  // call + test ebx, ebx + je\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\b10884a495070c2f\\iter2_v2.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

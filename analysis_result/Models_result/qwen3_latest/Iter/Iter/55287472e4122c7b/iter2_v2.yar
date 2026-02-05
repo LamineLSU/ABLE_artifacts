@@ -1,0 +1,14 @@
+rule Bypass_Sample_Evolved
+{
+    meta:
+        description = "Evasion bypass rule - evolved"
+        cape_options = "bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0"
+
+    strings:
+        $pattern0 = { FF 15 74 64 45 00 83 F8 11 74 05 } // VirtualAlloc + EAX cmp + JE
+        $pattern1 = { 83 7D FC 00 74 2F } // [ebp-04h] cmp + JE
+        $pattern2 = { FF 15 9C 63 45 00 83 7C 24 08 00 74 2F } // VirtualFree + [esp+08h] cmp + JE
+
+    condition:
+        any of them
+}

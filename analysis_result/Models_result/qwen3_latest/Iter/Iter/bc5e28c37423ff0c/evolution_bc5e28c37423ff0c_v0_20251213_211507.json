@@ -1,0 +1,77 @@
+{
+  "sha256": "bc5e28c37423ff0c939fc98754280a3bba22bbad3c7048894d0908c445477c5e",
+  "prompt_version": "v0",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v0",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v0",
+      "yara_rule": "rule EvasionPatterns\n{\n    meta:\n        description = \"Detects evasion techniques involving calls to ExitProcess and other suspicious functions.\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n    \n    strings:\n        // Pattern 1: Call to ExitProcess with surrounding instructions\n        $a = { 83 C4 ?? 52 FF D0 5E }  // add esp, 14h; push edx; call eax; pop esi\n        \n        // Pattern 2: Call to 0041EB27 with surrounding instructions\n        $b = { 50 E8 ?? ?? ?? ?? 8B 55 ?? }  // push eax; call; mov edx, [ebp+0Ch]\n        \n        // Pattern 3: LEA instruction and surrounding pushes\n        $c = { 8D B0 ?? ?? ?? ?? 56 50 }  // lea esi, [eax+0CA0h]; push esi; push eax\n        \n    condition:\n        any of ($a, $b, $c)\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "977",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule EvasionPatterns\n{\n    meta:\n        description = \"Detects evasion techniques involving calls to ExitProcess and other suspicious functions.\"\n    \n    strings:\n        // Pattern 1: Call to ExitProcess with surrounding instructions\n        $a = {83 C4 ?? 52 FFD0 5E}  // add esp, 14h; push edx; call eax; pop esi\n        \n        // Pattern 2: Call to 0041EB27 with surrounding instructions\n        $b = {50 E8 ?? ?? ?? ?? 8B 55 ??}  // push eax; call; mov edx, [ebp+0Ch]\n        \n        // Pattern 3: LEA instruction and surrounding pushes\n        $c = {8D B0 ?? ?? ?? ?? 56 50}  // lea esi, [eax+0CA0h]; push esi; push eax\n        \n    condition:\n        any of ($a, $b, $c)\n}\n```\n\n### Explanation:\n1. **Pattern 1** targets the call to `ExitProcess` (`FFD0`) with surrounding instructions (`83 C4 ??` for `add esp, 14h`, `52` for `push edx`, and `5E` for `pop esi`). The displacement `14h` is replaced with `??` to avoid hardcoded addresses.\n2. **Pattern 2** identifies a call to an external function (`E8 ?? ?? ?? ??`) preceded by a `push eax` and followed by a `mov edx, [ebp+0Ch]`. The displacement `0Ch` is masked with `??`.\n3. **Pattern 3** captures a `lea` instruction (`8D B0 ?? ?? ?? ??`) with a displacement, followed by `push esi` and `push eax`, which are common in function call sequences.\n\nThese patterns ensure flexibility by masking addresses/offsets while targeting suspicious code structures.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\bc5e28c37423ff0c\\iter1_v0.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B 16 50 51 FF D2 } // RtlAllocateHeap call with setup\n        $pattern1 = { 56 56 6A 35 6A 00 51 8D B0 98 0C 00 00 E8 74 0A 00 00 } // Call to 0041EB27h with parameter pushes\n        $pattern2 = { 6A 35 6A 00 51 8D B0 98 0C 00 00 E8 74 0A 00 00 } // Heap operation push sequence\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 85,
+      "opcodes": "",
+      "task_id": "978",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule hit but failed to find new signatures likely due to incorrect pattern location. The trace shows critical calls to RtlAllocateHeap and RtlFreeHeap, which are often used in evasion checks. By focusing on the call sequences and parameter pushes (Strategy A), we target the decision point before exit. The three patterns capture distinct but related evasion checks, ensuring specificity while allowing for variant tolerance.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 85\n\n**REASONING**: These patterns target the call to RtlAllocateHeap (FFD2) and surrounding setup, the call to 0041EB27h with parameter pushes, and the push sequence for heap operations. They are derived directly from the trace and focus on evasion checks rather than the exit itself, increasing the likelihood of bypassing detection.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B16 50 51 FFD2 } // RtlAllocateHeap call with setup\n        $pattern1 = { 56 56 6A35 6A00 51 8DB0980C0000 E8740A0000 } // Call to 0041EB27h with parameter pushes\n        $pattern2 = { 6A35 6A00 51 8DB0980C0000 E8740A0000 } // Heap operation push sequence\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\bc5e28c37423ff0c\\iter2_v0.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

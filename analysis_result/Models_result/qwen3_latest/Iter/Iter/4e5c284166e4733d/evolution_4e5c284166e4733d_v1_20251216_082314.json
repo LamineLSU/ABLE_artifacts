@@ -1,0 +1,399 @@
+{
+  "sha256": "4e5c284166e4733dc78572d1ab49bdbe68c6d05b4c8cf4372629939fc2ca322c",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To resolve the error related to the first pattern (`$pattern0`), we need to ensure that the pattern includes **4 or more bytes** **after the call offset** (i.e., after the `E8` instruction and its 4-byte offset field). The original pattern was too short, only including 3 bytes after the offset, which violated the requirement.\n\n---\n\n### ✅ **Corrected Pattern 0**\n\n**Original:**  \n`E8 ?? ?? ?? ?? 83 F8 01`  \n→ Only 3 bytes after the call offset (`83 F8 01`)\n\n**Corrected:**  \n`E8 ?? ?? ?? ?? 83 F8 01 75 0A`  \n→ Now includes 4 bytes after the call offset (`83 F8 01 75 0A`)\n\n- **Explanation:**  \n  - The `E8` instruction is followed by a 4-byte offset (the `?? ?? ?? ??`).\n  - The next instruction after the call is `83 F8 01` (a `cmp` instruction).\n  - Then comes a `jne` instruction (`75 0A`), which adds the 4th byte after the offset.\n\nThis now satisfies the requirement of having **4 or more bytes after the call offset**.\n\n---\n\n### ✅ **Other Patterns (Unchanged)**\n\n- **Pattern 1:**  \n  `E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ??`  \n  → Includes 4 bytes after the offset (`83 C4 ??`), and continues with `85 C0 0F 84 ...` — valid.\n\n- **Pattern 2:**  \n  `6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0`  \n  → Includes a `push` instruction (`6A ??`), `pop` (`5A`), `mov` (`8B CE`), and a call (`E8 ...`), then `85 C0` — valid.\n\n---\n\n### ✅ **Final Answer**\n\n```plaintext\nCorrected Patterns:\n\n- $pattern0: E8 ?? ?? ?? ?? 83 F8 01 75 0A  (10 bytes)\n- $pattern1: E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ??  (14 bytes)\n- $pattern2: 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0  (12 bytes)\n```\n\nThese patterns now meet the requirement of having **4 or more bytes after the call offset** in `$pattern0`, and the other patterns remain valid as is.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v1",
+      "yara_rule": "rule Evasion_Termination_Check {\n    meta:\n        description = \"Detects evasion logic and ExitProcess call in memory\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n    strings:\n        $a = { E8 CD 3D 00 00 83 F8 01 74 20 }\n        $b = { C1 E8 08 A8 01 75 10 }\n        $c = { 90 E8 ?? ?? ?? ?? }\n    condition:\n        all of ($a, $b, $c)\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 75,
+      "opcodes": "",
+      "task_id": "1022",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 10,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Replace `bp0=$a+0,action0=skip` with `bp0=$a+0,action0=halt` to pause execution at the evasion logic without skipping it, preserving the original behavior for accurate detection."
+      ],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to insufficient specificity or incorrect pattern placement. The trace shows critical checks before ExitProcess, including conditional jumps (JE/JNE) and API calls. By targeting the **call to the evasion check**, **conditional test logic**, and the **ExitProcess call itself**, we ensure coverage of both the evasion mechanism and the termination decision. These patterns are concrete from the trace, avoiding wildcards except for address offsets, ensuring specificity while allowing for variant flexibility.\n\n---\n\n**PATTERN_TYPE**: CALL_TEST_JE  \n**CONFIDENCE**: 75  \n**PATTERN**: `E8 CD 3D 00 00 83 F8 01 74 20`  \n**DESCRIPTION**: A call to the evasion check function (`0101A302h`) followed by `cmp eax, 0x01` and `je` to bypass logic.  \n\n---\n\n**PATTERN_TYPE**: TEST_JNE  \n**CONFIDENCE**: 70  \n**PATTERN**: `C1 E8 08 A8 01 75 10`  \n**DESCRIPTION**: A sequence of `shr eax, 0x08`, `test al, 0x01`, and `jne` to evaluate conditions before termination.  \n\n---\n\n**PATTERN_TYPE**: EXIT_PROCESS_CALL  \n**CONFIDENCE**: 65  \n**PATTERN**: `90 E8 ?? ?? ?? ??`  \n**DESCRIPTION**: A `nop` followed by a call to `ExitProcess` (`74DF4100h`), capturing the termination trigger.  \n\n---\n\n**YARA_RULE**:  \n```yara\nrule Evasion_Termination_Check {\n    meta:\n        description = \"Detects evasion logic and ExitProcess call in memory\"\n    strings:\n        $a = { E8 CD 3D 00 00 83 F8 01 74 20 }\n        $b = { C1 E8 08 A8 01 75 10 }\n        $c = { 90 E8 ?? ?? ?? ?? }\n    condition:\n        all of ($a, $b, $c)\n}\n```\n\n**CAPE_OPTIONS**:  \n```json\n{\n    \"CAPE\": {\n        \"pattern\": \"E8 CD 3D 00 00 83 F8 01 74 20\",\n        \"pattern\": \"C1 E8 08 A8 01 75 10\",\n        \"pattern\": \"90 E8 ?? ?? ?? ??\"\n    }\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\4e5c284166e4733d\\iter1_v1.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=halt,bp1=$pattern1+0,action1=halt,bp2=$pattern2+0,action2=halt,count=0\"\n\n    strings:\n        $pattern0 = { E8 CD 3D 00 00 83 F8 01 74 20 }\n        $pattern1 = { C1 E8 08 A8 01 75 10 }\n        $pattern2 = { 90 50 E8 94 DB DD 73 }\n\n    condition:\n        all of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "1023",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 10,
+      "new_signatures": 4,
+      "new_signature_names": [
+        "procmem_yara",
+        "packer_unknown_pe_section_name",
+        "static_pe_anomaly",
+        "injection_rwx"
+      ],
+      "new_signature_details": [
+        {
+          "name": "packer_unknown_pe_section_name",
+          "description": "The binary contains an unknown PE section name indicative of packing",
+          "categories": [
+            "packer"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "unknown section": {
+                "name": "   \u0000    ",
+                "raw_address": "0x00001000",
+                "virtual_address": "0x00001000",
+                "virtual_size": "0x00068000",
+                "size_of_data": "0x00068000",
+                "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE",
+                "characteristics_raw": "0xe0000040",
+                "entropy": "7.10"
+              }
+            },
+            {
+              "unknown section": {
+                "name": ".idata  ",
+                "raw_address": "0x00069200",
+                "virtual_address": "0x0006a000",
+                "virtual_size": "0x00001000",
+                "size_of_data": "0x00000200",
+                "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE",
+                "characteristics_raw": "0xc0000040",
+                "entropy": "1.04"
+              }
+            },
+            {
+              "unknown section": {
+                "name": "kapxoyny",
+                "raw_address": "0x00069400",
+                "virtual_address": "0x0006b000",
+                "virtual_size": "0x002a4000",
+                "size_of_data": "0x002a4000",
+                "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE",
+                "characteristics_raw": "0xe0000040",
+                "entropy": "6.41"
+              }
+            },
+            {
+              "unknown section": {
+                "name": "mbnitgof",
+                "raw_address": "0x0030d400",
+                "virtual_address": "0x0030f000",
+                "virtual_size": "0x00001000",
+                "size_of_data": "0x00000400",
+                "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE",
+                "characteristics_raw": "0xe0000040",
+                "entropy": "6.10"
+              }
+            },
+            {
+              "unknown section": {
+                "name": ".taggant",
+                "raw_address": "0x0030d800",
+                "virtual_address": "0x00310000",
+                "virtual_size": "0x00003000",
+                "size_of_data": "0x00002200",
+                "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE",
+                "characteristics_raw": "0xe0000040",
+                "entropy": "0.64"
+              }
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "injection_rwx",
+          "description": "Creates RWX memory",
+          "categories": [
+            "injection"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 50,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 5256,
+              "cid": 271
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "procmem_yara",
+          "description": "Yara detections observed in process dumps, payloads or dropped files",
+          "categories": [
+            "malware"
+          ],
+          "severity": 3,
+          "weight": 4,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "Hit": "PID 5256 triggered the Yara rule 'Themida' with data '['{ FC 31 C9 49 89 CA 31 C0 31 DB AC 30 C8 88 E9 88 D5 88 F2 B6 08 66 D1 EB 66 D1 D8 73 09 }']'"
+            },
+            {
+              "Hit": "PID 5256 triggered the Yara rule 'Amadey' with data '['{ 8B D1 B8 FF FF FF 7F D1 EA 2B C2 3B C8 76 07 BB FF FF FF 7F EB 08 8D 04 0A 3B D8 0F 42 D8 }', '{ 8A 04 02 88 04 0F 41 8B 7D FC 8D 42 01 3B CB 7C }']'"
+            },
+            {
+              "Hit": "PID 5256 triggered the Yara rule 'Themida' with data '['{ FC 31 C9 49 89 CA 31 C0 31 DB AC 30 C8 88 E9 88 D5 88 F2 B6 08 66 D1 EB 66 D1 D8 73 09 }']'"
+            },
+            {
+              "Hit": "PID 5256 triggered the Yara rule 'Amadey' with data '['{ 8B D1 B8 FF FF FF 7F D1 EA 2B C2 3B C8 76 07 BB FF FF FF 7F EB 08 8D 04 0A 3B D8 0F 42 D8 }', '{ 8A 04 02 88 04 0F 41 8B 7D FC 8D 42 01 3B CB 7C }']'"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "static_pe_anomaly",
+          "description": "Anomalous binary characteristics",
+          "categories": [
+            "static"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 80,
+          "references": [],
+          "data": [
+            {
+              "anomaly": "Actual checksum does not match that reported in PE header"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to insufficient specificity in patterns, leading to incorrect rule hits. By selecting three distinct patterns from the trace—specifically targeting the evasion check (cmp+je), the test+jne logic, and the ExitProcess call—we increase precision. These patterns are concrete from the trace, avoiding wildcards where possible, and span different locations to reduce false positives. The first pattern targets the evasion check, the second the conditional logic, and the third the exit mechanism, aligning with Strategies A and B.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 95\n\n**REASONING**: These patterns directly reference the evasion logic and exit mechanism from the trace. The first pattern (E8 CD 3D 00 00 83 F8 01 74 20) captures the initial call and comparison, the second (C1 E8 08 A8 01 75 10) targets the test+jne logic, and the third (90 50 E8 94 DB DD 73) identifies the ExitProcess call. Using concrete bytes from the trace ensures specificity while avoiding false matches.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=halt,bp1=$pattern1+0,action1=halt,bp2=$pattern2+0,action2=halt,count=0\"\n\n    strings:\n        $pattern0 = { E8 CD 3D 00 00 83 F8 01 74 20 }\n        $pattern1 = { C1 E8 08 A8 01 75 10 }\n        $pattern2 = { 90 50 E8 94 DB DD 73 }\n\n    condition:\n        all of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\4e5c284166e4733d\\iter2_v1.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v1",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=halt,bp1=$pattern1+0,action1=halt,bp2=$pattern2+0,action2=halt,count=0\"\n\n    strings:\n        $pattern0 = { E8 CD 3D 00 00 83 F8 01 74 20 }\n        $pattern1 = { C1 E8 08 A8 01 75 10 }\n        $pattern2 = { 90 50 E8 94 DB DD 73 }\n\n    condition:\n        all of them\n}",
+    "pattern_type": "CALL_TEST_JE",
+    "confidence": 95,
+    "opcodes": "",
+    "task_id": "1023",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 10,
+    "new_signatures": 4,
+    "new_signature_names": [
+      "procmem_yara",
+      "packer_unknown_pe_section_name",
+      "static_pe_anomaly",
+      "injection_rwx"
+    ],
+    "new_signature_details": [
+      {
+        "name": "packer_unknown_pe_section_name",
+        "description": "The binary contains an unknown PE section name indicative of packing",
+        "categories": [
+          "packer"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "unknown section": {
+              "name": "   \u0000    ",
+              "raw_address": "0x00001000",
+              "virtual_address": "0x00001000",
+              "virtual_size": "0x00068000",
+              "size_of_data": "0x00068000",
+              "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE",
+              "characteristics_raw": "0xe0000040",
+              "entropy": "7.10"
+            }
+          },
+          {
+            "unknown section": {
+              "name": ".idata  ",
+              "raw_address": "0x00069200",
+              "virtual_address": "0x0006a000",
+              "virtual_size": "0x00001000",
+              "size_of_data": "0x00000200",
+              "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE",
+              "characteristics_raw": "0xc0000040",
+              "entropy": "1.04"
+            }
+          },
+          {
+            "unknown section": {
+              "name": "kapxoyny",
+              "raw_address": "0x00069400",
+              "virtual_address": "0x0006b000",
+              "virtual_size": "0x002a4000",
+              "size_of_data": "0x002a4000",
+              "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE",
+              "characteristics_raw": "0xe0000040",
+              "entropy": "6.41"
+            }
+          },
+          {
+            "unknown section": {
+              "name": "mbnitgof",
+              "raw_address": "0x0030d400",
+              "virtual_address": "0x0030f000",
+              "virtual_size": "0x00001000",
+              "size_of_data": "0x00000400",
+              "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE",
+              "characteristics_raw": "0xe0000040",
+              "entropy": "6.10"
+            }
+          },
+          {
+            "unknown section": {
+              "name": ".taggant",
+              "raw_address": "0x0030d800",
+              "virtual_address": "0x00310000",
+              "virtual_size": "0x00003000",
+              "size_of_data": "0x00002200",
+              "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE",
+              "characteristics_raw": "0xe0000040",
+              "entropy": "0.64"
+            }
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "injection_rwx",
+        "description": "Creates RWX memory",
+        "categories": [
+          "injection"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 50,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 5256,
+            "cid": 271
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "procmem_yara",
+        "description": "Yara detections observed in process dumps, payloads or dropped files",
+        "categories": [
+          "malware"
+        ],
+        "severity": 3,
+        "weight": 4,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "Hit": "PID 5256 triggered the Yara rule 'Themida' with data '['{ FC 31 C9 49 89 CA 31 C0 31 DB AC 30 C8 88 E9 88 D5 88 F2 B6 08 66 D1 EB 66 D1 D8 73 09 }']'"
+          },
+          {
+            "Hit": "PID 5256 triggered the Yara rule 'Amadey' with data '['{ 8B D1 B8 FF FF FF 7F D1 EA 2B C2 3B C8 76 07 BB FF FF FF 7F EB 08 8D 04 0A 3B D8 0F 42 D8 }', '{ 8A 04 02 88 04 0F 41 8B 7D FC 8D 42 01 3B CB 7C }']'"
+          },
+          {
+            "Hit": "PID 5256 triggered the Yara rule 'Themida' with data '['{ FC 31 C9 49 89 CA 31 C0 31 DB AC 30 C8 88 E9 88 D5 88 F2 B6 08 66 D1 EB 66 D1 D8 73 09 }']'"
+          },
+          {
+            "Hit": "PID 5256 triggered the Yara rule 'Amadey' with data '['{ 8B D1 B8 FF FF FF 7F D1 EA 2B C2 3B C8 76 07 BB FF FF FF 7F EB 08 8D 04 0A 3B D8 0F 42 D8 }', '{ 8A 04 02 88 04 0F 41 8B 7D FC 8D 42 01 3B CB 7C }']'"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "static_pe_anomaly",
+        "description": "Anomalous binary characteristics",
+        "categories": [
+          "static"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 80,
+        "references": [],
+        "data": [
+          {
+            "anomaly": "Actual checksum does not match that reported in PE header"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to insufficient specificity in patterns, leading to incorrect rule hits. By selecting three distinct patterns from the trace—specifically targeting the evasion check (cmp+je), the test+jne logic, and the ExitProcess call—we increase precision. These patterns are concrete from the trace, avoiding wildcards where possible, and span different locations to reduce false positives. The first pattern targets the evasion check, the second the conditional logic, and the third the exit mechanism, aligning with Strategies A and B.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 95\n\n**REASONING**: These patterns directly reference the evasion logic and exit mechanism from the trace. The first pattern (E8 CD 3D 00 00 83 F8 01 74 20) captures the initial call and comparison, the second (C1 E8 08 A8 01 75 10) targets the test+jne logic, and the third (90 50 E8 94 DB DD 73) identifies the ExitProcess call. Using concrete bytes from the trace ensures specificity while avoiding false matches.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=halt,bp1=$pattern1+0,action1=halt,bp2=$pattern2+0,action2=halt,count=0\"\n\n    strings:\n        $pattern0 = { E8 CD 3D 00 00 83 F8 01 74 20 }\n        $pattern1 = { C1 E8 08 A8 01 75 10 }\n        $pattern2 = { 90 50 E8 94 DB DD 73 }\n\n    condition:\n        all of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\4e5c284166e4733d\\iter2_v1.yar"
+  },
+  "best_score": 4,
+  "optimization_history": [
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: SUCCESS - 4 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    ""
+  ]
+}

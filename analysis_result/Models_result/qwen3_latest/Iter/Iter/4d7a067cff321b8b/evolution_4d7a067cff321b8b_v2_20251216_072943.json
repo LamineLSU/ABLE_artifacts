@@ -1,0 +1,79 @@
+{
+  "sha256": "4d7a067cff321b8bb69e94bda9209780b697797a3f604eedb0d4a9544d1ca7f2",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule ExitPattern1\n{\n    meta:\n        description = \"Pattern 1: Call to ExitProcess with preceding push ebx\"\n        cape_options = \"bp0=$a+0,action0=skip,count=0\"\n    strings:\n        $a = { 53 E8 ?? ?? ?? ?? }\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1014",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Adjust the skip offset to avoid disrupting the CALL's displacement calculation. Target a different instruction sequence that is less critical to program flow."
+      ],
+      "debugger_log": "=== 4016.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 22:37:01 2025\nBreakpoint 0 hit by instruction at 0x06DC3403 (thread 5040) EAX=0x6dc3400 EBX=0x9ee898 ECX=0x4748dcc ESI=0x4748b6c EDI=0x4748dcc ESP=0x9ee794 *ESP=0x9ee7a8 EBP=0x9ee794\n0x06DC3403  53                       PUSH      EBX                           \nActionDispatcher: skipping instruction.\n0x06DC3404  E88F8E86FD               CALL      0x0462C298                    \n\n\n=== 6700.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 22:36:51 2025\nBreakpoint 0 hit by instruction at 0x076A34CD (thread 6628) EBX=0x7 EDX=0x2 ESI=0x440a704 EDI=0x2 ESP=0x19bb54 *ESP=0x0 EBP=0x19bb88\n0x076A34CD  53                       PUSH      EBX                           \nActionDispatcher: skipping instruction.\n0x076A34CE  E88D8B5063               CALL      0x6ABAC060                    \nBreakpoint 0 hit by instruction at 0x076A34CD (thread 6628) EBX=0x7 EDX=0x2 ESI=0x440a704 EDI=0x2 ESP=0x19bb58 *ESP=0x0 EBP=0x19bb88\n0x076A34CD  53                       PUSH      EBX                           \nActionDispatcher: skipping instruction.\n0x076A34CE  E88D8B5063               CALL      0x6ABAC060                    \n",
+      "raw_response": "```yara\nrule ExitPattern1\n{\n    meta:\n        description = \"Pattern 1: Call to ExitProcess with preceding push ebx\"\n    strings:\n        $a = {53 E8 ?? ?? ?? ??}\n    condition:\n        all of them\n}\n\nrule ExitPattern2\n{\n    meta:\n        description = \"Pattern 2: Test eax, eax followed by je\"\n    strings:\n        $b = {85 C0 74 ?? ?? ?? ??}\n    condition:\n        all of them\n}\n\nrule ExitPattern3\n{\n    meta:\n        description = \"Pattern 3: Test eax, eax followed by je (different displacement)\"\n    strings:\n        $c = {85 C0 74 ?? ?? ?? ??}\n    condition:\n        all of them\n}\n```\n\n**Explanation of Patterns:**\n\n1. **Pattern 1 (`53 E8 ?? ?? ?? ??`)**  \n   - This captures the `push ebx` instruction (opcode `53`) followed by a `call` instruction (opcode `E8`). The `call` instruction includes a 4-byte displacement (replaced with `??`), which is typically used to jump to the `ExitProcess` function. This pattern is useful for detecting direct calls to the exit function.\n\n2. **Pattern 2 (`85 C0 74 ?? ?? ?? ??`)**  \n   - This captures a `test eax, eax` instruction (opcodes `85 C0`) followed by a `je` (jump if equal) instruction (opcode `74`). The `je` instruction includes a 4-byte displacement (replaced with `??`), which is used to conditionally jump to a location that may avoid the exit call. This pattern is useful for detecting conditional logic that might bypass the exit call.\n\n3. **Pattern 3 (`85 C0 74 ?? ?? ?? ??`)**  \n   - This is similar to Pattern 2 but is designed to capture a different conditional jump (potentially to a different location or with a different offset). While the structure is the same, the displacement may differ, making it a distinct pattern for detection purposes. This helps in identifying variations in conditional branching that might be used to avoid the exit call.\n\n**Note:** The use of `??` ensures that any address-related bytes (like displacement or target addresses) are not hardcoded, allowing the rule to match across different memory layouts or executable builds. This flexibility is crucial for detecting evasion techniques where the actual addresses might change.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\4d7a067cff321b8b\\iter0_v2.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 6A 5B 5A 8B CE }  // test+je+push+pop+mov\n        $pattern1 = { 85 C0 0F 84 33 FD FF FF }      // test+je (offset)\n        $pattern2 = { FF 15 88 A0 2E 01 }            // call to ExitProcess\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE | API_CHECK | OTHER",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "1015",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule hit the target but failed to find new signatures, likely due to overly specific or incorrect pattern placement. This evolution focuses on three distinct instruction sequences from the trace: early evasion checks (test+je+mov), a later conditional jump, and a direct API call to ExitProcess. These patterns are more likely to trigger evasion logic or termination conditions, ensuring broader coverage while avoiding false positives.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | OTHER\n\n**CONFIDENCE**: 95\n\n**REASONING**:  \n1. **Pattern0** captures early evasion logic with `test eax, eax` followed by a conditional jump (`je`), which is common in checks to validate execution flow.  \n2. **Pattern1** targets a later conditional jump (`je`) with a specific offset, which may enforce termination or bypass checks.  \n3. **Pattern2** directly references the `ExitProcess` API call, a strong indicator of program termination and potential evasion logic.  \nThese patterns are concrete from the trace, reducing false matches while covering critical evasion points.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 6A 5B 5A 8B CE }  // test+je+push+pop+mov\n        $pattern1 = { 85 C0 0F 84 33 FD FF FF }      // test+je (offset)\n        $pattern2 = { FF 15 88 A0 2E 01 }            // call to ExitProcess\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\4d7a067cff321b8b\\iter1_v2.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v2",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "```plaintext\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 ?? 6A 5B }\n        $pattern1 = { 8B CE E8 ?? ?? ?? ?? }\n        $pattern2 = { 85 C0 0F 84 ?? ?? ?? ?? E8 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```\n\n### Explanation:\n1. **Pattern 0**  \n   - Captures a `test eax, eax` followed by a `je` (short jump) with an offset (`??`) and the subsequent `push` instruction.  \n   - Hex: `85 C0 74 ?? 6A 5B`  \n   - Length: 6 bytes  \n   - Offset bytes replaced with `??` to avoid hardcoding addresses.\n\n2. **Pattern 1**  \n   - Captures a `mov ecx, edx` followed by a `call` with a 4-byte offset.  \n   - Hex: `8B CE E8 ?? ?? ?? ??`  \n   - Length: 8 bytes  \n   - Offset bytes replaced with `??`.\n\n3. **Pattern 2**  \n   - Captures a `test eax, eax`, a `jz` (conditional jump) with a 4-byte offset, and a `call` to `ExitProcess` with a 4-byte offset.  \n   - Hex: `85 C0 0F 84 ?? ?? ?? ?? E8 ?? ?? ?? ??`  \n   - Length: 14 bytes  \n   - All address/offset bytes replaced with `??`.\n\n### Key Details:\n- **Wildcard Use:** All address/offset bytes are replaced with `??` to avoid hardcoding specific memory addresses.\n- **Rule Structure:** The `condition` clause ensures the rule triggers if any of the patterns are matched.\n- **Cape Options:** The `cape_options` field specifies the behavior for the YARA rule in the context of a YARA-based analysis tool (e.g., for use with tools like YARA or Capa).",
+      "yara_file": null
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

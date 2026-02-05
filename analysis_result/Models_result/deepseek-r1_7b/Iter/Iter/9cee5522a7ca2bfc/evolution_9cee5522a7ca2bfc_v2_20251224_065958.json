@@ -1,0 +1,197 @@
+{
+  "sha256": "9cee5522a7ca2bfca7cd3d9daba23e9a30deb6205f56c12045839075f7627297",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass detection\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 8D ?? }\n        $pattern2 = { 3C ?? 7E ?? 99 ?? ?? ?? ?? 01 C0 8B 5F 40 }\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1518",
+      "status": "bypass_failed",
+      "rule_hit": false,
+      "baseline_signatures": 21,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "YARA pattern did not match",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 5168.log ===\nCAPE Sandbox - Debugger log: Wed Dec 24 19:30:18 2025\nBreakpoint 0 hit by instruction at 0x00007FFA804215F8 (thread 4852) RBX=0x212800872e8 RCX=0x21280087580 RDX=0xf70ba7df70 RDI=0x4 RSP=0xf70ba7db20 \"\u0010\u0014\" *RSP=0x21280011410 \"8C\u001d\" RBP=0xf70ba7dba0 R8=0x212800872f4 L\"ep\" R10=0xa R11=0xf70ba7d910 R12=0x8 R13=0x58 R14=0x21290001048 R15=0x2\n0x00007FFA804215F8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x00007FFA804215FA  0F84E1000000             JZ        0xe7                          \n",
+      "raw_response": "<think>\nAlright, so I'm trying to figure out how to create a Yara rule based on the given malware trace. The goal is to detect bypass evasions by analyzing the execution flow and identifying potential counterfactual scenarios where instructions could be skipped to prevent the exit.\n\nFirst, let's look at the provided trace data. It seems quite extensive with various instructions like sub, jnbe, add, jmp, etc. Since the program exits early due to sandbox evasion, I need to find out which instruction is causing the exit and then see if there are any opportunities for bypassing it.\n\nLooking through the trace, I notice that at line 011CEEA6, the instruction FF962CE00000 is called. This call seems to be exiting by calling a function at a specific address (esi + E000). But since the program exits early, maybe this exit path isn't being taken because of some bypass.\n\nNow, I need to think about what would happen if that instruction were skipped or modified. If we can create scenarios where the program continues executing instead of exiting, those could be our counterfactuals.\n\nLet me start by identifying key instructions near the exit:\n\n1. Line 011CEEA6: FF962CE00000 - This is the exit call.\n   - Counterfactual: What if this instruction isn't called? The program might continue instead of exiting.\n\n2. Line 011CEEB2: EB E1 - There's a test (E1) before the jmp at line 011CEEB4.\n   - If this test wasn't performed, maybe the jmp would execute differently or not at all, allowing execution to proceed further without exiting.\n\n3. Line 011CEEB4: 8D5EFC - This is a lea instruction moving ebx based on esi-04h.\n   - Skipping this could change what's in ebx, potentially affecting subsequent jumps or operations.\n\nNow, I need to create patterns for each of these scenarios.\n\nFor the first counterfactual (skipping FF962CE00000), we want a pattern where that instruction is missing but execution continues. However, without knowing exactly how the rest would proceed, it's hard to build an accurate pattern. But maybe by combining the surrounding instructions with some wildcards.\n\nSecondly, if we skip the E1 test before jmp, perhaps the program can continue executing beyond the exit call. So including that instruction might help in bypassing.\n\nThirdly, skipping the lea instruction could alter what's in ebx, possibly leading to a different execution path without exiting.\n\nI'll try to build each pattern by selecting relevant instructions and applying wildcards where necessary, keeping opcodes and register encodings concrete.\n\nPattern 0: Skip FF962CE00000. So the pattern would include the surrounding lines with that instruction removed but keep other bytes wildcarded as needed.\n\nPattern 1: Skip E1 test before jmp. This would involve combining the sub instruction, E1, and jmp into a single pattern.\n\nPattern 2: Skip lea instruction at line CEEC5. So including the previous add and next xor.\n\nI need to make sure each pattern is between 6-20 bytes and includes wildcards where appropriate.\n</think>\n\nTo create effective Yara patterns for detecting bypass evasions, we analyze the trace data by considering counterfactual scenarios where specific instructions are skipped. Each pattern targets a potential point of bypass and ensures specificity using wildcards.\n\n### Step-by-Step Explanation:\n\n1. **Identify Exit Path**: The exit occurs at instruction FF962CE00000 (line 011CEEA6). Skipping this would prevent early exit.\n   \n2. **Counterfactual Analysis**:\n   - **Instruction E1 (011CEEB2)**: Skipping the test before jmp could alter execution flow, allowing bypass.\n   - **Instruction lea (011CEEC5)**: Skipping changes ebx, potentially avoiding the exit path.\n\n3. **Pattern Construction**:\n   - Combine relevant instructions with surrounding context and apply wildcards for address/offset bytes while keeping opcodes concrete.\n\n### Final Patterns:\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass detection\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 8D ?F ?? }\n        $pattern2 = { 3C ?? 7E ?? 99 ?? ?? ?? ?? 01 C0 8B 5F 40 }\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\9cee5522a7ca2bfc\\iter0_v2.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved with specific addresses\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83 F8 01 74 00 00 00 00 CA EA ?? EE ?? }\n        $pattern1 = { 85 C0 0F 84 00 00 00 00 EC ED FC EA DD 00 00 00 00 }\n        $pattern2 = { 83 F8 01 74 00 00 00 00 CA ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "- CALL_TEST_JE",
+      "confidence": 70,
+      "opcodes": "",
+      "task_id": "1519",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 21,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "virus"
+      ],
+      "new_signature_details": [
+        {
+          "name": "virus",
+          "description": "Likely virus infection of existing binary",
+          "categories": [
+            "virus"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 4856,
+              "cid": 55140
+            },
+            {
+              "type": "call",
+              "pid": 4856,
+              "cid": 55152
+            },
+            {
+              "type": "call",
+              "pid": 4856,
+              "cid": 55163
+            },
+            {
+              "type": "call",
+              "pid": 4856,
+              "cid": 55174
+            },
+            {
+              "type": "call",
+              "pid": 4856,
+              "cid": 55181
+            },
+            {
+              "type": "call",
+              "pid": 4856,
+              "cid": 55322
+            },
+            {
+              "type": "call",
+              "pid": 4856,
+              "cid": 55445
+            },
+            {
+              "file": "c:\\users\\sanya\\appdata\\local\\microsoft\\onedrive\\21.220.1024.0005\\filecoauth.exe"
+            },
+            {
+              "file": "c:\\users\\sanya\\appdata\\local\\microsoft\\windowsapps\\microsoft.microsoftedge_8wekyb3d8bbwe\\microsoftedge.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nOkay, I'm trying to help evolve a YARA bypass rule based on the given trace and feedback from previous attempts. The original task was to bypass an anti-malware check using three different strategies: Evasion Check, Exit Decision, and Evasion Technique.\n\nFrom the initial attempt, it seems that the first strategy (Evasion Check) didn't work because the YARA pattern didn't match. So, I need to look into the trace data provided to find suitable patterns for each strategy.\n\nLooking at Strategy A: Evasion Check, which involves a call followed by a test on EAX and a JE/JNE instruction. In the trace, there are several calls like 83F80174h (sub edi, 04h), but I need to see if after these calls, there's a TEST EAX and then a JE or JNE.\n\nIn the trace, at trace #1, the instructions start with sub ecx, 04h. Then later, around line 011CEE32: pop esi; mov edi, esi; which seems like an eviction check. After that, there's a loop where they push values into the stack and then call functions.\n\nWait, looking closer at trace #1:\n\n- Line 011CEE5F is an AB stosd (store zero byte), followed by sub ecx, 01h.\n- Then line 011CEE62: jnc 011CEE3Ch. So this might be a conditional jump.\n\nBut Strategy A suggests looking at the first 30% of the trace for a call → TEST EAX → JE/JNE pattern.\n\nIn the trace, I see calls like 83F80174h (sub edi, 04h) and 85C00F84h. After these calls, in the code, there's an operation that tests EAX: for example, 8A07 at line 011CEE3E which is mov al, byte ptr [edi], followed by increments.\n\nWait, but maybe after a call to check something (like a stack eviction), they test EAX. For instance, in the code:\n\n- Line 011CEE2D: jmp 011CED7Eh\n- Then 83F904 at line 011CEE45: cmp ecx, 04h\n\nHmm, maybe that's a TEST instruction after a call. But how does this fit into EAX?\n\nLooking for TEST EAX in the trace:\n\nThe instructions have TEST operations like 77F1 (jne) and others, but I don't see TEST EAX.\n\nWait, looking at line 011CEE3E: mov al, byte ptr [edi]. Then inc edi. Maybe after that, there's a TEST EAX instruction? Or perhaps it's an operation on EAX before a JE?\n\nAlternatively, maybe the call to test is followed by a conditional jump based on EAX.\n\nWait, in line 011CEE7E: mov eax, dword ptr [edi], which suggests that after a call (like to check EAX), they load into EAX and then perform some operation.\n\nBut I'm not seeing TEST EAX immediately before JE or JNE. So maybe the initial pattern didn't match because it was too broad or specific.\n\nFor Strategy A, perhaps instead of looking for any TEST EAX after a call, we can look for specific addresses where this occurs in the first 30% of the trace.\n\nLooking at the first few instructions:\n\nLine 011CEE26: sub ecx, 04h\nThen line 011CEE29: jnbe to 011CEE1Ch (assuming it's a label)\nLine 011CEE2B: add edi, ecx; then jmp to 011CED7Eh.\n\nHmm, maybe in the first few calls like at 83F80174 and others, after which they test EAX. So perhaps the pattern is:\n\n[CALL] [TEST EAX] [JE/JNE]\n\nSo, looking for a call instruction followed by TEST EAX and then JE or JNE.\n\nIn the trace, let's see if any of these occur in the first 30% (maybe up to around line 50).\n\nFor example, at line 011CEE4C: mov eax, dword ptr [edi] is after a call. Maybe this is part of a test.\n\nWait, maybe I should look for TEST EAX followed by JE or JNE within the first few calls and loops in the trace.\n\nAlternatively, perhaps the initial YARA pattern was too broad, so it's matching any TEST EAX and JE/JNE anywhere, but since it wasn't specific enough, it didn't hit on the right place. So I need to make this more precise by including exact addresses from the trace.\n\nFor Strategy A, let's try to find a call (like 83F80174h) followed immediately by TEST EAX and then JE/JNE.\n\nLooking at line 011CEE2D: jmp 011CED7Eh. Before that, there is an add edi, ecx; which may not be the test.\n\nWait, earlier in the trace:\n\nLine 011CEE26: sub ecx, 04h\nLine 011CEE29: jnbe to 011CEE1Ch (assuming label)\nBut that's a jmp.\n\nLooking for TEST EAX and JE/JNE after a call. Let's see where TEST EAX occurs in the trace:\n\nIn line 011CEE3E: mov al, byte ptr [edi]\nThen inc edi\n\nWait, but this is part of an add operation? I'm not seeing TEST EAX here.\n\nAlternatively, maybe there are other TEST operations that I missed. Let's scan through the entire trace for TEST instructions:\n\nLooking for \"TEST\" in the hex data: I see 77F1 (line 011CEE29), which is a jne, so maybe not a test of EAX.\n\nWait, perhaps looking for TEST on EAX as part of an instruction like TEST EAX, or using TEST with operands. For example:\n\n- TEST EAX, something\n\nIn the trace, I see mov al, byte ptr [edi] at line 011CEE3E, which is after a call.\n\nWait, maybe after this move, there's a TEST EAX instruction before JE? Or perhaps not.\n\nThis is getting a bit tricky. Maybe for Strategy A, instead of looking for any TEST EAX and JE/JNE, we can target specific addresses where these occur in the first 30% of the trace.\n\nSince the first strategy didn't work because it matched too broadly, I'll look for more specific patterns that include exact addresses from the trace.\n\nFor example:\n\n- The call at 83F80174h (line 011CEE2D)\n- Then after this call, is there a TEST EAX and JE/JNE?\n\nLooking at line 011CEE2E: sub al, E8h; then inc edi\nLine 011CEE2F: jmp to 011CECC\n\nNo, not matching.\n\nAlternatively, perhaps the initial YARA pattern was using a wildcard for address/offsets, which made it match too many places. So I can replace those with exact hex values from the trace.\n\nFor example:\n\nCall at 83F80174h (line 011CEE2D)\nFollowed by TEST EAX and then JE/JNE\n\nSo maybe:\n\n[CALL] 83F80174\n(TEST) EAX, ???\n(JE/JNE) ???\n\nBut I'm not sure exactly where the TEST occurs after this call.\n\nAlternatively, perhaps looking for a call to check something (like a stack eviction) and then immediately after testing EAX with a specific offset.\n\nThis is getting complex. Maybe it's better to move on to Strategy B and C first and come back to A if needed.\n\nFor Strategy B: API Check. This involves checking the return addresses of API calls like checked_call or checked_function, followed by a jump to their implementation.\n\nIn the trace, I see several calls:\n\n- 83F80174h (sub edi, 04h)\n- 85C00F84h\n- 8A07 at line 011CEE3E: mov al, byte ptr [edi]\n  \nLooking for checked_call or checked_function followed by jump to implementation.\n\nIn the trace, I don't see any calls labeled as checked_*, but perhaps after a call, there's an instruction that loads into EAX and then jumps. For example:\n\nLine 011CEE4C: mov eax, dword ptr [edi]\n\nIf this is part of a checked_function, maybe it should be followed by something like push ebp or a jump.\n\nBut in the trace, after line 011CEE4C (mov eax,...), there's nothing else. So perhaps this isn't an API check but rather a data structure manipulation.\n\nAlternatively, looking for a call to a function that returns into EAX and then jumps to its implementation.\n\nWait, another thought: Maybe in the first strategy attempt, the call to TEST EAX wasn't directly after the call, making it hard to match. So perhaps moving the pattern to be more specific about where TEST EAX occurs could help.\n\nFor Strategy C: Evasion Technique, which involves checking for varying return addresses or stack usage that Yara can exploit by guessing.\n\nIn the trace, I see several calls with known offsets:\n\n- 83F80174h (sub edi, 04h)\n- 85C00F84h\n- 8A07 at line 011CEE3E\n\nIf these are fixed offsets, perhaps the pattern can be made specific to check for these addresses.\n\nAlternatively, since the first attempt didn't find a match, maybe changing how Yara searches could help. For example, using an offset of 4 instead of a wildcard.\n\nBut I need to create three patterns that fit within the trace and are specific enough.\n\nGiven all this, here's what I'll do:\n\n1. **Strategy A (Evasion Check)**: Find a call instruction followed by TEST EAX at a known address and then a JE/JNE with a fixed offset.\n\nLooking through the trace, after line 011CEE2D (call to sub edi, 04h), there's an add edi, ecx; which might not be related. Then jmp to 011CED7Eh at line 011CEE2F. Maybe that's too far.\n\nAlternatively, in the loop starting around line 011CEE6A:\n\n- push qword ptr +0\n- mov eax, dword ptr +0\n- ... some code ...\n\nMaybe after a call to check EAX (like at line 011CEE4C: mov eax, dword ptr [edi]), there's a conditional jump based on EAX. So perhaps the pattern is:\n\n[CALL] [TEST EAX] [JE/JNE with offset]\n\nBut I'm not exactly sure where that occurs.\n\n2. **Strategy B (API Check)**: Look for calls to checked_function followed by their implementation jumps. In the trace, after a call like 83F80174h, is there an instruction that loads EAX and then jumps? For example:\n\n- 83F80174h (call)\n- mov eax, dword ptr [edi]\n- jne something\n\nIf this exists with fixed offsets, I can create a pattern for it.\n\nLooking at line 011CEE4C: mov eax, dword ptr [edi], then maybe the next instruction is jne or jmp. If so, that could be a pattern.\n\n3. **Strategy C (Evasion Technique)**: Check for calls with fixed offsets and see if they can be guessed by Yara.\n\nFor example:\n\n- Call at 83F80174h followed by fixed jumps\n- Call at 85C00F84h followed by fixed jumps\n\nI'll need to make sure each pattern is specific enough in the trace, using exact addresses from the trace data instead of wildcards.\n\nPutting it all together, I'll create three patterns:\n\n1. For Evasion Check: A call (like 83F80174h) followed by TEST EAX at a known address and then JE/JNE with specific offsets.\n2. For API Check: A checked_function call followed immediately by the function's implementation code, like mov eax,... and jne or jmp.\n3. For Evasion Technique: Fixed offset calls that Yara can exploit by guessing their return addresses.\n\nEach pattern will be 6-20 bytes long, using exact hex values for addresses and wildcards where address/offsets are variable.\n</think>\n\n**EVOLUTION_REASONING**: \nThe previous attempt failed because the YARA pattern was too broad, matching on a general instruction rather than specific addresses within the trace. By extracting exact addresses from the trace data, we can create more precise patterns that match only in relevant locations, increasing bypass success.\n\n**PATTERN_TYPE**: \n- CALL_TEST_JE\n- API_CHECK\n- CMP_SETZ\n\n**CONFIDENCE**: 70\n\n**REASONING**: Using exact addresses from the trace increases specificity. The first pattern looks for a call followed by a TEST EAX and JE/JNE at known offsets, the second for an API function with fixed offsets, and the third for calls that can be exploited due to predictable jumps.\n\n---\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved with specific addresses\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [83F80174h+00000000] call; [TEST EAX ??]; [JE/JNE ??] }\n        $pattern1 = { [85C00F84h+00000000] checked_function; [mov eax, dword ptr +00000000]; [jne/jmp] }\n        $pattern2 = { [83F80174h+00000000] call; [cmp ??] }\n\n    condition:\n        any of them\n}\n\nYARA_RULE: \nrule Bypass_Sample_Evolved {\n    meta:\n        description = \"Evasion bypass rule - evolved with specific addresses\"\n        cape_options = \"bp0=83F80174h+00000000,action0=skip;bp1=85C00F84h+00000000,action1=skip;bp2=83F80174h+00000000,action2=skip;count=0\"\n\n    strings:\n        $pattern0 = { [call] }\n        $pattern1 = { [checked_function] followed by [mov eax, dword ptr +00000000] and then [jne or jmp] }\n        $pattern2 = { [call] }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\9cee5522a7ca2bfc\\iter1_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved with specific addresses\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83 F8 01 74 00 00 00 00 CA EA ?? EE ?? }\n        $pattern1 = { 85 C0 0F 84 00 00 00 00 EC ED FC EA DD 00 00 00 00 }\n        $pattern2 = { 83 F8 01 74 00 00 00 00 CA ?? }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "- CALL_TEST_JE",
+    "confidence": 70,
+    "opcodes": "",
+    "task_id": "1519",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 21,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "virus"
+    ],
+    "new_signature_details": [
+      {
+        "name": "virus",
+        "description": "Likely virus infection of existing binary",
+        "categories": [
+          "virus"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 4856,
+            "cid": 55140
+          },
+          {
+            "type": "call",
+            "pid": 4856,
+            "cid": 55152
+          },
+          {
+            "type": "call",
+            "pid": 4856,
+            "cid": 55163
+          },
+          {
+            "type": "call",
+            "pid": 4856,
+            "cid": 55174
+          },
+          {
+            "type": "call",
+            "pid": 4856,
+            "cid": 55181
+          },
+          {
+            "type": "call",
+            "pid": 4856,
+            "cid": 55322
+          },
+          {
+            "type": "call",
+            "pid": 4856,
+            "cid": 55445
+          },
+          {
+            "file": "c:\\users\\sanya\\appdata\\local\\microsoft\\onedrive\\21.220.1024.0005\\filecoauth.exe"
+          },
+          {
+            "file": "c:\\users\\sanya\\appdata\\local\\microsoft\\windowsapps\\microsoft.microsoftedge_8wekyb3d8bbwe\\microsoftedge.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "<think>\nOkay, I'm trying to help evolve a YARA bypass rule based on the given trace and feedback from previous attempts. The original task was to bypass an anti-malware check using three different strategies: Evasion Check, Exit Decision, and Evasion Technique.\n\nFrom the initial attempt, it seems that the first strategy (Evasion Check) didn't work because the YARA pattern didn't match. So, I need to look into the trace data provided to find suitable patterns for each strategy.\n\nLooking at Strategy A: Evasion Check, which involves a call followed by a test on EAX and a JE/JNE instruction. In the trace, there are several calls like 83F80174h (sub edi, 04h), but I need to see if after these calls, there's a TEST EAX and then a JE or JNE.\n\nIn the trace, at trace #1, the instructions start with sub ecx, 04h. Then later, around line 011CEE32: pop esi; mov edi, esi; which seems like an eviction check. After that, there's a loop where they push values into the stack and then call functions.\n\nWait, looking closer at trace #1:\n\n- Line 011CEE5F is an AB stosd (store zero byte), followed by sub ecx, 01h.\n- Then line 011CEE62: jnc 011CEE3Ch. So this might be a conditional jump.\n\nBut Strategy A suggests looking at the first 30% of the trace for a call → TEST EAX → JE/JNE pattern.\n\nIn the trace, I see calls like 83F80174h (sub edi, 04h) and 85C00F84h. After these calls, in the code, there's an operation that tests EAX: for example, 8A07 at line 011CEE3E which is mov al, byte ptr [edi], followed by increments.\n\nWait, but maybe after a call to check something (like a stack eviction), they test EAX. For instance, in the code:\n\n- Line 011CEE2D: jmp 011CED7Eh\n- Then 83F904 at line 011CEE45: cmp ecx, 04h\n\nHmm, maybe that's a TEST instruction after a call. But how does this fit into EAX?\n\nLooking for TEST EAX in the trace:\n\nThe instructions have TEST operations like 77F1 (jne) and others, but I don't see TEST EAX.\n\nWait, looking at line 011CEE3E: mov al, byte ptr [edi]. Then inc edi. Maybe after that, there's a TEST EAX instruction? Or perhaps it's an operation on EAX before a JE?\n\nAlternatively, maybe the call to test is followed by a conditional jump based on EAX.\n\nWait, in line 011CEE7E: mov eax, dword ptr [edi], which suggests that after a call (like to check EAX), they load into EAX and then perform some operation.\n\nBut I'm not seeing TEST EAX immediately before JE or JNE. So maybe the initial pattern didn't match because it was too broad or specific.\n\nFor Strategy A, perhaps instead of looking for any TEST EAX after a call, we can look for specific addresses where this occurs in the first 30% of the trace.\n\nLooking at the first few instructions:\n\nLine 011CEE26: sub ecx, 04h\nThen line 011CEE29: jnbe to 011CEE1Ch (assuming it's a label)\nLine 011CEE2B: add edi, ecx; then jmp to 011CED7Eh.\n\nHmm, maybe in the first few calls like at 83F80174 and others, after which they test EAX. So perhaps the pattern is:\n\n[CALL] [TEST EAX] [JE/JNE]\n\nSo, looking for a call instruction followed by TEST EAX and then JE or JNE.\n\nIn the trace, let's see if any of these occur in the first 30% (maybe up to around line 50).\n\nFor example, at line 011CEE4C: mov eax, dword ptr [edi] is after a call. Maybe this is part of a test.\n\nWait, maybe I should look for TEST EAX followed by JE or JNE within the first few calls and loops in the trace.\n\nAlternatively, perhaps the initial YARA pattern was too broad, so it's matching any TEST EAX and JE/JNE anywhere, but since it wasn't specific enough, it didn't hit on the right place. So I need to make this more precise by including exact addresses from the trace.\n\nFor Strategy A, let's try to find a call (like 83F80174h) followed immediately by TEST EAX and then JE/JNE.\n\nLooking at line 011CEE2D: jmp 011CED7Eh. Before that, there is an add edi, ecx; which may not be the test.\n\nWait, earlier in the trace:\n\nLine 011CEE26: sub ecx, 04h\nLine 011CEE29: jnbe to 011CEE1Ch (assuming label)\nBut that's a jmp.\n\nLooking for TEST EAX and JE/JNE after a call. Let's see where TEST EAX occurs in the trace:\n\nIn line 011CEE3E: mov al, byte ptr [edi]\nThen inc edi\n\nWait, but this is part of an add operation? I'm not seeing TEST EAX here.\n\nAlternatively, maybe there are other TEST operations that I missed. Let's scan through the entire trace for TEST instructions:\n\nLooking for \"TEST\" in the hex data: I see 77F1 (line 011CEE29), which is a jne, so maybe not a test of EAX.\n\nWait, perhaps looking for TEST on EAX as part of an instruction like TEST EAX, or using TEST with operands. For example:\n\n- TEST EAX, something\n\nIn the trace, I see mov al, byte ptr [edi] at line 011CEE3E, which is after a call.\n\nWait, maybe after this move, there's a TEST EAX instruction before JE? Or perhaps not.\n\nThis is getting a bit tricky. Maybe for Strategy A, instead of looking for any TEST EAX and JE/JNE, we can target specific addresses where these occur in the first 30% of the trace.\n\nSince the first strategy didn't work because it matched too broadly, I'll look for more specific patterns that include exact addresses from the trace.\n\nFor example:\n\n- The call at 83F80174h (line 011CEE2D)\n- Then after this call, is there a TEST EAX and JE/JNE?\n\nLooking at line 011CEE2E: sub al, E8h; then inc edi\nLine 011CEE2F: jmp to 011CECC\n\nNo, not matching.\n\nAlternatively, perhaps the initial YARA pattern was using a wildcard for address/offsets, which made it match too many places. So I can replace those with exact hex values from the trace.\n\nFor example:\n\nCall at 83F80174h (line 011CEE2D)\nFollowed by TEST EAX and then JE/JNE\n\nSo maybe:\n\n[CALL] 83F80174\n(TEST) EAX, ???\n(JE/JNE) ???\n\nBut I'm not sure exactly where the TEST occurs after this call.\n\nAlternatively, perhaps looking for a call to check something (like a stack eviction) and then immediately after testing EAX with a specific offset.\n\nThis is getting complex. Maybe it's better to move on to Strategy B and C first and come back to A if needed.\n\nFor Strategy B: API Check. This involves checking the return addresses of API calls like checked_call or checked_function, followed by a jump to their implementation.\n\nIn the trace, I see several calls:\n\n- 83F80174h (sub edi, 04h)\n- 85C00F84h\n- 8A07 at line 011CEE3E: mov al, byte ptr [edi]\n  \nLooking for checked_call or checked_function followed by jump to implementation.\n\nIn the trace, I don't see any calls labeled as checked_*, but perhaps after a call, there's an instruction that loads into EAX and then jumps. For example:\n\nLine 011CEE4C: mov eax, dword ptr [edi]\n\nIf this is part of a checked_function, maybe it should be followed by something like push ebp or a jump.\n\nBut in the trace, after line 011CEE4C (mov eax,...), there's nothing else. So perhaps this isn't an API check but rather a data structure manipulation.\n\nAlternatively, looking for a call to a function that returns into EAX and then jumps to its implementation.\n\nWait, another thought: Maybe in the first strategy attempt, the call to TEST EAX wasn't directly after the call, making it hard to match. So perhaps moving the pattern to be more specific about where TEST EAX occurs could help.\n\nFor Strategy C: Evasion Technique, which involves checking for varying return addresses or stack usage that Yara can exploit by guessing.\n\nIn the trace, I see several calls with known offsets:\n\n- 83F80174h (sub edi, 04h)\n- 85C00F84h\n- 8A07 at line 011CEE3E\n\nIf these are fixed offsets, perhaps the pattern can be made specific to check for these addresses.\n\nAlternatively, since the first attempt didn't find a match, maybe changing how Yara searches could help. For example, using an offset of 4 instead of a wildcard.\n\nBut I need to create three patterns that fit within the trace and are specific enough.\n\nGiven all this, here's what I'll do:\n\n1. **Strategy A (Evasion Check)**: Find a call instruction followed by TEST EAX at a known address and then a JE/JNE with a fixed offset.\n\nLooking through the trace, after line 011CEE2D (call to sub edi, 04h), there's an add edi, ecx; which might not be related. Then jmp to 011CED7Eh at line 011CEE2F. Maybe that's too far.\n\nAlternatively, in the loop starting around line 011CEE6A:\n\n- push qword ptr +0\n- mov eax, dword ptr +0\n- ... some code ...\n\nMaybe after a call to check EAX (like at line 011CEE4C: mov eax, dword ptr [edi]), there's a conditional jump based on EAX. So perhaps the pattern is:\n\n[CALL] [TEST EAX] [JE/JNE with offset]\n\nBut I'm not exactly sure where that occurs.\n\n2. **Strategy B (API Check)**: Look for calls to checked_function followed by their implementation jumps. In the trace, after a call like 83F80174h, is there an instruction that loads EAX and then jumps? For example:\n\n- 83F80174h (call)\n- mov eax, dword ptr [edi]\n- jne something\n\nIf this exists with fixed offsets, I can create a pattern for it.\n\nLooking at line 011CEE4C: mov eax, dword ptr [edi], then maybe the next instruction is jne or jmp. If so, that could be a pattern.\n\n3. **Strategy C (Evasion Technique)**: Check for calls with fixed offsets and see if they can be guessed by Yara.\n\nFor example:\n\n- Call at 83F80174h followed by fixed jumps\n- Call at 85C00F84h followed by fixed jumps\n\nI'll need to make sure each pattern is specific enough in the trace, using exact addresses from the trace data instead of wildcards.\n\nPutting it all together, I'll create three patterns:\n\n1. For Evasion Check: A call (like 83F80174h) followed by TEST EAX at a known address and then JE/JNE with specific offsets.\n2. For API Check: A checked_function call followed immediately by the function's implementation code, like mov eax,... and jne or jmp.\n3. For Evasion Technique: Fixed offset calls that Yara can exploit by guessing their return addresses.\n\nEach pattern will be 6-20 bytes long, using exact hex values for addresses and wildcards where address/offsets are variable.\n</think>\n\n**EVOLUTION_REASONING**: \nThe previous attempt failed because the YARA pattern was too broad, matching on a general instruction rather than specific addresses within the trace. By extracting exact addresses from the trace data, we can create more precise patterns that match only in relevant locations, increasing bypass success.\n\n**PATTERN_TYPE**: \n- CALL_TEST_JE\n- API_CHECK\n- CMP_SETZ\n\n**CONFIDENCE**: 70\n\n**REASONING**: Using exact addresses from the trace increases specificity. The first pattern looks for a call followed by a TEST EAX and JE/JNE at known offsets, the second for an API function with fixed offsets, and the third for calls that can be exploited due to predictable jumps.\n\n---\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved with specific addresses\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [83F80174h+00000000] call; [TEST EAX ??]; [JE/JNE ??] }\n        $pattern1 = { [85C00F84h+00000000] checked_function; [mov eax, dword ptr +00000000]; [jne/jmp] }\n        $pattern2 = { [83F80174h+00000000] call; [cmp ??] }\n\n    condition:\n        any of them\n}\n\nYARA_RULE: \nrule Bypass_Sample_Evolved {\n    meta:\n        description = \"Evasion bypass rule - evolved with specific addresses\"\n        cape_options = \"bp0=83F80174h+00000000,action0=skip;bp1=85C00F84h+00000000,action1=skip;bp2=83F80174h+00000000,action2=skip;count=0\"\n\n    strings:\n        $pattern0 = { [call] }\n        $pattern1 = { [checked_function] followed by [mov eax, dword ptr +00000000] and then [jne or jmp] }\n        $pattern2 = { [call] }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\9cee5522a7ca2bfc\\iter1_v2.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: bypass_failed - YARA pattern did not match",
+    "Iteration 2: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    ""
+  ]
+}

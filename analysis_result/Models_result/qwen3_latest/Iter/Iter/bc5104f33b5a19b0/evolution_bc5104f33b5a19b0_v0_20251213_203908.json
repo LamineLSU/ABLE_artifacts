@@ -1,0 +1,79 @@
+{
+  "sha256": "bc5104f33b5a19b048ddb58e9bae390514d78631341acd9e098ffdb7114dbeef",
+  "prompt_version": "v0",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v0",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "The provided assembly code represents a malware routine that attempts to detect and evade sandbox environments by interacting with console-related APIs. The key evasion points involve checking whether a console is present and terminating the process if it detects an environment that lacks a console.\n\n---\n\n### ✅ **Pattern 1: Console Allocation Check (AllocConsole)**\nThis pattern captures the logic where the malware checks if the console was successfully allocated after calling `AllocConsole`. If the allocation fails, the malware jumps to `ExitProcess`.\n\n**Assembly:**\n```\nFF 15 ?? ?? ?? ?? 50 85 C0 74 4B\n```\n\n**Explanation:**\n- `FF 15 ?? ?? ?? ??`: Call to `AllocConsole` (address is replaced with `??`).\n- `50`: Push `EAX` (return value of `AllocConsole`).\n- `85 C0`: Test `EAX` to check if the console was allocated.\n- `74 4B`: Jump to `ExitProcess` if the console allocation failed (`je` to `00F90DF3`).\n\n---\n\n### ✅ **Pattern 2: Console Attachment Check (AttachConsole)**\nThis pattern captures the logic where the malware attempts to attach to an existing console. The presence of a console might indicate a sandbox environment.\n\n**Assembly:**\n```\nFF 15 ?? ?? ?? ?? 6A 00 8D 44 24 18\n```\n\n**Explanation:**\n- `FF 15 ?? ?? ?? ??`: Call to `AttachConsole` (address is replaced with `??`).\n- `6A 00`: Push `0` (attempting to attach to an existing console).\n- `8D 44 24 18`: Load effective address of `ESP + 18` (used in subsequent operations).\n\n---\n\n### ✅ **Pattern 3: ExitProcess Call (Sandbox Detection)**\nThis pattern captures the final step where the malware terminates itself if it detects a sandbox environment.\n\n**Assembly:**\n```\nFF 15 ?? ?? ?? ?? 6A 00 FF 15 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `FF 15 ?? ?? ?? ??`: Call to `FreeConsole` (address is replaced with `??`).\n- `6A 00`: Push `0` (possibly to prepare for `ExitProcess`).\n- `FF 15 ?? ?? ?? ??`: Call to `ExitProcess` (address is replaced with `??`).\n\n---\n\n### 🔍 Summary\nThese three patterns represent key points in the malware's sandbox evasion logic:\n1. **Console Allocation Check** (`AllocConsole` and `test`/`je`).\n2. **Console Attachment Check** (`AttachConsole`).\n3. **Final Exit** via `ExitProcess` if no console is detected.\n\nThese sequences are indicative of sandbox detection and can be used for signature-based detection or heuristic analysis.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A 00 FF 15 ?? ?? ?? ?? }\n        $pattern1 = { 83 C4 18 FF 15 ?? ?? ?? ?? }\n        $pattern2 = { 68 10 27 00 00 FF 15 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "974",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 4668.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 02:47:14 2025\nBreakpoint 0 hit by instruction at 0x00F07E91 (thread 5156) EAX=0x305fbd0 EBX=0x993ea8b4 ECX=0x993ea8b4 EDX=0xaaaaaaaa ESP=0x305fbc8 *ESP=0xf164cc L\"mscoree.dll\" bc5104f33b5a19b048dd.exe EBP=0x305fbd8\nBreak at 0x00F07E91 in bc5104f33b5a19b048dd.exe (RVA 0x27e91, thread 5156, Stack 0x0301D000-0x03060000, ImageBase 0x00EE0000)\n0x00F07E91  6A00                     PUSH      0x0                           \nActionDispatcher: skipping instruction.\n0x00F07E93  FF151032F100             CALL      GetModuleHandleExW            \n\n\n=== 6252.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 02:47:15 2025\nBreakpoint 0 hit by instruction at 0x06D5AC02 (thread 872) EAX=0xa EBX=0x4871ce8 ECX=0x4871b94 EDX=0x4871d1c EDI=0x4871b6c ESP=0xbdf150 *ESP=0x0 EBP=0xbdf164\n0x06D5AC02  6A00                     PUSH      0x0                           \nActionDispatcher: skipping instruction.\n0x06D5AC04  FF153080D606             CALL      0x06D58E29                    \nBreakpoint 0 hit by instruction at 0x06D5AC02 (thread 872) EBX=0x4871ce8 ECX=0x4871b94 EDX=0x4871d38 ESI=0x1 EDI=0x4871b6c ESP=0xbdf154 *ESP=0x0 EBP=0xbdf164\n0x06D5AC02  6A00                     PUSH      0x0                           \nActionDispatcher: skipping instruction.\n0x06D5AC04  FF153080D606             CALL      0x06D5CC40                    \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A 00 FF 15 ?? ?? ?? ?? }\n        $pattern1 = { 83 C4 18 FF 15 ?? ?? ?? ?? }\n        $pattern2 = { 68 10 27 00 00 FF 15 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\bc5104f33b5a19b0\\iter1_v0.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 15 ?? ?? ?? ?? 6A 00 }\n        $pattern1 = { FF 15 ?? ?? ?? ?? 85 C0 74 ?? }\n        $pattern2 = { FF 15 ?? ?? ?? ?? 50 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "975",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Refine the patterns to target more specific, non-critical instructions and adjust the skip offset to avoid disrupting the original code flow."
+      ],
+      "debugger_log": "=== 4668.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 06:53:28 2025\nBreakpoint 1 hit by instruction at 0x0642700C (thread 7888) EAX=0x3ed1538 EBX=0x3ed1538 ECX=0x3ed14e4 EDX=0xfb45 ESI=0x3ed13f0 EDI=0x3ed1434 ESP=0x4ff170 *ESP=0x3ed14c4 EBP=0x4ff180\n0x0642700C  837E0400                 CMP       DWORD [ESI+0x4], 0x0          \nActionDispatcher: skipping instruction.\n0x06427010  7517                     JNZ       0x19                          \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 15 ?? ?? ?? ?? 6A 00 }\n        $pattern1 = { FF 15 ?? ?? ?? ?? 85 C0 74 ?? }\n        $pattern2 = { FF 15 ?? ?? ?? ?? 50 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\bc5104f33b5a19b0\\iter2_v0.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

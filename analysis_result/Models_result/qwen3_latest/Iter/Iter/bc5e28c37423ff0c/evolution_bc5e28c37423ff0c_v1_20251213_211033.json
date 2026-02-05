@@ -1,0 +1,79 @@
+{
+  "sha256": "bc5e28c37423ff0c939fc98754280a3bba22bbad3c7048894d0908c445477c5e",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To analyze the code path leading to the call to `ExitProcess`, we identify three distinct byte sequences that are critical to the execution flow. These sequences are extracted from the disassembled code and represent key points in the function call chain.\n\n---\n\n### ✅ **Pattern 1: Stack Adjustment Before Exit Call**\n\nThis sequence represents the stack adjustment and function call to `ExitProcess`.\n\n**Code:**\n```\n83 C4 14 52 FF D0\n```\n\n**Explanation:**\n- `83 C4 14` → `add esp, 14h` (adjust stack pointer)\n- `52` → `push edx` (push register onto stack)\n- `FF D0` → `call eax` (call to `ExitProcess`)\n\n**Length:** 6 bytes\n\n---\n\n### ✅ **Pattern 2: Call to an Intermediate Function**\n\nThis sequence shows the call to a function (likely `0041EB27h`) and the preceding setup.\n\n**Code:**\n```\n8B 06 50 E8 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `8B 06` → `mov eax, [esi]` (load value from `esi` into `eax`)\n- `50` → `push eax` (push `eax` onto stack)\n- `E8 ?? ?? ?? ??` → `call` to some function (offset is unknown, replaced with `??`)\n\n**Length:** 8 bytes\n\n---\n\n### ✅ **Pattern 3: Setup and Call to Intermediate Function**\n\nThis sequence captures the setup and call to an intermediate function, which likely sets up arguments for `ExitProcess`.\n\n**Code:**\n```\n50 E8 ?? ?? ?? ?? 8B 55 0C\n```\n\n**Explanation:**\n- `50` → `push eax` (push `eax` onto stack)\n- `E8 ?? ?? ?? ??` → `call` to some function (offset is unknown, replaced with `??`)\n- `8B 55 0C` → `mov edx, [ebp+0Ch]` (load value from `ebp+0Ch` into `edx`)\n\n**Length:** 9 bytes\n\n---\n\n### 🧠 Summary\n\nThese three patterns represent critical points in the function call chain leading to `ExitProcess`. They can be used to identify and analyze the execution flow in a disassembled binary or for reverse engineering purposes. Each pattern captures a unique aspect of the function call setup, providing insight into how the program prepares to terminate.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 16 50 51 FF D2 5E } // RtlAllocateHeap call with stack setup\n        $pattern1 = { E8 74 0A 00 00 8B 55 14 } // Call to 0041EB27h with following mov\n        $pattern2 = { 8D B0 98 0C 00 00 } // Unique lea instruction for memory addressing\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 75,
+      "opcodes": "",
+      "task_id": "848",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Target the `PUSH ESI` instruction (`0x0041E1DC`) instead of the `LEA` instruction. This avoids disrupting the register state while still bypassing the detection logic."
+      ],
+      "debugger_log": "=== 9172.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 06:01:03 2025\nBreakpoint 2 hit by instruction at 0x0041E1D6 (thread 2928) EAX=0x95f054 EBX=0x95ef84 \"\u0014\u001e\" ECX=0x77271737 EDX=0xc81e00 ESI=0xc81e00 EDI=0xc87fa8 ESP=0x95eed8 \"7\u0017'w\" *ESP=0x77271737 EBP=0x95eee8\nBreak at 0x0041E1D6 in regsvcs.exe (RVA 0x1e1d6, thread 2928, Stack 0x00952000-0x00960000, ImageBase 0x00400000)\n0x0041E1D6  8DB0980C0000             LEA       ESI, [EAX+0xc98]              \nActionDispatcher: skipping instruction.\n0x0041E1DC  56                       PUSH      ESI                           \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to insufficient specificity in patterns. By selecting three distinct sequences from the trace (call to RtlAllocateHeap, call to 0041EB27h, and lea instruction), we target critical evasion logic while ensuring specificity. These patterns are derived directly from the trace and avoid wildcards where possible to reduce false positives.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 75\n\n**REASONING**: These patterns capture key evasion logic in the trace:  \n1. The call to `RtlAllocateHeap` (FFD2) with preceding stack manipulation (pushes) indicates heap allocation checks.  \n2. The call to `0041EB27h` (E8740A0000) likely represents a conditional check or evasion logic.  \n3. The `lea` instruction (8DB0980C0000) points to memory addressing patterns unique to this sample.  \nAll patterns are concrete from the trace, avoiding generic wildcards to ensure precision.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B16 50 51 FFD2 5E } // RtlAllocateHeap call with stack setup\n        $pattern1 = { E8 74 0A 00 00 8B 55 14 } // Call to 0041EB27h with following mov\n        $pattern2 = { 8DB0980C0000 } // Unique lea instruction for memory addressing\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\bc5e28c37423ff0c\\iter1_v1.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v1",
+      "yara_rule": "rule bypass_exit_call\n{\n    meta:\n        description = \"Bypasses an exit call by detecting specific instruction sequences\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n    \n    strings:\n        $a = { 83 C4 ?? 52 FF D0 }  // add esp, 14h followed by push edx and call eax\n        $b = { E8 ?? ?? ?? ?? 8B 55 ?? 83 C4 ?? }  // call to 0041EB27 followed by mov and add instructions\n        $c = { 56 50 E8 ?? ?? ?? ?? }  // push esi, push eax, and call instruction\n    \n    condition:\n        all of ($a or $b or $c)\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "849",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule bypass_exit_call\n{\n    meta:\n        description = \"Bypasses an exit call by detecting specific instruction sequences\"\n    \n    strings:\n        $a = { 83 C4 ?? 52 FFD0 }  // add esp, 14h followed by push edx and call eax\n        $b = { E8 ?? ?? ?? ?? 8B 55 ?? 83 C4 ?? }  // call to 0041EB27 followed by mov and add instructions\n        $c = { 56 50 E8 ?? ?? ?? ?? }  // push esi, push eax, and call instruction\n    \n    condition:\n        all of ($a or $b or $c)\n}\n```\n\n**Explanation:**  \n- **Pattern $a** targets the sequence leading to the `call eax` (ExitProcess) by including the `add esp, 14h` (displacement replaced with `??`) and subsequent `push edx` and `call eax` instructions.  \n- **Pattern $b** captures the call to `0041EB27` (offset replaced with `??`) followed by memory access instructions (`mov edx, [ebp+0Ch]` and `add esp, 14h`), with displacements replaced by `??`.  \n- **Pattern $c** identifies the `push esi`, `push eax`, and `call` sequence before the main exit call.  \n\nEach pattern ensures address/offset bytes are wildcarded (`??`) as per the rules, while maintaining distinct instruction sequences to avoid false positives.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\bc5e28c37423ff0c\\iter2_v1.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 2: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "sha256": "0e375952de1156c54b66a85423d63a073845e288cb64028d4cb3a0dba8fecad3",
+  "prompt_version": "v0",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v0",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "{\n  \"pattern0\": \"FF 15 ?? ?? ?? ??\",\n  \"pattern1\": \"85 C0 74 ?? 6A 5B\",\n  \"pattern2\": \"E8 ?? ?? ?? ?? 85 C0\"\n}\n\n**Explanation:**\n\n1. **Pattern0 (ExitProcess call):**  \n   - The final `FF 15` is a `CALL` instruction with a 4-byte displacement (replaced with `??`).  \n   - This targets the `ExitProcess` API, a common evasion technique to terminate early in analysis environments.\n\n2. **Pattern1 (Conditional check):**  \n   - `85 C0` tests `EAX` (common for sandbox detection).  \n   - `74 ??` is a short `JE` (jump if equal) with an offset (replaced with `??`).  \n   - `6A 5B` pushes a value (likely part of a sandbox check).  \n   - Combines a conditional flow and register check, typical for evasion logic.\n\n3. **Pattern2 (Function call):**  \n   - `E8 ?? ?? ?? ??` is a `CALL` with a 4-byte displacement (replaced with `??`).  \n   - Followed by `85 C0` (another `TEST EAX, EAX`), suggesting a sequence of checks or sandbox detection logic.  \n\nAll patterns use wildcards for address/offset bytes (`??`) to account for ASLR and vary addresses, while keeping opcode/register bytes concrete for accurate detection.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample_Evolved  \n{  \n    meta:  \n        description = \"Evasion bypass rule - evolved\"  \n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"  \n\n    strings:  \n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? }  // test eax, je to exit  \n        $pattern1 = { 53 FF 15 ?? ?? ?? ?? }       // push ebx + call ExitProcess  \n        $pattern2 = { E8 ?? ?? ?? ?? 85 C0 }      // call + test eax setup  \n\n    condition:  \n        any of them  \n}",
+      "pattern_type": "CALL_TEST_JE | API_CHECK | CALL_TEST",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "1045",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 39,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Replace the generic `E8 ?? ?? ?? ??` pattern with a more specific one targeting the"
+      ],
+      "debugger_log": "=== 7664.log ===\nCAPE Sandbox - Debugger log: Mon Dec 15 11:37:20 2025\nBreakpoint 2 hit by instruction at 0x00EF6FD0 (thread 8796) EAX=0xef0000 \"MZ\" 0e375952de1156c54b66.exe ECX=0xe0 EDX=0x10b ESI=0xef10bc 0e375952de1156c54b66.exe EDI=0xef69b0 0e375952de1156c54b66.exe ESP=0x4bfd78 *ESP=0xef0000 \"MZ\" 0e375952de1156c54b66.exe EBP=0x4bfd7c\nBreak at 0x00EF6FD0 in 0e375952de1156c54b66.exe (RVA 0x6fd0, thread 8796, Stack 0x004B2000-0x004C0000, ImageBase 0x00EF0000)\n0x00EF6FD0  E87FFFFFFF               CALL      0xffffff84                    \nActionDispatcher: skipping instruction.\n0x00EF6FD5  85C0                     TEST      EAX, EAX                      \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to incorrect pattern selection. By analyzing the original trace, I identified three distinct instruction sequences critical to the exit logic. These include a conditional jump before exiting, a call to ExitProcess, and a call followed by a test instruction. These patterns are specific to the sample and avoid false positives by using exact bytes from the trace.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | CALL_TEST  \n\n**CONFIDENCE**: 95  \n\n**REASONING**: The patterns target the core logic of the sample's exit mechanism. The first pattern (test + je) captures the conditional check before exiting. The second pattern (call to ExitProcess) directly references the termination instruction. The third pattern (call + test) identifies the setup for the exit check. These are all derived from the trace and are unlikely to match unrelated code.  \n\n**YARA_RULE**:  \n```yara  \nrule Bypass_Sample_Evolved  \n{  \n    meta:  \n        description = \"Evasion bypass rule - evolved\"  \n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"  \n\n    strings:  \n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? }  // test eax, je to exit  \n        $pattern1 = { 53 FF15 ?? ?? ?? ?? }       // push ebx + call ExitProcess  \n        $pattern2 = { E8 ?? ?? ?? ?? 85 C0 }      // call + test eax setup  \n\n    condition:  \n        any of them  \n}  \n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\0e375952de1156c5\\iter1_v0.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 8B 45 FC }  // Test eax, je + mov (specific stack offset)\n        $pattern1 = { FF 15 2C A1 0C 00 }      // Call to ExitProcess (exact bytes)\n        $pattern2 = { 85 C0 0F 84 33 FD FF FF } // Test eax, je with offset (specific address)\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE, API_CHECK, OTHER",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "1046",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 39,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Modify the code to avoid the exact `test eax, eax` and `je` sequence detected by pattern2. For example, replace the `je` with a different conditional jump or alter the register operations to bypass the pattern."
+      ],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule used a generic E8 call pattern, which caused crashes due to false positives. By selecting concrete byte sequences from the original trace (specific test/je instructions and the ExitProcess call), we ensure specificity and reduce unintended matches. The three patterns target evasion checks (test+je) and the termination call, which are critical for bypassing detection.\n\n**PATTERN_TYPE**: CALL_TEST_JE, API_CHECK, OTHER\n\n**CONFIDENCE**: 95\n\n**REASONING**: The patterns are derived directly from the original trace, ensuring they match only the intended locations. The first two patterns target evasion checks (test eax, eax + je) at specific offsets, while the third targets the ExitProcess call. Using concrete bytes minimizes false positives, and the cape_options skip these points to bypass detection.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85C0 74 12 8B 45 FC }  // Test eax, je + mov (specific stack offset)\n        $pattern1 = { FF15 2C A1 0C 00 }      // Call to ExitProcess (exact bytes)\n        $pattern2 = { 85C0 0F84 33 FD FF FF } // Test eax, je with offset (specific address)\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\0e375952de1156c5\\iter2_v0.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 2: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

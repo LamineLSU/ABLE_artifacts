@@ -1,0 +1,72 @@
+{
+  "prompt_version": "v3",
+  "prompt_name": "Adversarial Reasoning",
+  "iterations": [
+    {
+      "iteration_number": 1,
+      "prompt_version": "v3",
+      "llm_query": {
+        "query_id": "b684643e052d",
+        "timestamp": "2025-12-11T18:04:53.987658",
+        "iteration": 1,
+        "prompt_version": "v3",
+        "prompt_text": "\nYou are evolving a YARA bypass rule based on execution feedback.\n\n## Task Context\nWe are trying to bypass malware evasion for sample: b48348bce63f1ad4\n\n## Evolution History (what we've tried)\n\n\n## Current Best Rule (Found 0 new signatures)\n```yara\nNone\n```\n\n## Latest Attempt Analysis\n\nPattern Type: UNKNOWN\nConfidence: 50\nStatus: error\nRule Hit: False\nNew Signatures: 0\nFailure Reason: Failed to generate YARA rule\n\n\n## Original Trace\nSHA256: b48348bce63f1ad4550e28f99b61f3166e30eec746299c4258632a5fae95df7d\nExitProcess Address: 00427B11\nInstructions: 7\n--------------------------------------------------------------------------------\nAddress      Opcode               Instruction\n--------------------------------------------------------------------------------\n    00427B0B  55                   push ebp\n    00427B0C  8BEC                 mov ebp, esp\n    00427B0E  FF7508               push dword ptr [ebp+08h]  # ASCII \\\n>>> 00427B11  E8C1FFFFFF           call 00427AD7h  # ___crtCorExitProcess@LIBCMT.LIB (Import, Unknown Params)\n    00427B16  59                   pop ecx\n    00427B17  FF7508               push dword ptr [ebp+08h]\n    00427B1A  FF155CC24C00         call dword ptr [004CC25Ch]  # ExitProcess@KERNEL32.DLL (Import, Unknown Params)\n\n## Evolution Task\n\nBased on the feedback, generate an IMPROVED YARA bypass rule.\n\n**Key Principles:**\n1. Learn from failures - don't repeat the same mistakes\n2. Use momentum - if a direction is working, continue it\n3. Be specific enough to hit the target, generic enough for variants\n\n===============================================================================\nBYPASS STRATEGY EVOLUTION\n===============================================================================\n\nConsider THREE bypass strategies when evolving:\n\n**STRATEGY A: EVASION CHECK (60% success - try first)**\n- Location: FIRST 30% of trace\n- Pattern: CALL \u2192 TEST EAX \u2192 JE/JNE\n- Target the check function, not the exit\n\n**STRATEGY B: EXIT DECISION (25% success - try if A fails)**\n- Location: BEFORE the exit call\n- Pattern: Conditional check before ExitProcess/TerminateProcess\n- Sometimes the exit itself has conditional logic\n\n**STRATEGY C: EVASION TECHNIQUE (15% success - for specific cases)**\n- RDTSC timing, CPUID VM detect, Sleep acceleration\n- Look for unique instruction sequences\n\n**If previous attempts show \"Rule hit but no new signatures\":**\n- Your pattern matched but the WRONG location\n- Move EARLIER in the trace (Strategy A)\n- Or check if there's conditional logic before exit (Strategy B)\n- The bypass point must be where the DECISION is made, not the action\n\n===============================================================================\nPATTERN EXAMPLES\n===============================================================================\n\nSelect 3 DIFFERENT patterns from the trace. Examples of valid patterns:\n- { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 FC }  -- test+je+mov (specific stack offset)\n- { 83 F8 01 74 12 8B 4D F8 }  -- cmp+je+mov (concrete bytes, very specific)\n- { 3D 00 10 00 00 0F 82 }  -- cmp eax,imm32 + jb (concrete comparison value)\n\nTarget exit-related instructions as bypass points - the instruction that triggers program termination is often an effective 6-byte pattern.\n\n**CRITICAL: All patterns MUST come from the original trace above!**\n- Every hex byte in your pattern must exist in the TRACE DATA\n- Do NOT invent or guess byte sequences - copy them from the trace\n- Patterns not found in the trace will match wrong locations and cause crashes\n\n**PATTERN SPECIFICITY:**\n- Use CONCRETE bytes from the trace (copy exact hex values, not wildcards) for most patterns\n- Only use wildcards (??) for bytes that MUST vary (like CALL/JMP offsets)\n- More specific patterns = less chance of matching wrong locations = fewer crashes\n\nEach pattern must be 6-20 bytes. Use ?? for addresses/offsets.\n\n## Required Output Format\n\n**EVOLUTION_REASONING**: [What changes are you making and why?]\n\n**PATTERN_TYPE**: [CALL_TEST_JE | API_CHECK | CMP_SETZ | VM_DETECT | DEBUG_CHECK | TIMING_CHECK | OTHER]\n\n**CONFIDENCE**: [0-100]\n\n**REASONING**: [Why these evolved patterns should work better]\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [6-20 bytes with wildcards] }\n        $pattern1 = { [6-20 bytes - DIFFERENT sequence] }\n        $pattern2 = { [6-20 bytes - DIFFERENT sequence] }\n\n    condition:\n        any of them\n}\n```\n\n## CRITICAL REQUIREMENTS\n\n1. **EXACTLY 3 PATTERNS**: You MUST have `$pattern0`, `$pattern1`, `$pattern2` - no more, no less\n2. **CAPE_OPTIONS REQUIRED**: You MUST include cape_options referencing all 3 patterns\n3. **6-20 BYTES PER PATTERN**: Each pattern must be 6-20 bytes\n4. **ALL 3 PATTERNS MUST BE DIFFERENT**: Do not duplicate patterns\n5. Use wildcards (??) for all address/offset bytes\n",
+        "prompt_length": 4986,
+        "prompt_tokens": 1246,
+        "response_text": "**EVOLUTION_REASONING**: The previous attempt failed due to incorrect pattern extraction. The trace shows critical exit logic involving `ExitProcess` and a prior call to `___crtCorExitProcess`. To bypass, I focus on **Strategy A (Evasion Check)** and **Strategy B (Exit Decision)** by extracting concrete byte sequences from the trace. Three patterns are selected from the trace: the push before the first call, the `ExitProcess` call, and the sequence involving `pop ecx` and subsequent pushes. These patterns are specific to the trace and avoid wildcards for non-address bytes to minimize false positives.\n\n**PATTERN_TYPE**: CALL_TEST_JE  \n**CONFIDENCE**: 85  \n\n**REASONING**: The patterns are derived directly from the trace, targeting the call to `ExitProcess` and preceding instructions. The first pattern captures the push before the first call, the second targets the `ExitProcess` call, and the third includes the `pop ecx` and subsequent push sequence. These are specific to the sample and avoid generic wildcards, increasing accuracy.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 08 E8 ?? ?? ?? ?? }  // Push before first call\n        $pattern1 = { FF 15 5C C2 4C 00 }         // ExitProcess call\n        $pattern2 = { 59 FF 75 08 FF 15 ?? ?? ?? ?? }  // Pop, push, and second call\n\n    condition:\n        any of them\n}\n```",
+        "response_length": 1567,
+        "response_tokens": 391,
+        "query_start_time": 1765497777.9186995,
+        "query_end_time": 1765497893.9876585,
+        "query_duration_seconds": 116.06895899772644,
+        "model_name": "qwen3:latest",
+        "model_provider": "ollama",
+        "temperature": 0.7,
+        "pattern_type": "CALL_TEST_JE",
+        "confidence": 85,
+        "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 08 E8 ?? ?? ?? ?? }  // Push before first call\n        $pattern1 = { FF 15 5C C2 4C 00 }         // ExitProcess call\n        $pattern2 = { 59 FF 75 08 FF 15 ?? ?? ?? ?? }  // Pop, push, and second call\n\n    condition:\n        any of them\n}",
+        "opcodes_generic": "",
+        "opcodes_specific": ""
+      },
+      "cape_analysis": {
+        "task_id": 1506,
+        "analysis_type": "bypass",
+        "vm_host": "192.168.52.145",
+        "vm_name": "cape_vm4",
+        "submit_time": 1765497904.2666194,
+        "complete_time": 1765498060.8918505,
+        "duration_seconds": 156.62523102760315,
+        "signatures_count": 6,
+        "signature_names": [
+          "antidebug_setunhandledexceptionfilter",
+          "exec_crash",
+          "static_pe_pdbpath",
+          "injection_rwx",
+          "packer_unknown_pe_section_name",
+          "packer_entropy"
+        ],
+        "rule_hit": true,
+        "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 08 E8 ?? ?? ?? ?? }  // Push before first call\n        $pattern1 = { FF 15 5C C2 4C 00 }         // ExitProcess call\n        $pattern2 = { 59 FF 75 08 FF 15 ?? ?? ?? ?? }  // Pop, push, and second call\n\n    condition:\n        any of them\n}",
+        "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\b48348bce63f1ad4\\iter1_v3.yar"
+      },
+      "success": false,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "feedback_given": "Rule caused crash: ['exec_crash']",
+      "evolution_reasoning": null
+    }
+  ],
+  "total_iterations": 1,
+  "iterations_to_success": null,
+  "total_time_seconds": 584.3864986896515,
+  "avg_query_time_seconds": 116.06895899772644,
+  "avg_analysis_time_seconds": 156.62523102760315,
+  "total_input_tokens": 6054,
+  "total_output_tokens": 1603,
+  "total_tokens": 7657,
+  "success": false,
+  "best_score": 0,
+  "best_iteration": null,
+  "final_yara_rule": null,
+  "final_new_signatures": []
+}

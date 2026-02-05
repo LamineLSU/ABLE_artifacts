@@ -1,0 +1,85 @@
+{
+  "sha256": "ee5d38dba17ae62136092b7288149dd6fc472a829eb35daee3047ec5d32111b5",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_ESI_LEA\n{\n    meta:\n        description = \"Evasion bypass: Skip LEA instruction\"\n        cape_options = \"bp0=$pattern0+0,action0=skip\"\n\n    strings:\n        $pattern0 = { 6A 00 56 8D B0 A0 0C 00 00 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "104",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Instead of attempting to skip the entire sequence, focus on the initial `push 00000000h` (6A 00) and then skip a smaller, more flexible offset.  Also, consider using a different bypass strategy that doesn't involve skipping a fixed number of bytes."
+      ],
+      "debugger_log": null,
+      "raw_response": "Okay, let's analyze the provided trace and craft three bypass patterns according to the requirements.\n\n**Step 1: Identifying Suspicious Instructions**\n\nThe trace ends abruptly at `0041E22F: FFD0 call eax`. This is the most likely point of evasion.  We need to trace back and identify what check caused this early exit.  The `call eax` is suspicious because `eax` likely holds an address calculated based on some condition.\n\n**Step 2: Tracing the Exit Path Backwards**\n\nLet's trace back from `0041E22F`.\n\n*   `0041E22F: FFD0 call eax` - The instruction that caused the exit.  `eax` contains the address to be called.\n*   `0041E22B: 83C414 add esp, 14h` - Cleans up the stack.\n*   `0041E229: 8B06 mov eax, dword ptr [esi]` -  Loads the address from memory pointed to by `esi` into `eax`. This is the crucial instruction, as `esi` is likely controlled by the evasion check.\n*   `0041E226: 8B550C mov edx, dword ptr [ebp+0Ch]` - Loads a value from the stack into `edx`.\n*   `0041E220: E8740A0000 call 0041EB27h` - This is a call to a function, likely part of the evasion logic.\n*   `0041E219: 8DB0A00C0000 lea esi, dword ptr [eax+00000CA0h]` - Calculates an address and stores it in `esi`. This is where the `esi` value is being computed.\n*   `0041E216: 6A00 push 00000000h` - Pushes 0 onto the stack.\n*   `0041E214: 56 push esi` - Pushes `esi` onto the stack.\n\n**Step 3 & 4: Building Bypass Candidates**\n\nWe'll focus on bypassing the check that determines the value of `esi` and thus the address loaded into `eax`.  Let's choose three different bypass candidates:\n\n1.  **Bypass the `lea esi, dword ptr [eax+00000CA0h]` instruction:** This is the most direct point of control.  We'll skip this calculation entirely.\n2.  **Bypass the `call 0041EB27h` instruction:**  This call might be part of the evasion logic.  Skipping it could prevent the check from happening.\n3.  **Bypass the `push esi` instruction:** This might influence the address calculation or subsequent checks.\n\n**Step 5: Creating YARA Rules**\n\nHere are the three YARA rules, formatted as requested:\n\n```yara\nrule Bypass_ESI_LEA\n{\n    meta:\n        description = \"Evasion bypass: Skip LEA instruction\"\n        cape_options = \"bp0=$pattern0+0,action0=skip\"\n\n    strings:\n        $pattern0 = { 6A 00 56 8DB0 A0 0C 00 00 }\n\n    condition:\n        any of them\n}\n\nrule Bypass_CALL_EB27\n{\n    meta:\n        description = \"Evasion bypass: Skip CALL instruction\"\n        cape_options = \"bp0=$pattern0+0,action0=skip\"\n\n    strings:\n        $pattern0 = { 56 6A 36 6A 00 51 }\n\n    condition:\n        any of them\n}\n\nrule Bypass_PUSH_ESI\n{\n    meta:\n        description = \"Evasion bypass: Skip PUSH ESI instruction\"\n        cape_options = \"bp0=$pattern0+0,action0=skip\"\n\n    strings:\n        $pattern0 = { 8DB0 A0 0C 00 00 56 }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation of Choices:**\n\n*   **Bypass_ESI_LEA:** This pattern skips the `lea` instruction directly.  The length is 8 bytes (6A 00 56 8DB0 A0 0C 00 00).\n*   **Bypass_CALL_EB27:** This pattern skips the `call` instruction. The length is 6 bytes (56 6A 36 6A 00 51).\n*   **Bypass_PUSH_ESI:** This pattern skips the `push esi` instruction. The length is 6 bytes (8DB0 A0 0C 00 00 56).\n\nThese rules are designed to be relatively specific to the given trace. They bypass key instructions that likely contribute to the evasion check. The wildcards are avoided as the patterns are based on the trace provided.\n",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\ee5d38dba17ae621\\iter0_v1.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B 16 50 51 FF D2 5E 5D C3 }\n        $pattern1 = { 8B 48 14 56 6A 35 6A 00 51 8D B0 98 0C 00 00 56 50 E8 74 0A 00 00 }\n        $pattern2 = { 8B 55 14 8B 45 10 8B 4D 0C 83 C4 14 52 8B 16 50 51 FF D2 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "105",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Instead of skipping `8B5514`, we should skip a different instruction further down the trace that has less impact on the program's core functionality, or adjust the skip offset to avoid the critical instruction altogether.  A safer option is to try and skip the `6A35` instruction."
+      ],
+      "debugger_log": "=== 5356.log ===\nCAPE Sandbox - Debugger log: Sat Dec 27 23:33:58 2025\nBreakpoint 2 hit by instruction at 0x0041E346 (thread 6136) EAX=0x76929bb0 LookupPrivilegeValueW  EBX=0x9cf9b8 ECX=0x76d11737 crypt32.dll EDX=0x4331737 ESI=0x9cf884 EDI=0x776e2ed0 NtProtectVirtualMemory  ESP=0x9ceb1c *ESP=0x9cebd4 EBP=0x9ceb34\nBreak at 0x0041E346 in ee5d38dba17ae6213609.exe (RVA 0x1e346, thread 6136, Stack 0x009C1000-0x009D0000, ImageBase 0x00400000)\n0x0041E346  8B5514                   MOV       EDX, [EBP+0x14]               \nActionDispatcher: skipping instruction.\n0x0041E349  8B4510                   MOV       EAX, [EBP+0x10]               \n",
+      "raw_response": "```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B16 50 51 FFD2 5E 5D C3 }\n        $pattern1 = { 8B4814 56 6A35 6A00 51 8DB0980C0000 56 50 E8740A0000 }\n        $pattern2 = { 8B5514 8B4510 8B4D0C 83C414 52 8B16 50 51 FFD2 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\ee5d38dba17ae621\\iter1_v1.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A 35 56 56 6A 00 }\n        $pattern1 = { 8B 45 08 8B 45 08 8B 48 14 }\n        $pattern2 = { 83 C4 14 52 52 8B 16 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 65,
+      "opcodes": "",
+      "task_id": "106",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Instead of skipping the instruction sequences directly, focus on a more targeted bypass. The `call` instruction at `0041E1DE` appears to be the key point of interest.  The surrounding instructions are setting up arguments for this call.  Instead of skipping the setup, consider modifying the arguments passed to the `call` or attempting to redirect the execution flow"
+      ],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule caused a crash likely due to interfering with a critical instruction. The analysis suggested skipping the `6A35` instruction. This attempt will skip this instruction and a few surrounding instructions to minimize the risk of a crash while still attempting to bypass the detection. I've chosen three patterns, each targeting a different part of the trace, hoping to disrupt the execution flow without triggering a crash.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 65\n\n**REASONING**: Skipping `6A35` and surrounding instructions should avoid the problematic area while still potentially disrupting the malware's execution. The patterns are selected to be relatively specific but allow for some variation.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A 35 56 56 6A 00 }\n        $pattern1 = { 8B 45 08 8B 45 08 8B 48 14 }\n        $pattern2 = { 83 C4 14 52 52 8B 16 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\ee5d38dba17ae621\\iter2_v1.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

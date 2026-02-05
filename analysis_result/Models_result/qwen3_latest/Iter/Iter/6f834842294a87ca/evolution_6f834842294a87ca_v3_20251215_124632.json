@@ -1,0 +1,81 @@
+{
+  "sha256": "6f834842294a87caa8eba0926c8d7dd28de4f57bc600ab7a36f9335edd1d03c8",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        author = \"ThreatIntel\"\n        cape_options = \"bp0=$p0+0,action0=skip,bp1=$p1+0,action1=skip,bp2=$p2+0,action2=skip,count=0\"\n        description = \"Patterns to bypass exit process call in evasion code\"\n\n    strings:\n        // Pattern 0: Push ebp+08h followed by exit call\n        $p0 = { FF 75 08 E8 ?? ?? ?? ?? }\n\n        // Pattern 1: Exit call and subsequent instructions\n        $p1 = { E8 ?? ?? ?? ?? 59 FF 75 08 FF 15 ?? ?? ?? ?? }\n\n        // Pattern 2: Prologue and exit call\n        $p2 = { 55 8B EC FF 75 08 E8 ?? ?? ?? ?? }\n\n    condition:\n        (uint8($p0) and uint8($p1) and uint8($p2)) or\n        (uint8($p0) and uint8($p1)) or\n        (uint8($p0) and uint8($p2)) or\n        (uint8($p1) and uint8($p2))\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1697",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 9,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Refactor the YARA rule to target a different instruction sequence or use more flexible wildcards to avoid false positives. For example, focus on the `ExitProcess` import address or use relative offsets instead of absolute ones."
+      ],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        author = \"ThreatIntel\"\n        description = \"Patterns to bypass exit process call in evasion code\"\n\n    strings:\n        // Pattern 0: Push ebp+08h followed by exit call\n        $p0 = { FF 75 08 E8 ?? ?? ?? ?? }\n\n        // Pattern 1: Exit call and subsequent instructions\n        $p1 = { E8 ?? ?? ?? ?? 59 FF 75 08 FF 15 ?? ?? ?? ?? }\n\n        // Pattern 2: Prologue and exit call\n        $p2 = { 55 8B EC FF 75 08 E8 ?? ?? ?? ?? }\n\n    condition:\n        (uint8($p0) and uint8($p1) and uint8($p2)) or\n        (uint8($p0) and uint8($p1)) or\n        (uint8($p0) and uint8($p2)) or\n        (uint8($p1) and uint8($p2))\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\6f834842294a87ca\\iter0_v3.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 08 E8 ?? ?? ?? ?? }  // Push ebp+08h + call (relative)\n        $pattern1 = { 59 FF 15 ?? ?? ?? ?? }    // Pop ecx + indirect call\n        $pattern2 = { 55 8B EC FF 75 08 }        // Stack setup before call\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 75,
+      "opcodes": "",
+      "task_id": "1698",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 9,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 8968.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 04:19:06 2025\nBreakpoint 1 hit by instruction at 0x004079CE (thread 6136) EBX=0x1 ECX=0x63205b8 EDX=0x2ff000 ESI=0x63205b8 EDI=0x77340000 \"MZ\" kernel32.dll ESP=0x19fee8 *ESP=0x0 EBP=0x19ff70\nBreak at 0x004079CE in 6f834842294a87caa8eb.exe (RVA 0x79ce, thread 6136, Stack 0x00193000-0x001A0000, ImageBase 0x00400000)\n0x004079CE  59                       POP       ECX                           \nActionDispatcher: skipping instruction.\n0x004079CF  FF1520114000             CALL      GetCurrentThreadId            \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule hit but failed to find new signatures, likely due to targeting the exit action rather than the decision logic. I refactored the patterns to focus on **evasion checks** (Strategy A) and **conditional logic before exit** (Strategy B). The new patterns target the call sequences and stack manipulation around ExitProcess, which are more likely to represent evasion logic rather than the exit itself. By using concrete bytes from the trace and wildcards for variable offsets, I balance specificity and flexibility to avoid false positives.\n\n---\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 75\n\n**REASONING**: These patterns target the call sequences and stack manipulation around ExitProcess, which are more likely to represent evasion logic. The first pattern focuses on the call to ExitProcess with a relative offset (E8 ?? ?? ?? ??), the second targets the indirect call (FF15 ?? ?? ?? ??), and the third captures stack setup before the call (55 8B EC FF7508). These sequences are less likely to be false positives than the exit action itself.\n\n---\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF7508 E8 ?? ?? ?? ?? }  // Push ebp+08h + call (relative)\n        $pattern1 = { 59 FF15 ?? ?? ?? ?? }    // Pop ecx + indirect call\n        $pattern2 = { 55 8B EC FF7508 }        // Stack setup before call\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\6f834842294a87ca\\iter1_v3.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC FF 75 08 E8 ?? ?? ?? ?? }\n        $pattern1 = { FF 15 ?? ?? ?? ?? }\n        $pattern2 = { 59 FF 75 08 FF 15 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1699",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 9,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 6928.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 01:23:38 2025\nBreakpoint 0 hit by instruction at 0x00407B13 (thread 6148) EBX=0x1 ECX=0x4011c8 6f834842294a87caa8eb.exe EDX=0xc000eff1 EDI=0xfffffffe ESP=0x19fee4 \"\f?@\" *ESP=0x403f0c 6f834842294a87caa8eb.exe EBP=0x19feec\nBreak at 0x00407B13 in 6f834842294a87caa8eb.exe (RVA 0x7b13, thread 6148, Stack 0x00193000-0x001A0000, ImageBase 0x00400000)\n0x00407B13  55                       PUSH      EBP                           \nActionDispatcher: skipping instruction.\n0x00407B14  8BEC                     MOV       EBP, ESP                      \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC FF 75 08 E8 ?? ?? ?? ?? }\n        $pattern1 = { FF 15 ?? ?? ?? ?? }\n        $pattern2 = { 59 FF 75 08 FF 15 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\6f834842294a87ca\\iter2_v3.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

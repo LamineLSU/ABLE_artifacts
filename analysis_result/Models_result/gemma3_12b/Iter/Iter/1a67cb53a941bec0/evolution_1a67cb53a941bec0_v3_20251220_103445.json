@@ -1,0 +1,85 @@
+{
+  "sha256": "1a67cb53a941bec069515f6939955b3f4e8df5ea7cdd3e2d7a557960ae1c7d70",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC E8 ?? ?? ?? ?? 59 FF 75 08 } // Bypass initial CALL (trace 1, 4, 5)\n        $pattern1 = { 8B FF 55 8B EC E8 ?? ?? ?? ?? 83 F8 ?? 74 ?? } // Bypass conditional jump (trace 5)\n        $pattern2 = { 55 8B EC FF 75 08 FF 15 ?? ?? ?? ?? 59 } // Bypass push instruction (trace 5)\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1263",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 40,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Broaden the YARA patterns to account for variations in the assembly.  Instead of rigidly matching the exact instruction sequence, introduce wildcards (`?`) to allow for flexibility.  Also, carefully examine the debugger log to understand the context of the skipped instruction and ensure the skip offset is appropriate for the broader code block."
+      ],
+      "debugger_log": "=== 4144.log ===\nCAPE Sandbox - Debugger log: Sun Dec 21 00:41:34 2025\nBreakpoint 1 hit by instruction at 0x0101A9A1 (thread 8500) EBX=0x15c3160 \"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP\\xriv.exe\" ECX=0x116b50ef EDX=0x15a0000 \"@c\" ESI=0x77363310 GetFileAttributesA  EDI=0x15bd710 \"C:\\Users\\sanya\\AppData\\Local\\Temp\\4b9a106e76\\mnolyk.exe\" ESP=0x11af5b0 *ESP=0x101a9a0 xriv.exe EBP=0x11af5d0\nBreak at 0x0101A9A1 in xriv.exe (RVA 0x1a9a1, thread 8500, Stack 0x011A2000-0x011B0000, ImageBase 0x01000000)\n0x0101A9A1  8BFF                     MOV       EDI, EDI                      \nActionDispatcher: skipping instruction.\n0x0101A9A3  55                       PUSH      EBP                           \n",
+      "raw_response": "芪\n\nOkay, let's analyze the traces and construct three YARA patterns based on the specified criteria. I'll focus on identifying evasion checks and potential bypass points.  Given the repeated structure of the traces, I'll pick bypasses that seem to target a core evasion mechanism.\n\n**Trace Analysis & Bypass Selection:**\n\nThe traces show a common pattern of checks followed by an exit (INT3). The most likely evasion is checking for a debugger or virtual machine presence. The repeated `push ebp; mov ebp, esp; call ...; pop ecx` sequence strongly suggests a function prologue and potentially a check within that function. The `FF15` (CALL) instructions are critical as they likely implement these checks.  The fact that the traces terminate with `int3` indicates a deliberate halt upon detection.\n\n**Bypass Points Chosen:**\n\n1.  **Targeting the initial CALL:** The first `call` instruction after `mov ebp, esp` is likely the evasion check itself. Bypassing this could allow execution to continue.\n2.  **Targeting a conditional jump:**  A conditional jump (JE, JNE, JG, etc.) following a check is a common way to branch based on the evasion detection result. Skipping this jump might bypass the check.\n3.  **Targeting a `push dword ptr [ebp+08h]`:** This push instruction is often used to save registers before a check, and skipping it may prevent the check from occurring.\n\n**YARA Patterns:**\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8BEC E8 ?? ?? ?? ?? 59 FF7508 } // Bypass initial CALL (trace 1, 4, 5)\n        $pattern1 = { 8BFF 55 8BEC E8 ?? ?? ?? ?? 83F8 ?? 74 ?? } // Bypass conditional jump (trace 5)\n        $pattern2 = { 55 8BEC FF7508 FF15 ?? ?? ?? ?? 59 } // Bypass push instruction (trace 5)\n\n    condition:\n        any of them\n}\n```\n\n**Explanation of Patterns:**\n\n*   **`$pattern0`:**  Bypasses the initial `CALL` instruction. This pattern targets the sequence `55 8BEC E8 ?? ?? ?? ?? 59 FF7508` which is present in traces 1, 4, and 5. The `E8` byte is replaced with `??` because it represents a displacement, which is an address. This bypass essentially skips the check function entirely.\n*   **`$pattern1`:** Bypasses a conditional jump. This pattern targets the sequence `8BFF 55 8BEC E8 ?? ?? ?? ?? 83F8 ?? 74 ??` which is present in trace 5. The `E8` and `74` bytes are replaced with `??` because they represent displacement values. This bypass prevents the program from branching based on the check's result.\n*   **`$pattern2`:** Bypasses the `push dword ptr [ebp+08h]` instruction. This pattern targets the sequence `55 8BEC FF7508 FF15 ?? ?? ?? ?? 59`. The `FF15` opcode is a CALL, and the 4 bytes following it represent an address, so those are replaced with `??`.\n\n**Important Considerations:**\n\n*   **Wildcards:** The `??` placeholders are crucial for making these patterns adaptable to different offset values.\n*   **Specificity:** These patterns are designed to be relatively specific to the identified evasion pattern.  Further refinement might be needed based on the actual malware behavior.\n*   **Robustness:** These are initial bypass attempts. A sophisticated malware author could easily detect and counter these simple bypasses.\n*   **Context:**  The surrounding instructions provide context to ensure the bypass is targeted at the correct location.\n*   **CAPE options**: The `cape_options` metadata allows for the usage of these bypasses within a dynamic analysis environment.\n\nThis solution provides three different bypass patterns that meet all the specified requirements.  Remember that this is just a starting point, and further analysis and experimentation would be needed to refine these bypasses and ensure their effectiveness.",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\1a67cb53a941bec0\\iter0_v3.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 6A 5B }\n        $pattern1 = { 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 8D 95 F0 FE FF FF 89 9D F0 FE FF FF }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 65,
+      "opcodes": "",
+      "task_id": "1264",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 40,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Instead of skipping the entire instruction sequence, we should focus on skipping only the conditional jump instruction (0F 84).  This allows the test instruction (85 C0) to execute, potentially revealing more useful information without causing a crash. The skip offset should be adjusted to account for the length of the conditional jump instruction."
+      ],
+      "debugger_log": "=== 4608.log ===\nCAPE Sandbox - Debugger log: Sun Dec 21 00:49:16 2025\nBreakpoint 1 hit by instruction at 0x03DD87AE (thread 4832) ESI=0x402132c EDI=0x788a58 ESP=0x19d960 *ESP=0x6abdf4eb \"ZY_^[]\" clr.dll EBP=0x19d980\n0x03DD87AE  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x03DD87B0  0F847F000000             JZ        0x85                          \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule hit but found no new signatures, indicating it matched a location that wasn't the intended bypass point. Given that the initial trace shows a check before the `ExitProcess` call, and focusing on Strategy A (Evasion Check), I've selected patterns around the `test eax, eax` instruction and the subsequent conditional jump.  I'm prioritizing concrete bytes where possible for specificity, and using `??` where offsets are variable. I am also including a conditional check before the exit call.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 65\n\n**REASONING**: These patterns target the instruction sequence immediately preceding the `ExitProcess` call, aiming to bypass a check that might be determining whether the process should exit. The inclusion of `test eax, eax` and conditional jumps is crucial for targeting the decision-making logic. The patterns are concrete to reduce false positives and are 6-20 bytes as requested.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 6A 5B }\n        $pattern1 = { 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 8D 95 F0 FE FFFF 89 9D F0 FE FFFF }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\1a67cb53a941bec0\\iter1_v3.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n        $pattern1 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern2 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1265",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 40,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Remove the `cape_options` meta tag entirely.  The rule's condition should rely on the pattern matching the core logic without relying on fixed skip offsets. This will allow YARA to detect the underlying pattern more reliably across different variations of the code."
+      ],
+      "debugger_log": "=== 9164.log ===\nCAPE Sandbox - Debugger log: Sat Dec 20 23:36:26 2025\nBreakpoint 1 hit by instruction at 0x03B771C8 (thread 4024) EAX=0x1 EBX=0x40a5300 ECX=0x19ddb8 EDX=0x7d450c ESI=0x19ddd8 EDI=0x19ddb8 ESP=0x19dd58 *ESP=0x0 EBP=0x19de08\n0x03B771C8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x03B771CA  0F8409020000             JZ        0x20f                         \nBreakpoint 1 hit by instruction at 0x03B771C8 (thread 4024) EAX=0x1 EBX=0x40a55d4 ECX=0x19ddb8 EDX=0x23067d8 ESI=0x19ddd8 EDI=0x19ddb8 ESP=0x19dd58 *ESP=0x0 EBP=0x19de08\n0x03B771C8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x03B771CA  0F8409020000             JZ        0x20f                         \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n        $pattern1 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern2 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\1a67cb53a941bec0\\iter2_v3.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

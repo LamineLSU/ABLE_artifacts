@@ -1,0 +1,507 @@
+{
+  "sha256": "9be494b1233a38c3d86ae075d3073ff4de88bc3064011554aa7c96d5ef068c04",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample {\n       meta:\n           description = \"Evasion bypass patterns\"\n           cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n       strings:\n           $pattern0 = { 85 C0 ?? ?? ?? ?? 02 4F }\n   }",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nAlright, so I'm trying to figure out how to create three different bypass patterns from the given trace data for a Yara rule. The goal is to help an analyst detect these bypass attempts in sandbox environments. Let's break it down step by step.\n\nFirst, I need to understand what the attacker did in this evasion. Looking at the traces, especially Phase 1 where the author implemented checks, I can see that there are several conditional jumps and memory accesses. The attacker is likely trying to avoid detection by evading these checks.\n\nIn Phase 1, from the trace data, the author has checks like `85 C0` (TEST EAX), followed by JZ or JC instructions with specific offsets. For example:\n\n- After TEST EAX comes a conditional jump:\n  \n  ```\n  85 C0\n  00 2F 04 6C 1E ... (JZ or JC)\n  ```\n\nSo, the bypass would involve skipping these jumps.\n\nIn Phase 2, from the defender's perspective, each of these checks is a potential target. The idea is to find where in the code execution can be manipulated so that even if some checks are skipped, others might still fail. But since we're creating bypass patterns, the focus is on specific points where skipping would allow bypass.\n\nIn Phase 3, looking at adversarial game analysis, each bypass should ideally target a specific vulnerability without affecting other legitimate uses of those instructions.\n\nNow, moving to phase 4: selecting three different bypass targets. I need to choose instruction sequences that are both effective and specific enough.\n\nLooking at the trace data:\n\n1. **Target around TEST EAX and JZ/JC (instruction 0x27 onwards):**\n   - The attacker has `TEST EAX` followed by a jump with an offset of 4 bytes. So, if we can skip this conditional jump, it would bypass one check.\n   \n2. **Target around LEA instruction leading to a memory access:**\n   - The code does several LEA instructions followed by calls and memory reads/writes. There's also a point where the stack is manipulated with `8D 85 14 FC FFFF`, which points to an offset of 0x14 in the stack.\n   \n3. **Target around the second call instruction (FF15F88F6E00):**\n   - This seems to be a deeper memory access, perhaps into an API or user space code that needs to be bypassed.\n\nFor each of these targets, I need to construct patterns that skip specific instructions while keeping others intact. Using wildcards for address/offset bytes is crucial because they're harder to detect and can be manipulated without changing the opcode.\n\nLet's draft some patterns:\n\n**Pattern 1: Bypassing TEST EAX and JZ**\n- The sequence would involve skipping the conditional jump after the TEST.\n- So, instead of jumping, we might fall through or take a different path that doesn't execute this jump.\n\nPattern:\n```\n85 C0 ?? ?? ?? ?? 02 4F\n```\nExplanation: TEST EAX (85 C0), then skip JZ (replace with ?? for address), then proceed to the next instruction which is `02 4F`.\n\n**Pattern 2: Bypassing LEA and Memory Access**\n- Here, we target a memory access where the attacker loads into ESI. To bypass this, we can modify or remove the instruction that causes the load.\n\nPattern:\n```\n5E ?? ?F C9 ?? ?? ?? ?? 8D ?? ?C ?? ?? ?4 ?F F8\n```\nExplanation: After some operations, instead of LEA (5E), use ?? to skip it and proceed with other instructions.\n\n**Pattern 3: Bypassing the Second Call**\n- The attacker calls an unknown function (FF15F88F6E00). To bypass, we can replace this call with a no-op or modify its offset.\n\nPattern:\n```\n?C ?? ?D ?4 ?9 ?? ?? ?? ?? FF 15 F8 8F 6E 00\n```\nExplanation: Replace the call instruction's opcode (FF) and offset (FE) with wildcards to skip it entirely.\n\nThese patterns should effectively target specific checks without being too broad, allowing for detection while bypassing legitimate uses of these instructions.\n</think>\n\nTo create three distinct bypass patterns from the provided trace data, we'll focus on specific instruction sequences that can be manipulated to bypass the evasion checks. Each pattern is designed to skip critical conditional jumps or memory accesses while keeping opcode and register bytes concrete.\n\n### Patterns:\n\n1. **Bypassing TEST EAX and Conditional Jump (JZ/JC):**\n   - This pattern skips the JZ instruction after TEST EAX, allowing bypass of the check.\n   \n   ```yara\n   rule Bypass_Sample {\n       meta:\n           description = \"Evasion bypass patterns\"\n           cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n       strings:\n           $pattern0 = { 85 C0 ?? ?? ?? ?? 02 4F }\n   }\n   ```\n\n2. **Bypassing LEA Instruction and Memory Access:**\n   - This pattern skips the memory access instruction following LEA, bypassing that check.\n   \n   ```yara\n       $pattern1 = { 5E ?? ?F C9 ?? ?? ?? ?? 8D ?? ?C ?? ?? ?4 ?F F8 }\n   ```\n\n3. **Bypassing Call Instruction (FF15F88F6E00):**\n   - This pattern skips the call instruction, bypassing its check.\n   \n   ```yara\n       $pattern2 = { ?C ?? ?D ?4 ?9 ?? ?? ?? ?? FF 15 F8 8F 6E 00 }\n   ```\n\n### Explanation:\n\n- **Pattern 0:** Skips a conditional jump (JZ) after TEST EAX, neutralizing the first check.\n- **Pattern 1:** Skips a memory load instruction following LEA, bypassing that specific access check.\n- **Pattern 2:** Skips an arbitrary call instruction with wildcards for its offset, preventing detection of the called function.\n\nEach pattern is designed to target distinct vulnerabilities while maintaining specificity and robustness against legitimate program execution.",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\9be494b1233a38c3\\iter0_v3.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 7D 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to connect to CAPE",
+      "improvement_suggestions": [
+        "Modify the Yara rule to use wildcards for more flexibility and adjust the skip offset to prevent invalid jumps."
+      ],
+      "debugger_log": null,
+      "raw_response": "<think>\nAlright, so I need to analyze this trace from a Yara perspective and create a bypass rule for it. Let me start by understanding what's happening here.\n\nLooking at the trace, it seems like there are two main phases: when exiting to an external address (like the sandbox exit) and when continuing execution without being detected. The attacker probably implemented some checks to detect bypass attempts, so I need to figure out where those checks are and how to bypass them.\n\nFirst, in Phase 1, the attacker's perspective: They likely checked for certain instructions that would cause the analysis tool to flag their code as suspicious. Maybe they used something like TEST EAX or conditional jumps to check if the execution path is controlled by legitimate code or an attacker. The trace shows a lot of jumps around, but where exactly are those checks placed?\n\nIn Phase 2, from the defender's point of view: I need to find points in the code where my bypass can go undetected. These would be instruction sequences that don't match the attacker's checks. For example, if the attacker uses a TEST EAX before a conditional jump, maybe I can skip some instructions around those points.\n\nLooking at the trace again, there are several places where jumps or calls happen followed by tests and then more jumps. My goal is to find three different instruction sequences that bypass these checks.\n\nLet me try to identify potential bypass points:\n\n1. Around the first TEST EAX: Maybe skipping this TEST would let execution continue.\n2. Skipping a conditional jump after a call, like E8 ?? ?? ?? ??.\n3. Another place where a test is followed by jumps; perhaps skipping those as well.\n\nI need to make sure each pattern is 6-20 bytes long and includes the target instruction plus surrounding context with wildcards for address/offset bytes.\n\nSo, first pattern: Skipping TEST EAX + JZ + something else.\nSecond pattern: Skipping a call (E8) followed by four wildcard bytes.\nThird pattern: Maybe another conditional jump or a different test.\n\nWait, let me check the trace again. The first part has 0F 84 ?? ??? which could be a displacement in a memory access. So maybe I can create a pattern around that.\n\nPutting it all together, I'll draft three patterns:\n\n1. Around the TEST EAX instruction and skip the JZ.\n2. Skip a call (E8) followed by four wildcards to bypass the offset check.\n3. Another conditional jump with wildcards for displacement.\n\nI need to make sure each pattern is unique and fits within 6-20 bytes, using ?? where necessary and keeping opcodes concrete.\n</think>\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 7D 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\9be494b1233a38c3\\iter1_v3.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1575",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 27,
+      "new_signatures": 7,
+      "new_signature_names": [
+        "accesses_recyclebin",
+        "deletes_executed_files",
+        "queries_keyboard_layout",
+        "stealth_timeout",
+        "uses_windows_utilities",
+        "accesses_public_folder",
+        "suspicious_command_tools"
+      ],
+      "new_signature_details": [
+        {
+          "name": "queries_keyboard_layout",
+          "description": "Queries the keyboard layout",
+          "categories": [
+            "location_discovery"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 3176,
+              "cid": 688
+            },
+            {
+              "type": "call",
+              "pid": 5124,
+              "cid": 740
+            },
+            {
+              "type": "call",
+              "pid": 5444,
+              "cid": 699
+            },
+            {
+              "type": "call",
+              "pid": 5444,
+              "cid": 716
+            },
+            {
+              "type": "call",
+              "pid": 5444,
+              "cid": 739
+            },
+            {
+              "type": "call",
+              "pid": 2424,
+              "cid": 718
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "accesses_public_folder",
+          "description": "A file was accessed within the Public folder.",
+          "categories": [
+            "generic"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "file": "C:\\Users\\Public\\Desktop"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "stealth_timeout",
+          "description": "Possible date expiration check, exits too soon after checking local time",
+          "categories": [
+            "stealth"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 40,
+          "references": [],
+          "data": [
+            {
+              "process": "Applaunch.exe, PID 9132"
+            },
+            {
+              "type": "call",
+              "pid": 9132,
+              "cid": 19724
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "accesses_recyclebin",
+          "description": "Manipulates data from or to the Recycle Bin",
+          "categories": [
+            "evasion",
+            "execution"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 9132,
+              "cid": 15665
+            },
+            {
+              "type": "call",
+              "pid": 9132,
+              "cid": 15737
+            },
+            {
+              "file": "C:\\$Recycle.Bin\\S-1-5-21-4260811189-1909074817-1048678129-1001"
+            },
+            {
+              "file": "C:\\$Recycle.Bin\\S-1-5-21-4260811189-1909074817-1048678129-1001\\desktop.ini"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "uses_windows_utilities",
+          "description": "Uses Windows utilities for basic functionality",
+          "categories": [
+            "command",
+            "lateral"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 80,
+          "references": [],
+          "data": [
+            {
+              "command": "\"C:\\Windows\\system32\\cmd.exe\" /c timeout /t 10 & del /f /q \"C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\Applaunch.exe\" & rd /s /q \"C:\\ProgramData\\GHDBKJKJKKJD\" & exit"
+            },
+            {
+              "command": "C:\\Windows\\System32\\cmd.exe /c timeout /t 10 & del /f /q \"C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\Applaunch.exe\" & rd /s /q \"C:\\ProgramData\\GHDBKJKJKKJD\" & exit"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "deletes_executed_files",
+          "description": "Deletes executed files from disk",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "file": "C:\\ProgramData\\GHDBKJKJKKJD"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "suspicious_command_tools",
+          "description": "Uses suspicious command line tools or Windows utilities",
+          "categories": [
+            "command",
+            "lateral"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 80,
+          "references": [],
+          "data": [
+            {
+              "command": "\"C:\\Windows\\system32\\cmd.exe\" /c timeout /t 10 & del /f /q \"C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\Applaunch.exe\" & rd /s /q \"C:\\ProgramData\\GHDBKJKJKKJD\" & exit"
+            },
+            {
+              "command": "\"C:\\Windows\\system32\\cmd.exe\" /c timeout /t 10 & del /f /q \"C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\Applaunch.exe\" & rd /s /q \"C:\\ProgramData\\GHDBKJKJKKJD\" & exit"
+            },
+            {
+              "command": "C:\\Windows\\System32\\cmd.exe /c timeout /t 10 & del /f /q \"C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\Applaunch.exe\" & rd /s /q \"C:\\ProgramData\\GHDBKJKJKKJD\" & exit"
+            },
+            {
+              "command": "C:\\Windows\\System32\\cmd.exe /c timeout /t 10 & del /f /q \"C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\Applaunch.exe\" & rd /s /q \"C:\\ProgramData\\GHDBKJKJKKJD\" & exit"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": "Failed to connect to CAPE",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 6244.log ===\nCAPE Sandbox - Debugger log: Wed Dec 24 16:06:49 2025\nBreakpoint 1 hit by instruction at 0x00F8E41D (thread 2016) EAX=0xffce ECX=0xffce ESI=0xfc8bf0 cmd.exe EDI=0x7fe7 ESP=0x95fcac *ESP=0xffce EBP=0x95fcc0\nBreak at 0x00F8E41D in cmd.exe (RVA 0xe41d, thread 2016, Stack 0x00863000-0x00960000, ImageBase 0x00F80000)\n0x00F8E41D  E8038A0000               CALL      0x8a08                        \nActionDispatcher: skipping instruction.\n0x00F8E422  83C408                   ADD       ESP, 0x8                      \n",
+      "raw_response": "<think>\nAlright, so I'm trying to figure out how to create a Yara rule that bypasses an evasion check in this given trace. Let's start by understanding what's happening here.\n\nLooking at the trace, it seems like there are multiple phases where different instructions are executed. The attacker probably implemented some checks to detect bypass attempts. My job is to find points where these checks can be evaded and then construct patterns that target those points.\n\nFirst, I'll analyze Phase 1 from the attacker's perspective. They likely have a few checks in place:\n\n- Maybe they're checking for specific instructions like TEST, JZ (Jump if Zero), or some conditional jumps.\n- Perhaps they use these to determine whether to continue execution or exit.\n\nNow, looking at the trace data, I can see several instances of TEST and JZ. For example, there's a TEST EAX instruction towards the end, which might be one of the checks. There's also a JZX instruction near line 2038, but that seems to be part of an address check, not a conditional jump.\n\nIn Phase 2, from the defender's perspective, I need to think about where bypasses can occur. The goal is to find instructions that, if skipped, would allow execution to continue past the attacker's checks without being detected.\n\nLooking at the trace again, I notice several places where CALL and PUSH instructions are used. These often set up the program counter or stack pointer in a way that could be manipulated for bypassing. For example, the early calls might jump over certain checks if skipped.\n\nIn Phase 3, identifying specific bypass points is crucial. Each point should target a different instruction sequence to cover various evasion methods and make it harder for the attacker to detect.\n\nLet me consider each potential bypass:\n\n1. **Bypassing TEST EAX + JZ (instruction 2045):** If this instruction is skipped, the next TEST might not be triggered if EAX hasn't changed value.\n2. **Skipping JZX near line 2038:** Since it's an address check, skipping it could bypass some checks without affecting execution flow immediately.\n3. **Overwriting ESI with a different value (line 2047):** If this instruction is manipulated to set ESI to a known value not checked by the attacker, the bypass can be achieved.\n\nNow, constructing patterns for each:\n\n1. For TEST EAX and JZ, I'll need to skip these two instructions but keep enough context so that other relevant bytes after them aren't flagged.\n2. Skipping JZX should just remove that single instruction without affecting surrounding addresses.\n3. Overwriting ESI with a different value would involve changing the operand of the STORE instruction.\n\nI also need to ensure each pattern is 6-20 bytes long and uses wildcards for any address or offset bytes as per Yara's rules.\n\nPutting it all together, I'll create three distinct patterns targeting these bypass points. Each will be wrapped in braces with appropriate wildcards and concrete opcodes where possible.\n</think>\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\9be494b1233a38c3\\iter2_v3.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v3",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1575",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 27,
+    "new_signatures": 7,
+    "new_signature_names": [
+      "accesses_recyclebin",
+      "deletes_executed_files",
+      "queries_keyboard_layout",
+      "stealth_timeout",
+      "uses_windows_utilities",
+      "accesses_public_folder",
+      "suspicious_command_tools"
+    ],
+    "new_signature_details": [
+      {
+        "name": "queries_keyboard_layout",
+        "description": "Queries the keyboard layout",
+        "categories": [
+          "location_discovery"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 3176,
+            "cid": 688
+          },
+          {
+            "type": "call",
+            "pid": 5124,
+            "cid": 740
+          },
+          {
+            "type": "call",
+            "pid": 5444,
+            "cid": 699
+          },
+          {
+            "type": "call",
+            "pid": 5444,
+            "cid": 716
+          },
+          {
+            "type": "call",
+            "pid": 5444,
+            "cid": 739
+          },
+          {
+            "type": "call",
+            "pid": 2424,
+            "cid": 718
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "accesses_public_folder",
+        "description": "A file was accessed within the Public folder.",
+        "categories": [
+          "generic"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "file": "C:\\Users\\Public\\Desktop"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "stealth_timeout",
+        "description": "Possible date expiration check, exits too soon after checking local time",
+        "categories": [
+          "stealth"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 40,
+        "references": [],
+        "data": [
+          {
+            "process": "Applaunch.exe, PID 9132"
+          },
+          {
+            "type": "call",
+            "pid": 9132,
+            "cid": 19724
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "accesses_recyclebin",
+        "description": "Manipulates data from or to the Recycle Bin",
+        "categories": [
+          "evasion",
+          "execution"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 9132,
+            "cid": 15665
+          },
+          {
+            "type": "call",
+            "pid": 9132,
+            "cid": 15737
+          },
+          {
+            "file": "C:\\$Recycle.Bin\\S-1-5-21-4260811189-1909074817-1048678129-1001"
+          },
+          {
+            "file": "C:\\$Recycle.Bin\\S-1-5-21-4260811189-1909074817-1048678129-1001\\desktop.ini"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "uses_windows_utilities",
+        "description": "Uses Windows utilities for basic functionality",
+        "categories": [
+          "command",
+          "lateral"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 80,
+        "references": [],
+        "data": [
+          {
+            "command": "\"C:\\Windows\\system32\\cmd.exe\" /c timeout /t 10 & del /f /q \"C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\Applaunch.exe\" & rd /s /q \"C:\\ProgramData\\GHDBKJKJKKJD\" & exit"
+          },
+          {
+            "command": "C:\\Windows\\System32\\cmd.exe /c timeout /t 10 & del /f /q \"C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\Applaunch.exe\" & rd /s /q \"C:\\ProgramData\\GHDBKJKJKKJD\" & exit"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "deletes_executed_files",
+        "description": "Deletes executed files from disk",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "file": "C:\\ProgramData\\GHDBKJKJKKJD"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "suspicious_command_tools",
+        "description": "Uses suspicious command line tools or Windows utilities",
+        "categories": [
+          "command",
+          "lateral"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 80,
+        "references": [],
+        "data": [
+          {
+            "command": "\"C:\\Windows\\system32\\cmd.exe\" /c timeout /t 10 & del /f /q \"C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\Applaunch.exe\" & rd /s /q \"C:\\ProgramData\\GHDBKJKJKKJD\" & exit"
+          },
+          {
+            "command": "\"C:\\Windows\\system32\\cmd.exe\" /c timeout /t 10 & del /f /q \"C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\Applaunch.exe\" & rd /s /q \"C:\\ProgramData\\GHDBKJKJKKJD\" & exit"
+          },
+          {
+            "command": "C:\\Windows\\System32\\cmd.exe /c timeout /t 10 & del /f /q \"C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\Applaunch.exe\" & rd /s /q \"C:\\ProgramData\\GHDBKJKJKKJD\" & exit"
+          },
+          {
+            "command": "C:\\Windows\\System32\\cmd.exe /c timeout /t 10 & del /f /q \"C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\Applaunch.exe\" & rd /s /q \"C:\\ProgramData\\GHDBKJKJKKJD\" & exit"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": "Failed to connect to CAPE",
+    "improvement_suggestions": [],
+    "debugger_log": "=== 6244.log ===\nCAPE Sandbox - Debugger log: Wed Dec 24 16:06:49 2025\nBreakpoint 1 hit by instruction at 0x00F8E41D (thread 2016) EAX=0xffce ECX=0xffce ESI=0xfc8bf0 cmd.exe EDI=0x7fe7 ESP=0x95fcac *ESP=0xffce EBP=0x95fcc0\nBreak at 0x00F8E41D in cmd.exe (RVA 0xe41d, thread 2016, Stack 0x00863000-0x00960000, ImageBase 0x00F80000)\n0x00F8E41D  E8038A0000               CALL      0x8a08                        \nActionDispatcher: skipping instruction.\n0x00F8E422  83C408                   ADD       ESP, 0x8                      \n",
+    "raw_response": "<think>\nAlright, so I'm trying to figure out how to create a Yara rule that bypasses an evasion check in this given trace. Let's start by understanding what's happening here.\n\nLooking at the trace, it seems like there are multiple phases where different instructions are executed. The attacker probably implemented some checks to detect bypass attempts. My job is to find points where these checks can be evaded and then construct patterns that target those points.\n\nFirst, I'll analyze Phase 1 from the attacker's perspective. They likely have a few checks in place:\n\n- Maybe they're checking for specific instructions like TEST, JZ (Jump if Zero), or some conditional jumps.\n- Perhaps they use these to determine whether to continue execution or exit.\n\nNow, looking at the trace data, I can see several instances of TEST and JZ. For example, there's a TEST EAX instruction towards the end, which might be one of the checks. There's also a JZX instruction near line 2038, but that seems to be part of an address check, not a conditional jump.\n\nIn Phase 2, from the defender's perspective, I need to think about where bypasses can occur. The goal is to find instructions that, if skipped, would allow execution to continue past the attacker's checks without being detected.\n\nLooking at the trace again, I notice several places where CALL and PUSH instructions are used. These often set up the program counter or stack pointer in a way that could be manipulated for bypassing. For example, the early calls might jump over certain checks if skipped.\n\nIn Phase 3, identifying specific bypass points is crucial. Each point should target a different instruction sequence to cover various evasion methods and make it harder for the attacker to detect.\n\nLet me consider each potential bypass:\n\n1. **Bypassing TEST EAX + JZ (instruction 2045):** If this instruction is skipped, the next TEST might not be triggered if EAX hasn't changed value.\n2. **Skipping JZX near line 2038:** Since it's an address check, skipping it could bypass some checks without affecting execution flow immediately.\n3. **Overwriting ESI with a different value (line 2047):** If this instruction is manipulated to set ESI to a known value not checked by the attacker, the bypass can be achieved.\n\nNow, constructing patterns for each:\n\n1. For TEST EAX and JZ, I'll need to skip these two instructions but keep enough context so that other relevant bytes after them aren't flagged.\n2. Skipping JZX should just remove that single instruction without affecting surrounding addresses.\n3. Overwriting ESI with a different value would involve changing the operand of the STORE instruction.\n\nI also need to ensure each pattern is 6-20 bytes long and uses wildcards for any address or offset bytes as per Yara's rules.\n\nPutting it all together, I'll create three distinct patterns targeting these bypass points. Each will be wrapped in braces with appropriate wildcards and concrete opcodes where possible.\n</think>\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\9be494b1233a38c3\\iter2_v3.yar"
+  },
+  "best_score": 7,
+  "optimization_history": [
+    "Iteration 1: error - ",
+    "Iteration 2: error - Failed to connect to CAPE",
+    "Iteration 3: SUCCESS - 7 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

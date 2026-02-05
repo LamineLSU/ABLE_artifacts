@@ -1,0 +1,81 @@
+{
+  "sha256": "665deaef12c56c5cc87ce42a50b1362ff2947d50d73029352de27284740731be",
+  "prompt_version": "v0",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 08 E8 ?? ?? ?? ?? }\n        $pattern1 = { FF 75 08 FF 15 ?? ?? ?? ?? }\n        $pattern2 = { 55 8B EC FF 75 08 }\n\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1568",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 9,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Adjust the skip offsets to avoid invalid code jumps and ensure execution continues past the bypassed instructions."
+      ],
+      "debugger_log": "=== 8992.log ===\nCAPE Sandbox - Debugger log: Mon Dec 15 20:58:42 2025\nBreakpoint 1 hit by instruction at 0x0040D570 (thread 8148) EAX=0x100 EBX=0x19f6b8 ECX=0x9b50834d EDX=0x19fe4c ESI=0x7735df80 MultiByteToWideChar  EDI=0x100 ESP=0x19f6a4 *ESP=0x19f6b8 EBP=0x19f8d0\nBreak at 0x0040D570 in 665deaef12c56c5cc87c.exe (RVA 0xd570, thread 8148, Stack 0x00192000-0x001A0000, ImageBase 0x00400000)\n0x0040D570  FF7508                   PUSH      DWORD [EBP+0x8]               \nActionDispatcher: skipping instruction.\n0x0040D573  FF158C114000             CALL      GetStringTypeW                \nBreakpoint 2 hit by instruction at 0x004082F5 (thread 8148) EBX=0x1 ECX=0x4011c4 665deaef12c56c5cc87c.exe EDX=0xc0004aa1 EDI=0xfffffffe ESP=0x19fee4 \",?@\" *ESP=0x403f2c 665deaef12c56c5cc87c.exe EBP=0x19feec\n0x004082F5  55                       PUSH      EBP                           \nActionDispatcher: skipping instruction.\n0x004082F6  8BEC                     MOV       EBP, ESP                      \n",
+      "raw_response": "0<think>\nOkay, let's tackle this YARA rule creation. The user provided a malware trace that exits early due to evasion. The task is to create three different patterns from the given trace data, each 6-20 bytes long, using wildcards where necessary.\n\nFirst, I need to look at the trace data. The key part is the call to ExitProcess. Let me list the instructions again:\n\nAddress      Opcode               Instruction\n0040E7EE  8BFF                 mov edi, edi\n0040E7F0  55                   push ebp\n0040E7F1  8BEC                 mov ebp, esp\n0040E7F3  FF7508               push dword ptr [ebp+08h]\n0040E7F6  E8C8FFFFFF           call 0040E7C3h  # ___crtCorExitProcess@LIBCMT.LIB\n0040E7FB  59                   pop ecx\n0040E7FC  FF7508               push dword ptr [ebp+08h]\n0040E7FF  FF15ACB04100         call dword ptr [0041B0ACh]  # ExitProcess@KERNEL32.DLL\n\nThe evasion is happening because the malware is calling ExitProcess, which might be detected in a sandbox. So the patterns should target the call instructions and surrounding context.\n\nLet me think about the first pattern. The call to ___crtCorExitProcess is at 0040E7F6. The opcode is E8C8FFFFFF. The E8 is the call opcode, and the next four bytes are the offset. Since the offset is to a relative address, those bytes should be replaced with ??.\n\nSo the instruction is E8 C8 FFFF FF. But the surrounding instructions might help. Let's look at the previous instruction: FF7508 (push [ebp+08h]) at 0040E7F3. Then the call. So combining the push and the call. Let me check the addresses:\n\nAt 0040E7F3: FF7508 (push ebp+08h)\nThen 0040E7F6: E8C8FFFFFF (call to 0040E7C3h)\n\nSo the push is followed by the call. So combining those two instructions. The push is 5 bytes (FF 75 08) and the call is 5 bytes (E8 C8 FFFF FF). Wait, the call is 5 bytes? Wait, the E8 is the opcode, then 4 bytes for the offset. So the call instruction is 5 bytes. So combining the push (FF 75 08) and the call (E8 C8 FFFF FF) would make a 5+5=10-byte pattern. But the offset bytes (C8 FFFF FF) need to be wildcards. So the pattern would be FF 75 08 E8 ?? ?? ?? ??.\n\nWait, the call instruction's offset is 4 bytes. So the E8 is followed by four bytes. So the call instruction is 5 bytes. So the pattern would be FF 75 08 E8 ?? ?? ?? ?? (total 4+4=8 bytes? Wait, FF 75 08 is 3 bytes for the push. Then E8 is the call opcode, followed by four bytes. So combining those two instructions would be 3+5=8 bytes. But the call's offset bytes are four bytes. So the pattern would be FF 75 08 E8 ?? ?? ?? ?? (total 8 bytes). That's acceptable.\n\nSo that's one pattern. Let's note that as pattern0: FF 75 08 E8 ?? ?? ?? ??\n\nAnother pattern could be the call to ExitProcess at 0040E7FF. The instruction is FF15ACB04100. The FF15 is the call instruction, then the four bytes are the address. So the opcode is FF 15, followed by AC B0 41 00. But the address bytes (AC B0 41 00) are part of the call. So the pattern would be FF 15 ?? ?? ?? ?? (but need to include surrounding instructions). Let's check the surrounding instructions. The previous instruction is 59 (pop ecx) at 0040E7FB, then FF7508 (push ebp+08h) at 0040E7FC, then the call. Wait, the call is at 0040E7FF. So the previous instruction is FF7508 (push ebp+08h) at 0040E7FC. Then the call. So combining the push and the call. The push is FF 75 08 (3 bytes), then the call is FF 15 AC B0 41 00 (5 bytes). So combining those two instructions would be 3+5=8 bytes. But the call's address bytes (AC B0 41 00) need to be wildcards. So the pattern would be FF 75 08 FF 15 ?? ?? ?? ??. Wait, that's 3+5=8 bytes. Wait, the push is 3 bytes (FF 75 08), then the call is 5 bytes (FF 15 followed by four bytes). So the pattern would be FF 75 08 FF 15 ?? ?? ?? ?? (total 3+5=8 bytes). But the call's address is four bytes, so replacing those with ??.\n\nSo that's another pattern: FF 75 08 FF 15 ?? ?? ?? ??\n\nWait, but the call instruction is FF 15 followed by four bytes. So the pattern would be FF 75 08 FF 15 ?? ?? ?? ?? (8 bytes). That's one pattern.\n\nThird pattern: Maybe looking at the initial setup. The first instruction is 8BFF (mov edi, edi) at 0040E7EE. Then push ebp (55) at 0040E7F0. Then mov ebp, esp (8BEC) at 0040E7F1. Then push ebp+08h (FF7508) at 0040E7F3. Then the call. So maybe combining some of these. For example, the push ebp (55) followed by mov ebp, esp (8BEC). So those two instructions are 55 8BEC (4 bytes). Then maybe the next push? Or maybe the call. Alternatively, the first three instructions: 8BFF 55 8BEC. That's 3 instructions, 3+1+2=6 bytes. Let me check:\n\n8BFF is 2 bytes (mov edi, edi)\n55 is 1 byte (push ebp)\n8BEC is 2 bytes (mov ebp, esp)\nSo combining these three instructions would be 2+1+2=5 bytes. Wait, 8BFF (2 bytes), 55 (1), 8BEC (2) → total 5 bytes. But need to make it 6-20 bytes. So maybe include the next instruction. The next instruction is FF7508 (push ebp+08h) at 0040E7F3. So combining the first four instructions: 8BFF 55 8BEC FF7508. That's 2+1+2+3=8 bytes. Let's see:\n\nThe first instruction is 8BFF (mov edi, edi)\nThen 55 (push ebp)\nThen 8BEC (mov ebp, esp)\nThen FF7508 (push ebp+08h)\nSo the pattern would be 8B FF 55 8B EC FF 75 08 → 8 bytes. But the FF7508 is part of the push instruction. However, the addresses in the push might be part of the pattern. Wait, the FF7508 is the push instruction, where 75 is the displacement (ebp+08h). The 08h is a register offset. So the 08h is a concrete value. So the pattern would be 8B FF 55 8B EC FF 75 08. That's 8 bytes. But the 08h is a concrete value, so no need to wildcard. However, the addresses in the call instructions need to be wildcards. But in this case, the push instruction's offset is 08h, which is a concrete value. So the pattern would include that. So this is a valid pattern. \n\nSo the three patterns would be:\n\nPattern0: FF 75 08 E8 ?? ?? ?? ?? (from the first call)\nPattern1: FF 75 08 FF 15 ?? ?? ?? ?? (from the second call)\nPattern2: 8B FF 55 8B EC FF 75 08 (the setup before the first call)\n\nWait, but pattern2 is 8 bytes. Let me check the exact bytes. The first instruction is 8BFF (two bytes), then 55 (one byte), then 8BEC (two bytes), then FF7508 (three bytes). So combining these four instructions would be 2+1+2+3=8 bytes. So the pattern would be 8B FF 55 8B EC FF 75 08. That's 8 bytes. \n\nBut the user requires three different patterns. Let me make sure they are all different. \n\nAnother possibility: the call to ___crtCorExitProcess is at 0040E7F6. The instruction is E8 C8 FFFF FF. The surrounding instructions are FF7508 (push ebp+08h) at 0040E7F3. So combining those two instructions: FF7508 (3 bytes) followed by E8 C8 FFFF FF (5 bytes). So the pattern would be FF 75 08 E8 C8 FFFF FF → but the offset bytes (C8 FFFF FF) need to be wildcards. Wait, the E8 is the call opcode, followed by four bytes. So the pattern would be FF 75 08 E8 ?? ?? ?? ?? (8 bytes). \n\nSimilarly, the second call is FF15 AC B0 41 00. The surrounding instruction is FF7508 (push ebp+08h) at 0040E7FC. So combining those two instructions: FF7508 (3 bytes) followed by FF15 AC B0 41 00 (5 bytes). So the pattern would be FF 75 08 FF 15 ?? ?? ?? ?? (8 bytes). \n\nThird pattern could be the initial setup. For example, the first three instructions: 8BFF (mov edi, edi), 55 (push ebp), 8BEC (mov ebp, esp). That's 2+1+2=5 bytes. To make it 6-20, perhaps include the next instruction. So 8BFF 55 8BEC FF7508 → 8 bytes. \n\nAlternatively, maybe the push ebp (55) followed by mov ebp, esp (8BEC) and then push ebp+08h (FF7508). That's 1+2+3=6 bytes. So the pattern would be 55 8B EC FF 75 08. That's 6 bytes. \n\nSo three patterns:\n\nPattern0: FF 75 08 E8 ?? ?? ?? ?? (8 bytes)\nPattern1: FF 75 08 FF 15 ?? ?? ?? ?? (8 bytes)\nPattern2: 55 8B EC FF 75 08 (6 bytes)\n\nWait, but the third pattern is 55 8B EC FF 75 08. Let me check the bytes:\n\n- 55 is push ebp (1 byte)\n- 8B EC is mov ebp, esp (2 bytes)\n- FF 75 08 is push [ebp+08h] (3 bytes)\nSo total 1+2+3=6 bytes. That's acceptable.\n\nSo the three patterns would be:\n\nPattern0: FF 75 08 E8 ?? ?? ?? ??\nPattern1: FF 75 08 FF 15 ?? ?? ?? ??\nPattern2: 55 8B EC FF 75 08\n\nBut need to ensure that all patterns are different and within the length. Let me check each pattern's length:\n\nPattern0: 3 (FF 75 08) + 5 (E8 ?? ?? ?? ??) → 8 bytes\nPattern1: 3 (FF 75 08) + 5 (FF 15 ?? ?? ?? ??) → 8 bytes\nPattern2: 6 bytes\n\nYes, all are within 6-20. Also, they are different sequences.\n\nNow, applying the wildcard rules. For the call instructions, the offset bytes (the four bytes after the opcode) must be replaced with ??.\n\nSo for the first call (E8 C8 FFFF FF), the pattern is FF 75 08 E8 ?? ?? ?? ?? → the E8 is the opcode, then four ?? for the offset.\n\nFor the second call (FF15 AC B0 41 00), the pattern is FF 75 08 FF 15 ?? ?? ?? ?? → the FF 15 is the opcode, then four ?? for the address.\n\nThe third pattern is concrete bytes, as there are no address/offset bytes in that sequence. The push ebp+08h instruction's 08h is a concrete value, so it's kept as is.\n\nThus, the three patterns are as above. Now, formatting them into YARA rules with the correct syntax.\n</think>\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = \"FF 75 08 E8 ?? ?? ?? ??\"\n        $pattern1 = \"FF 75 08 FF 15 ?? ?? ?? ??\"\n        $pattern2 = \"55 8B EC FF 75 08\"\n\n    condition:\n        all of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\665deaef12c56c5c\\iter0_v0.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample_Evolved  \n{  \n    meta:  \n        description = \"Evasion bypass rule - evolved\"  \n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"  \n\n    strings:  \n        $pattern0 = { E8 C8 FF FF FF }  // Call to ___crtCorExitProcess (evasion check)  \n        $pattern1 = { 55 8B EC }         // Push ebp / mov ebp, esp (setup code)  \n        $pattern2 = { FF 75 08 E8 C8 FF FF FF }  // Push [ebp+08h] + call to ___crtCorExitProcess  \n\n    condition:  \n        all of them  \n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 75,
+      "opcodes": "",
+      "task_id": "1569",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 9,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Adjust the skip offset for pattern0 to skip the call instruction without affecting subsequent code. Use a smaller skip offset (e.g., +1) to avoid disrupting the call chain."
+      ],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: Adjusted patterns to target the evasion check (call to ___crtCorExitProcess) and surrounding setup instructions, avoiding the exit call itself. Used concrete bytes from the trace to increase specificity while allowing flexibility for variants.  \n\n**PATTERN_TYPE**: CALL_TEST_JE  \n\n**CONFIDENCE**: 75  \n\n**REASONING**: The original rule likely matched the exit call but missed the evasion check logic. By targeting the call to ___crtCorExitProcess (a common evasion check) and surrounding setup code, we focus on the decision point, not the exit action. Concrete bytes from the trace ensure specificity while wildcards allow for variant tolerance.  \n\n**YARA_RULE**:  \n```yara  \nrule Bypass_Sample_Evolved  \n{  \n    meta:  \n        description = \"Evasion bypass rule - evolved\"  \n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"  \n\n    strings:  \n        $pattern0 = { E8 C8 FF FF FF }  // Call to ___crtCorExitProcess (evasion check)  \n        $pattern1 = { 55 8B EC }         // Push ebp / mov ebp, esp (setup code)  \n        $pattern2 = { FF 75 08 E8 C8 FF FF FF }  // Push [ebp+08h] + call to ___crtCorExitProcess  \n\n    condition:  \n        all of them  \n}  \n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\665deaef12c56c5c\\iter1_v0.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v0",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "```json\n{\n  \"pattern0\": \"55 8B EC FF 75 08 E8 ?? ?? ?? ??\",\n  \"pattern1\": \"59 FF 75 08 FF 15 ?? ?? ?? ??\",\n  \"pattern2\": \"8B FF 55 8B EC FF 75 08\"\n}\n```",
+      "yara_file": null
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

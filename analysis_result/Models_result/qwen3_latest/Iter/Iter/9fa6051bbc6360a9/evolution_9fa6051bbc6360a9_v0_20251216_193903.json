@@ -1,0 +1,81 @@
+{
+  "sha256": "9fa6051bbc6360a9543398d476e888306b777d891348a2c2897454d34834c731",
+  "prompt_version": "v0",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v0",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "Here are three distinct patterns from the provided code that could be relevant for analysis, particularly in the context of malware behavior or system interaction:\n\n---\n\n### **1. Call to `ExitProcess` (Termination Signal)**  \n**Pattern:**  \n`FF D0`  \n**Explanation:**  \nThis is the machine code for the `Call Eax` instruction, which in this context is used to invoke the `ExitProcess` function (Windows API). This is a strong indicator that the malware is terminating its execution, possibly to evade detection or due to sandbox detection logic.  \n**Context:**  \nThis call typically occurs after the malware has completed its malicious tasks or when it detects an environment that is not suitable (e.g., a sandbox).\n\n---\n\n### **2. Call to `RtlFreeHeap` (Memory Management)**  \n**Pattern:**  \n`FF D2`  \n**Explanation:**  \nThis is the machine code for the `Call Eax` instruction, which is used to invoke the `RtlFreeHeap` function (Windows API). This function is responsible for freeing memory allocated via `RtlAllocateHeap`.  \n**Context:**  \nThis could indicate that the malware is cleaning up allocated memory, possibly to avoid leaving traces or to manage resources. It might also be part of a larger anti-analysis strategy, such as obfuscating memory usage.\n\n---\n\n### **3. Sequence Leading to `ExitProcess` (Control Flow)**  \n**Pattern:**  \n`83 C4 04 50 FF D0`  \n**Explanation:**  \nThis sequence of instructions corresponds to:  \n- `83 C4 04` → `Add Esp, 4` (adjusting the stack pointer)  \n- `50` → `Push Eax` (pushing a value onto the stack)  \n- `FF D0` → `Call Eax` (invoking a function, likely `ExitProcess`)  \n**Context:**  \nThis sequence is part of the control flow leading to termination. It may be used to ensure that the stack is properly aligned before calling `ExitProcess`, or to pass arguments to the function. This is a common pattern in malware to gracefully exit or to avoid detection by sandbox environments.\n\n---\n\n### **Summary**  \nThese patterns reflect critical points in the malware's lifecycle:  \n1. **Termination** (`ExitProcess`) for sandbox evasion.  \n2. **Memory cleanup** (`RtlFreeHeap`) for resource management or obfuscation.  \n3. **Control flow** leading to termination, indicating structured behavior.  \n\nThese sequences can be used for detection, analysis, or reverse-engineering of the malware's intent.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6F 77 B8 0A 04 B6 }\n        $pattern1 = { 8D B0 74 0C 00 00 }\n        $pattern2 = { E8 44 09 00 00 8B 55 14 8B 45 10 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE | API_CHECK | CMP_SETZ",
+      "confidence": 85,
+      "opcodes": "",
+      "task_id": "1762",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Avoid skipping the `LEA` instruction. Instead, target the `PUSH ESI` instruction (`0x0041A675`) or add context bytes to the pattern to ensure specificity."
+      ],
+      "debugger_log": "=== 7640.log ===\nCAPE Sandbox - Debugger log: Wed Dec 17 09:31:14 2025\nBreakpoint 1 hit by instruction at 0x0041A66F (thread 9068) EAX=0x135f048 ECX=0x77270000 EDX=0x6b92e5d0 EdUZvH.dll ESI=0x2 EDI=0x135f048 ESP=0x135eee8 *ESP=0x77270000 EBP=0x135eef8\nBreak at 0x0041A66F in 9fa6051bbc6360a95433.exe (RVA 0x1a66f, thread 9068, Stack 0x01352000-0x01360000, ImageBase 0x00400000)\n0x0041A66F  8DB0740C0000             LEA       ESI, [EAX+0xc74]              \nActionDispatcher: skipping instruction.\n0x0041A675  56                       PUSH      ESI                           \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule failed to capture the evasion logic due to incorrect pattern placement. By focusing on the first 30% of the trace (Strategy A), I identified three unique sequences: a conditional jump followed by memory access (pattern0), a lea instruction (pattern1), and a call to a specific routine (pattern2). These sequences are critical to the sample's evasion mechanism and are present in the trace, ensuring specificity without wildcards beyond address offsets.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | CMP_SETZ\n\n**CONFIDENCE**: 85 | 80 | 75\n\n**REASONING**: These patterns target the sample's evasion logic, including conditional jumps, memory operations, and API calls. The first pattern (pattern0) captures a jnbe followed by an OR operation, likely checking for specific memory states. The second (pattern1) uses a lea instruction to manipulate registers, while the third (pattern2) identifies a call to a routine that may perform evasion checks. All sequences are directly extracted from the trace, minimizing false positives.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6F 77B8 0A04B6 }\n        $pattern1 = { 8DB0740C0000 }\n        $pattern2 = { E844090000 8B5514 8B4510 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\9fa6051bbc6360a9\\iter1_v0.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v0",
+      "yara_rule": "rule ExitProcess_Evasion\n{\n    meta:\n        description = \"Detects potential evasion or hooking around ExitProcess call\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n        author = \"Security Analyst\"\n        date = \"2023-10-25\"\n    \n    strings:\n        $pattern0 = { 83 C4 ?? 8B 06 FF D0 }\n        $pattern1 = { 50 E8 ?? ?? ?? ?? 8B 55 ?? }\n        $pattern2 = { 8B 88 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1763",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Update the YARA patterns to reflect the actual opcodes used in the evasion code. For example, adjust `$pattern0` to match `call edx` (FF D2), `$pattern1` to match `push ecx` followed by `call edx`, and `$pattern2` to match `mov ecx, [eax+imm]` (8B 48)."
+      ],
+      "debugger_log": "=== 692.log ===\nCAPE Sandbox - Debugger log: Wed Dec 17 04:36:36 2025\nBreakpoint 2 hit by instruction at 0x07443B0F (thread 4704) EAX=0x6011028 EBX=0x73edd0 ECX=0x1 EDX=0x1cf EDI=0x73ed20 ESP=0x73ed00 \"(\u0010\" *ESP=0x6011028 EBP=0x73ed08\n0x07443B0F  8B881C030000             MOV       ECX, [EAX+0x31c]              \nActionDispatcher: skipping instruction.\n0x07443B15  FF15245F3807             CALL      0x07443281                    \n",
+      "raw_response": "```yara\nrule ExitProcess_Evasion\n{\n    meta:\n        description = \"Detects potential evasion or hooking around ExitProcess call\"\n        author = \"Security Analyst\"\n        date = \"2023-10-25\"\n    \n    strings:\n        $pattern0 = { 83 C4 ?? 8B 06 FF D0 }\n        $pattern1 = { 50 E8 ?? ?? ?? ?? 8B 55 ?? }\n        $pattern2 = { 8B 88 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```\n\n### Explanation of the Rules:\n1. **$pattern0**:\n   - **Opcode**: `83 C4 ??` represents the `ADD ESP, ??` instruction, where the displacement is replaced with `??`.\n   - **Next Instructions**: `8B 06` (MOV EAX, [ESI]) and `FF D0` (CALL EAX).\n   - **Purpose**: This sequence is likely part of stack cleanup before calling a function, possibly `ExitProcess`.\n\n2. **$pattern1**:\n   - **Opcode**: `50` (PUSH EAX) followed by a `CALL` instruction (`E8 ?? ?? ?? ??`), indicating a near call to an external function.\n   - **Next Instruction**: `8B 55 ??` (MOV EDX, [EBP+??]), where the displacement is replaced with `??`.\n   - **Purpose**: This pattern could indicate a function call chain, possibly leading to `ExitProcess` or a related routine.\n\n3. **$pattern2**:\n   - **Opcode**: `8B 88 ?? ?? ?? ??` represents a `MOV ECX, [EAX+??]` instruction, where the displacement is replaced with `??`.\n   - **Purpose**: This could be used to access memory at a relative offset, possibly to retrieve a function pointer or address for a call, potentially related to `ExitProcess`.\n\n### Summary:\nThis YARA rule is designed to detect potential code sequences that may be associated with or used to bypass `ExitProcess` calls, which are often used in anti-debugging or anti-reversing techniques. The use of wildcards (`??`) ensures that the rule remains flexible and avoids false positives from fixed values.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\9fa6051bbc6360a9\\iter2_v0.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 2: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "sha256": "f0939ebfda6b30a330a00c57497038a54da359e316e0d6e6e71871fd50fec16a",
+  "prompt_version": "v0",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A 01 51 57 FF 15 50 A0 41 01 }\n        $pattern1 = { 8B 45 C4 8B F3 2B C3 89 45 C0 }\n        $pattern2 = { FF 15 84 A0 41 01 6A 02 EB F6 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "149",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 17,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Instead of skipping the `MOV EAX, [EBP-0x3c]` instruction (0x0072A29D), we should target a later instruction in the sequence that is less critical to the program's flow and still provides a bypass. The `call dword ptr [0141A07Ch]` (0x0072A2AC) looks like a reasonable alternative, as it's further down the chain and potentially less critical.  We also need to adjust the skip offset accordingly."
+      ],
+      "debugger_log": "=== 4548.log ===\nCAPE Sandbox - Debugger log: Sat Dec 27 22:32:49 2025\nBreakpoint 1 hit by instruction at 0x0072A29D (thread 8224) EBX=0x9c60e8 \"\u0018]\" ECX=0xbc803ef7 ESI=0x9bb0f8 EDI=0x1 ESP=0x4ffcec *ESP=0x5c6f36f4 EBP=0x4ffd48\nBreak at 0x0072A29D in f0939ebfda6b30a330a0.exe (RVA 0xa29d, thread 8224, Stack 0x004F2000-0x00500000, ImageBase 0x00720000)\n0x0072A29D  8B45C4                   MOV       EAX, [EBP-0x3c]               \nActionDispatcher: skipping instruction.\n0x0072A2A0  8BF3                     MOV       ESI, EBX                      \n",
+      "raw_response": "Okay, let's analyze the traces and construct a YARA rule with three distinct patterns targeting evasion points, adhering to all the specified constraints.\n\n**Analysis and Pattern Selection**\n\nBased on the provided traces, the malware appears to be employing techniques to avoid detection by sandboxes/VMs.  Specifically, the calls to addresses within `0141A0` and `013F21E6` are suspicious, as are the calls at `0141A108`. The conditional jumps and memory access patterns also indicate potential evasion.\n\nHere's the YARA rule with three patterns:\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A 01 51 57 FF15 50A04101 }\n        $pattern1 = { 8B 45 C4 8BF3 2BC3 8945 C0 }\n        $pattern2 = { FF15 84A04101 6A 02 EBF6 }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation of Patterns:**\n\n*   **$pattern0:** `6A 01 51 57 FF15 50A04101` (PUSH 0x1, PUSH EDI, PUSH ECX, CALL [0141A050h]). This pattern captures a sequence of instructions related to a function call. The `PUSH 0x1` and `PUSH EDI` are likely part of setting up arguments for the function. The `CALL` instruction at `[0141A050h]` is a key point to target for evasion.\n*   **$pattern1:** `8B 45 C4 8BF3 2BC3 8945 C0` (MOV EAX, dword ptr [ebp-3Ch], MOV ESI, EBX, SUB EAX, EBX, MOV dword ptr [ebp-40h], EAX). This sequence appears to be manipulating registers and memory, possibly related to data processing before a function call. This could be part of an anti-analysis technique.\n*   **$pattern2:** `FF15 84A04101 6A 02 EBF6` (CALL [0141A084h], PUSH 0x2, JMP 013CA2FFh). This pattern focuses on another function call at `[0141A084h]` followed by a jump. The jump suggests a loop or a conditional branch, which is a common evasion tactic.\n\n**Rationale for Wildcards and Length Constraints:**\n\n*   All patterns are between 6 and 20 bytes as required.\n*   Addresses (like those in the `CALL` instructions) are not included concretely (no wildcards needed in this case as they are specified)\n*   The opcode bytes and register encoding are kept concrete to ensure specificity.\n\n**Important Considerations:**\n\n*   **Trace Context:** These patterns are derived solely from the provided trace data. The effectiveness of this rule depends on the actual malware's behavior.\n*   **Evasion Techniques:** Malware authors can easily modify their code to bypass YARA rules. This rule is a starting point and may need to be adjusted based on new malware samples.\n*   **CAPE Integration:** The `cape_options` meta-tag is designed for integration with tools like Cuckoo Sandbox. It specifies how to use the patterns for dynamic analysis (e.g., skipping instructions).\n*   **False Positives:** It's possible that this rule could generate false positives against benign software. Careful testing and refinement are necessary.\n*   **Trace #2:** The second trace contains different calls. It might be useful to incorporate patterns from trace #2 as well, but it would require a more complex rule.\n\nThis solution attempts to satisfy all requirements and provide a reasonable starting point for bypassing the malware's evasion techniques. Remember to test and adapt the rule based on your specific needs.",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\f0939ebfda6b30a3\\iter0_v0.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 15 50 A0 41 01 CA DD 01 41 A0 50 85 FF ED ED 74 39 01 3C A2 D6 8B 45 C4 EA DD EB 3C }\n        $pattern1 = { 6A 00 00 00 00 00 FF 15 44 A0 41 01 CA DD 01 41 A0 44 50 EA FF 15 40 A0 41 01 CA DD 01 41 A0 40 }\n        $pattern2 = { E8 08 8D 02 00 CA 01 3F 21 E6 FF 75 BC DD EB 44 E8 08 8D 02 00 CA 01 3F 21 E6 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "150",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 17,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Introduce wildcards (`?`) into the YARA patterns to allow for flexibility in the byte sequence. Reduce the reliance on fixed skip offsets.  Consider targeting more generic instructions or sequences that are less likely to be altered by evasion techniques.  For example, the `call dword ptr [0141A050h]` could be made more generic."
+      ],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF1550A04101 call dword ptr [0141A050h] 85FF test edi, edi 7439 je 013CA2D6h 8B45C4 mov eax, dword ptr [ebp-3Ch] }\n        $pattern1 = { 6A00 push 00000000h FF1544A04101 call dword ptr [0141A044h] 50 push eax FF1540A04101 call dword ptr [0141A040h] }\n        $pattern2 = { E8088D0200 call 013F21E6h FF75BC push dword ptr [ebp-44h] E8088D0200 call 013F21E6h }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\f0939ebfda6b30a3\\iter1_v0.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 FC }\n        $pattern1 = { FF 15 50 A0 41 01 CA DD 01 41 A0 50 }\n        $pattern2 = { 3D 00 10 00 00 0F 82 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 65,
+      "opcodes": "",
+      "task_id": "151",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 17,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Broaden the patterns to incorporate wildcards (`?`) to account for variations in register values and instruction operands.  Remove the `cape_options` section entirely.  The skip offsets are too specific and likely causing the bypass to fail. Relying on the YARA engine's own analysis and skipping is generally more effective."
+      ],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule hit but didn't produce new signatures, suggesting it matched the wrong location or a non-critical part of the code. We will now focus on identifying key decision points related to the `ExitProcess` call. Strategy A (Evasion Check) will be prioritized, looking for a test instruction followed by a conditional jump. We'll also include a second pattern targeting a call sequence before the exit. A third pattern will target a common conditional instruction sequence.  The goal is to find a bypass point that alters the program's execution flow, preventing the malware from exiting.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 65\n\n**REASONING**: These patterns target a common evasion check before exiting, specifically a test instruction followed by a conditional jump. The wildcards are used to account for variable offsets. The second pattern targets a call sequence. The third pattern targets a conditional check.  These patterns are chosen because they represent crucial decision points that, if bypassed, could prevent the malware from terminating.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 FC }\n        $pattern1 = { FF1550A04101 call dword ptr [0141A050h] }\n        $pattern2 = { 3D 00 10 00 00 0F 82 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\f0939ebfda6b30a3\\iter2_v0.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

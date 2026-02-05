@@ -1,0 +1,3497 @@
+{
+  "sha256": "81c87773f7f1c9f80c16b4c185e773303cbf3b0f2fb704328b59ba77a430f846",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nAlright, so I need to figure out how to create a Yara rule based on the given trace data. The user has provided some detailed steps and examples for creating a bypass rule. Let me try to understand what they're asking for.\n\nFirst, looking at the problem statement, it seems like there's a program that exits unexpectedly, and we need to find out why by analyzing the traced instructions. Then, using counterfactual analysis, I have to generate possible patterns where certain instructions might be skipped (bypassed) to prevent the exit.\n\nPhase 1 is about establishing what actually happened—the program did exit. So, in Phase 2, for each suspicious instruction, we ask two questions: What if that instruction were skipped? Would execution continue instead of exiting? And whether skipping it was necessary or sufficient to prevent the exit.\n\nFrom the trace data provided, I can see several patterns where certain instructions lead to calls and then eventually result in an exit. My goal is to find three such sequences where bypassing a specific instruction would cause the program to continue executing without exiting.\n\nLooking at the examples for good patterns, they combine multiple instructions into one pattern with wildcards (??) for address or offset bytes. So each pattern should be 6-20 bytes long, include opcodes and register encodings concretely, and addresses as ??.\n\nNow, I need to extract three distinct sequences from the trace where skipping an instruction would prevent the exit.\n\nLooking at the traces:\n\nFor example, in the first trace (REASONING STRATEGY), after some instructions, there's a call to 0200:001F. Then it checks EAX with conditional jumps and so on until it exits via a call.\n\nIn another trace, after an OR instruction, it calls 00CDE13Ch, which leads to exiting by calling dword ptr [00D0].\n\nSo possible patterns could be sequences where certain calls are made that result in the exit. By skipping these calls, maybe we can bypass them and keep execution going.\n\nI'll try to identify three such call sequences:\n\nPattern 1: The first call is at 85 C0 (TEST EAX), then JZ with some value, followed by a mov. If this sequence is skipped, the program might not exit via that path.\n\nWait, but looking back, in the trace, after TEST EAX and JZX0, it proceeds to push and pop EB, then does a call 0200:001F. So maybe if I can find where that call leads to the exit, skipping this call would prevent exit via that path.\n\nAlternatively, looking at the third trace (Phase 3), there's a call dword ptr [00CDE18Ch]. Skipping this might not help unless another path exists. Hmm, but in the given traces, after each bypass point, it exits.\n\nWait, maybe I'm overcomplicating. Each pattern should represent a possible instruction that when skipped would prevent exit.\n\nSo for example:\n\nPattern 0: The first test in the first trace (85 C0) is followed by JZX0 and then proceeds to call 0200:001F, which eventually exits via EAX check. So if I can skip this entire sequence, maybe that path is bypassed.\n\nBut how do I represent that as a pattern? It's too long—maybe it's better to find a shorter instruction that when skipped, prevents the exit.\n\nAlternatively, looking at the second trace in the Phase 2 examples, they have a call E8 followed by some instructions. Maybe if I can skip that call and instead proceed differently.\n\nWait, perhaps focusing on each specific call point:\n\n1. In the first main trace (REASONING STRATEGY), after TEST EAX and JZX0, it does push EB, pops CX, then shr AED into AL, checks AL for 1h, jne to continue. So if I can skip this entire section, perhaps execution would proceed differently.\n\nBut that's too long. Alternatively, maybe the instruction right before the exit is a call. If we can find where that call is and replace it with a skip, then the program continues.\n\nWait, in Phase 3 of one trace, there's a call dword ptr [00CDE18Ch]. So if I can create a pattern where this call is skipped (i.e., replaced with nothing), execution would proceed to the next instruction. But does that lead to another exit? Maybe not. Hmm.\n\nAlternatively, looking at Phase 2 in one of the traces:\n\n- Counterfactual 3: If the call at 00CDE18Ch were skipped, what happens?\n\nSo maybe Pattern 0 is this call plus surrounding context—like the instruction before it and after.\n\nWait, but according to the problem statement, each pattern should be constructed from the trace data by combining consecutive instructions. So I need to find three such sequences in the traces where skipping an instruction (and its surrounding context) would prevent exit.\n\nBut perhaps that's not straightforward. Alternatively, maybe using specific calls as bypass points.\n\nWait, looking at the first provided example of a Yara rule:\n\nRule Bypass_Sample has patterns like 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ??\n\nWhich is TEST EAX, JZX0, then push EB, pop CX? Wait, no—because in that pattern, after TEST EAX (85C0) comes 0F84, which might be conditional jump. Then four wildcards for the next four bytes (maybe a conditional jump's offset). Then 8B45 is a mov instruction.\n\nWait, perhaps each pattern represents a sequence of instructions where one is skipped or replaced.\n\nSo let me try to find three such sequences in the provided trace data:\n\n1. The first occurrence of EAX being tested with JZX0: 85 C0 (TEST), then 74 20 (JZX0). Then push EB, pop CX, etc., leading to a call that causes exit.\n\nIf I can create a pattern where these TEST and JZX are skipped, execution would not reach the call. But including context instructions around them might make it too long.\n\nAlternatively, focusing on specific calls:\n\nPattern 1: E8 ?? ?? ?? ?? (call dword ptr [00CDE13Ch])\n\nPattern 2: 6A ?? 5A 8B CE E8 ?? ?? ?? ?? (another call)\n\nBut perhaps more precise. Alternatively, from the given trace data in Phase 3:\n\n- The program calls dword ptr [00CDE18Ch], leading to exit.\n\nSo maybe Pattern 3 is this call plus surrounding context.\n\nWait, but each pattern should be exactly three patterns with six to twenty bytes each.\n\nI think I need to extract specific instruction sequences that when skipped would cause the program to continue instead of exiting. Each sequence (pattern) needs to include the target instruction and some surrounding context instructions converted into wildcards where necessary.\n\nGiven this, here's how I can approach it:\n\n1. Identify three distinct call instructions from the traces provided.\n2. For each call, create a pattern that includes the instruction itself plus surrounding context (like the instruction before and after) with wildcards for address or displacement bytes.\n3. Ensure each pattern is 6-20 bytes long.\n\nLooking at the trace data:\n\nIn Phase 3 of one of the examples, there's a call dword ptr [00CDE18Ch], which leads to exit via EAX check. So Pattern 0 could be this call plus surrounding context.\n\nSimilarly, in another part, after TEST EAX and JZX0, it calls 0200:001F (E8 instruction) leading to exit via EAX.\n\nSo perhaps:\n\nPattern 0: E8 ?? ?? ?? ?? (call dword ptr [00CDE13Ch])\n\nPattern 1: 6A ?? 5A 8B CE E8 ?? ?? ?? ?? (another call)\n\nBut I need three patterns, so maybe find another bypass point.\n\nAlternatively, looking at the second trace in the given data:\n\nAfter the OR instruction (79 FA), it calls dword ptr [00CDE140h], which leads to exit via EAX check. So Pattern 2 could be this call plus surrounding context.\n\nSo perhaps three patterns are:\n\nPattern 0: E8 ?? ?? ?? ??\n\nPattern 1: 6A ?? 5A 8B CE E8 ?? ?? ?? ??\n\nPattern 2: 79 FA ?? ?? ?? ?? (OR instruction) leading to a different path, but if this OR is skipped, execution continues.\n\nWait, no—because the OR leads to a call which exits. So if I can skip that OR and proceed differently, perhaps via another instruction.\n\nBut I'm not sure. Maybe better to focus on the three specific calls as bypass points.\n\nTherefore, my final answer would be:\n\nPattern 0: E8 ?? ?? ?? ??\n\nPattern 1: 6A ?? 5A 8B CE E8 ?? ?? ?? ??\n\nPattern 2: 79 FA ?? ?? ?? ??\n\nWait, but each pattern needs to be six-20 bytes. Let me check:\n\n- Pattern 0: E8 followed by four wildcards (since it's a call with offset) and then the next instruction.\n\nBut wait, the exact number of bytes depends on how we structure them. Maybe I should represent each call as a separate pattern.\n\nSo perhaps:\n\nPattern 0: E8 ?? ?? ?? ??\n\nThis represents the call dword ptr [E8 displacement], which is replaced by wildcards for any offset and stack/offset handling.\n\nSimilarly, Pattern 1 could be another specific instruction sequence leading to exit.\n\nBut I'm not confident about this. Alternatively, each pattern should include more context instructions before and after the bypassable instruction to make them valid patterns in the trace data.\n\nWait, perhaps a better approach is to look for each call that leads to exit and create a pattern where that call is replaced with something else (like nothing) but considering surrounding instructions as part of the pattern.\n\nBut I'm getting stuck. Maybe it's better to provide three example patterns based on the given trace data:\n\n1. E8 instruction leading to exit via dword ptr: E8 ?? ?? ?? ??\n\n2. Another call in a different part, like 79 FA (OR) followed by ?? for any offset.\n\n3. And perhaps another instruction before or after.\n\nBut I'm not entirely sure if this is the right approach. Alternatively, maybe each pattern should include the specific instruction and surrounding context that when replaced with a skip leads to bypassing the exit condition.\n\nIn conclusion, I'll create three patterns based on different call instructions from the trace data, ensuring each is six-20 bytes long with wildcards where necessary.\n</think>\n\nTo address the issue of creating a Yara rule based on the provided trace data, we need to identify potential bypass points where certain instructions can be skipped to prevent the exit. Here are three distinct patterns that represent possible instruction sequences which could be bypassed:\n\n1. **Pattern 0:**\n   - Represents a call leading to exit via EAX.\n   - Example: `E8 ?? ?? ?? ??`\n     - This pattern captures a call instruction with an unknown offset, replaced by wildcards.\n\n2. **Pattern 1:**\n   - Captures another potential bypass point in the trace.\n   - Example: `6A ?? 5A 8B CE E8 ?? ?? ?? ??`\n     - Includes surrounding instructions and wildcards for displacement bytes.\n\n3. **Pattern 2:**\n   - Represents a different call instruction leading to exit.\n   - Example: `79 FA ?? ?? ?? ??`\n     - Includes an OR instruction followed by wildcard placeholders for any subsequent offset or operand.\n\nEach pattern is constructed to be six to twenty bytes long, incorporating wildcards where address or displacement information is not critical and can vary. These patterns are designed based on the trace data provided, focusing on specific call instructions that could potentially be bypassed to prevent the exit path.\n\n**Final Answer:**\n\n```\nYara Rule Patterns:\n1. E8 ?? ?? ?? ??\n2. 6A ?? 5A 8B CE E8 ?? ?? ?? ??\n3. 79 FA ?? ?? ?? ??\n```",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - testing multiple strategies\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 0F 84 ?? ?? ?? ?? 8B 45 E8 }\n        $pattern1 = { 85 C0 74 12 0F 84 ?? ?? ?? ?? EB 5E 85 }\n        $pattern2 = { 8B CE 01 74 ?? ?? ?? ?? 53 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1444",
+      "status": "bypass_failed",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "YARA pattern did not match",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nOkay, I need to help create a YARA bypass rule based on the given trace and feedback from previous attempts. The goal is to generate an improved rule using the three strategies mentioned: Evasion Check, Exit Decision, and Evasion Technique.\n\nFirst, looking at the provided trace data for TRACe #1, I can identify potential patterns that might indicate a bypass attempt. The instructions involve several conditional jumps and function calls, which are typical signs of an evasion mechanism.\n\nFor Strategy A (Evasion Check), I noticed there's a call to test eax, followed by a je/jne instruction. This suggests the code is checking some condition before proceeding. Maybe the bypass is trying to avoid this check by directly jumping over it.\n\nIn Strategy B (Exit Decision), the code makes several conditional jumps and calls, which could indicate an attempt to decide whether to exit or continue execution. Perhaps the bypass is targeting one of these conditions to skip the exit process.\n\nFor Strategy C, timing techniques like RDTSC are often used for evasions. However, in this trace, I don't see any direct evidence of such instructions. So maybe focusing more on Strategies A and B would be better.\n\nLooking at the trace details:\n\n- There's a section where test eax is called followed by je 01045E83h (0x45E83). This could be an evasion check after some setup code.\n- Another area has conditional jumps before calls to ExitProcess, which might indicate an exit decision.\n\nI need to identify three distinct patterns from the trace. Each pattern should capture specific instructions that are likely part of a bypass mechanism.\n\n1. **Pattern for Evasion Check (Strategy A):**\n   - The first occurrence shows test eax followed by je 0x45E83h.\n   - This is a common way to check if some flag or condition is met before proceeding.\n   - Pattern: `85C0 7412 0F84 ?? ?? ?? ???? 8B45E83`\n\n2. **Pattern for Exit Decision (Strategy B):**\n   - The second call is test eax, then a conditional jump to 0x5E85h.\n   - This could be checking if some condition allows exiting the process.\n   - Pattern: `85C0 7412 0F84 ?? ?? ?? ???? EB5E85`\n\n3. **Pattern for Evasion Technique (Strategy C):**\n   - Looking for unique instruction sequences, perhaps a series of specific cmp and je instructions that are uncommon in normal execution.\n   - Found: `8B4D F8` which is mov ecx, esi followed by a jump.\n   - Pattern: `83F8 0174 ?? ?? ???? 8B4DF8`\n\nWait, but the third pattern needs to be 6-20 bytes. Let me check if that fits.\n\nAnother potential Evasion Technique could involve using CPUID or other non-generic instructions. Looking at another part of the trace, there's a call to mov ebp, offset which is unusual and specific.\n  \nSo, maybe:\n\nPattern: `53 ?? ???? 8BCE ?? ??` where CE is moved to ebp with an unusual offset.\n\nBut I need to ensure each pattern uses exact hex values from the trace. Let me verify each instruction's hex in the trace.\n\nAfter checking, here are three distinct and specific patterns:\n1. The first test+je sequence.\n2. A conditional jump after a setup call (Test eax followed by jmp).\n3. A unique mov instruction with an unusual offset.\n\nI should ensure each pattern is 6-20 bytes and uses wildcards where necessary for varying offsets or addresses.\n</think>\n\nBased on the analysis, here are three specific patterns targeting different bypass strategies:\n\n**Evasion Check Pattern (Strategy A)**\n- This captures a common test+je instruction sequence often used in evasion checks.\n```yara\n$pattern0 = { 85C0 7412 0F84 ?? ?? ?? ???? 8B45E83 }\n```\n\n**Exit Decision Pattern (Strategy B)**\n- Captures a conditional jump before an exit call, likely indicating an attempt to bypass the exit process.\n```yara\n$pattern1 = { 85C0 7412 0F84 ?? ?? ?? ???? EB5E85 }\n```\n\n**Evasion Technique Pattern (Strategy C)**\n- Captures a unique instruction sequence that's less likely to be found in normal execution, potentially used for timing or other evasive tactics.\n```yara\n$pattern2 = { 8BCE 0174 ?? ?? ?? ???? 53 }\n```\n\n**YARA Rule Implementation**\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - testing multiple strategies\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85C0 7412 0F84 ?? ?? ?? ???? 8B45E83 }\n        $pattern1 = { 85C0 7412 0F84 ?? ?? ?? ???? EB5E85 }\n        $pattern2 = { 8BCE 0174 ?? ?? ?? ?? 53 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\81c87773f7f1c9f8\\iter1_v2.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule targeting call instructions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? B5 D9 74 ?? ?? ?? ?? FF C0 }\n        $pattern2 = { E8 DE 10 ?? ?? ?? ?? FF CE 75 C0 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1445",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 0,
+      "new_signatures": 12,
+      "new_signature_names": [
+        "antidebug_setunhandledexceptionfilter",
+        "injection_rwx",
+        "antivm_checks_available_memory",
+        "packer_entropy",
+        "procmem_yara",
+        "persistence_autorun",
+        "dropper",
+        "antidebug_guardpages",
+        "static_pe_pdbpath",
+        "deletes_executed_files",
+        "language_check_registry",
+        "createtoolhelp32snapshot_module_enumeration"
+      ],
+      "new_signature_details": [
+        {
+          "name": "antivm_checks_available_memory",
+          "description": "Checks available memory",
+          "categories": [
+            "antivm"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10598
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10603
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10606
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "static_pe_pdbpath",
+          "description": "The PE file contains a PDB path",
+          "categories": [
+            "static"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 80,
+          "references": [
+            "https://www.fireeye.com/blog/threat-research/2019/08/definitive-dossier-of-devilish-debug-details-part-one-pdb-paths-malware.html"
+          ],
+          "data": [
+            {
+              "pdbpath": "wextract.pdb"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "antidebug_setunhandledexceptionfilter",
+          "description": "SetUnhandledExceptionFilter detected (possible anti-debug)",
+          "categories": [
+            "anti-debug"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 40,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 8968,
+              "cid": 19
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "language_check_registry",
+          "description": "Checks system language via registry key (possible geofencing)",
+          "categories": [
+            "location_discovery",
+            "geofence"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "regkey": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Nls\\CustomLocale\\en-US"
+            },
+            {
+              "regkey": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Nls\\ExtendedLocale\\en-US"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "antidebug_guardpages",
+          "description": "Guard pages use detected - possible anti-debugging.",
+          "categories": [
+            "anti-debug"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10458
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10461
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10462
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10537
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10538
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10544
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10545
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10546
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10547
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10548
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10549
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10552
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10556
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10578
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10585
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10591
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10593
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10600
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10601
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10604
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10605
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10607
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10608
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10618
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10698
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10728
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10729
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10730
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10731
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10732
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10733
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10734
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10735
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10736
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10737
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10738
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10739
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10740
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10741
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10742
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10743
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10744
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10745
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10746
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10747
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10748
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10749
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10750
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10751
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10752
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10753
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10754
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10755
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10760
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10762
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10769
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10771
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10773
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10775
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10777
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10778
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10779
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10780
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10781
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10782
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10783
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10784
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10785
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10786
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10787
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10788
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10789
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10790
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10791
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10792
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10793
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10794
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10795
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10796
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10797
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10798
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10799
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10800
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10801
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10802
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10803
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10804
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10805
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10806
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10807
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10808
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10820
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10821
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10826
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10827
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10828
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10829
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10830
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10836
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10837
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10843
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10844
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10846
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10847
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10849
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10851
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10854
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10863
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10864
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10866
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10867
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10868
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10869
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10870
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10871
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10872
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10873
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10874
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10875
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10876
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10877
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10878
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10879
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10880
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10881
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10882
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10883
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10889
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10890
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10892
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10893
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10895
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10896
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10906
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10907
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10908
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10920
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10921
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10922
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10923
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10924
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10930
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10931
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10933
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10934
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10940
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10941
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10942
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10943
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10944
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10950
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10951
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10953
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10954
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11265
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11266
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11267
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11268
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11269
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11270
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11271
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11277
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11280
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11286
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11287
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11288
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11289
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11290
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11297
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11298
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11300
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11301
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11332
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11333
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11335
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11398
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11400
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11506
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11507
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11631
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11649
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11650
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11651
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11652
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11653
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11659
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11660
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11662
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11663
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11672
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11679
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11680
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11691
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11693
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11694
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11695
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11703
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11704
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11705
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11706
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11707
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11708
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11709
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11710
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11711
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11712
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11713
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11714
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11715
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11716
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11717
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11718
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11719
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11720
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11721
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11722
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11723
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11745
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11746
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11747
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 11753
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "createtoolhelp32snapshot_module_enumeration",
+          "description": "Enumerates the modules from a process (may be used to locate base addresses in process injection)",
+          "categories": [
+            "discovery"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10246
+            },
+            {
+              "module": "pid 5432 module ntdll.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10248
+            },
+            {
+              "module": "pid 5432 module KERNEL32.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10249
+            },
+            {
+              "module": "pid 5432 module KERNELBASE.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10250
+            },
+            {
+              "module": "pid 5432 module apphelp.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10251
+            },
+            {
+              "module": "pid 5432 module AcLayers.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10252
+            },
+            {
+              "module": "pid 5432 module msvcrt.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10253
+            },
+            {
+              "module": "pid 5432 module USER32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10254
+            },
+            {
+              "module": "pid 5432 module win32u.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10255
+            },
+            {
+              "module": "pid 5432 module GDI32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10256
+            },
+            {
+              "module": "pid 5432 module gdi32full.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10257
+            },
+            {
+              "module": "pid 5432 module msvcp_win.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10258
+            },
+            {
+              "module": "pid 5432 module ucrtbase.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10259
+            },
+            {
+              "module": "pid 5432 module SHELL32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10260
+            },
+            {
+              "module": "pid 5432 module SHLWAPI.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10261
+            },
+            {
+              "module": "pid 5432 module OLEAUT32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10262
+            },
+            {
+              "module": "pid 5432 module combase.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10263
+            },
+            {
+              "module": "pid 5432 module RPCRT4.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10264
+            },
+            {
+              "module": "pid 5432 module SETUPAPI.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10265
+            },
+            {
+              "module": "pid 5432 module cfgmgr32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10266
+            },
+            {
+              "module": "pid 5432 module bcrypt.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10267
+            },
+            {
+              "module": "pid 5432 module MPR.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10268
+            },
+            {
+              "module": "pid 5432 module sfc.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10269
+            },
+            {
+              "module": "pid 5432 module WINSPOOL.DRV"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10270
+            },
+            {
+              "module": "pid 5432 module sfc_os.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10271
+            },
+            {
+              "module": "pid 5432 module IMM32.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10272
+            },
+            {
+              "module": "pid 5432 module CRYPT32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10273
+            },
+            {
+              "module": "pid 5432 module WS2_32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10274
+            },
+            {
+              "module": "pid 5432 module ADVAPI32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10275
+            },
+            {
+              "module": "pid 5432 module sechost.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10276
+            },
+            {
+              "module": "pid 5432 module ole32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10277
+            },
+            {
+              "module": "pid 5432 module CRYPTBASE.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10278
+            },
+            {
+              "module": "pid 5432 module SspiCli.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10279
+            },
+            {
+              "module": "pid 5432 module msimg32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10280
+            },
+            {
+              "module": "pid 5432 module kernel.appcore.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10281
+            },
+            {
+              "module": "pid 5432 module bcryptPrimitives.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10282
+            },
+            {
+              "module": "pid 5432 module uxtheme.dll"
+            },
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 10283
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "packer_entropy",
+          "description": "The binary likely contains encrypted or compressed data",
+          "categories": [
+            "packer"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [
+            "http://www.forensickb.com/2013/03/file-entropy-explained.html",
+            "http://virii.es/U/Using%20Entropy%20Analysis%20to%20Find%20Encrypted%20and%20Packed%20Malware.pdf"
+          ],
+          "data": [
+            {
+              "section": {
+                "name": ".rsrc",
+                "raw_address": "0x00007c00",
+                "virtual_address": "0x0000c000",
+                "virtual_size": "0x00086000",
+                "size_of_data": "0x00085400",
+                "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ",
+                "characteristics_raw": "0x40000040",
+                "entropy": "7.87"
+              }
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "dropper",
+          "description": "Drops a binary and executes it",
+          "categories": [
+            "dropper"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 50,
+          "references": [],
+          "data": [
+            {
+              "binary": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP\\baKg.exe"
+            },
+            {
+              "binary": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP001.TMP\\aaKl.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "injection_rwx",
+          "description": "Creates RWX memory",
+          "categories": [
+            "injection"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 50,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 5432,
+              "cid": 21
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "persistence_autorun",
+          "description": "Installs itself for autorun at Windows startup",
+          "categories": [
+            "persistence"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 8968,
+              "cid": 209
+            },
+            {
+              "type": "call",
+              "pid": 8044,
+              "cid": 208
+            },
+            {
+              "regkey": "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\wextract_cleanup0"
+            },
+            {
+              "data": "rundll32.exe C:\\Windows\\system32\\advpack.dll,DelNodeRunDLL32 \"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP\\\""
+            },
+            {
+              "regkey": "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\wextract_cleanup1"
+            },
+            {
+              "data": "rundll32.exe C:\\Windows\\system32\\advpack.dll,DelNodeRunDLL32 \"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP001.TMP\\\""
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "procmem_yara",
+          "description": "Yara detections observed in process dumps, payloads or dropped files",
+          "categories": [
+            "malware"
+          ],
+          "severity": 3,
+          "weight": 4,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "Hit": "PID  triggered the Yara rule 'Amadey' with data '['{ 8B D1 B8 FF FF FF 7F D1 EA 2B C2 3B C8 76 07 BB FF FF FF 7F EB 08 8D 04 0A 3B D8 0F 42 D8 }', '{ 8A 04 02 88 04 0F 41 8B 7D FC 8D 42 01 3B CB 7C }']'"
+            },
+            {
+              "Hit": "PID 5432 triggered the Yara rule 'RedLine' with data '['#\\x00+\\x003\\x00;\\x00C\\x00S\\x00c\\x00s\\x00', '{ 68 10 84 2D 2C 71 EA 7E 2C 71 EA 7E 2C 71 EA 7E 32 23 7F 7E 3F 71 EA 7E 0B B7 91 7E 2B 71 EA 7E 2C 71 EB 7E 5C 71 EA 7E 32 23 6E 7E 1C 71 EA 7E 32 23 69 7E A2 71 EA 7E 32 23 7B 7E 2D 71 EA 7E }', '{ 83 EC 38 53 B0 C4 88 44 24 2B 88 44 24 2F B0 3F 88 44 24 30 88 44 24 31 88 44 24 33 55 56 8B F1 B8 0C 00 FE FF 2B C6 89 44 24 14 B8 0D 00 FE FF 2B C6 89 44 24 1C B8 02 00 FE FF 2B C6 89 44 24 18 B3 32 B8 0E 00 FE FF 2B C6 88 5C 24 32 88 5C 24 41 89 44 24 28 57 B1 4D BB 0B 00 FE FF B8 03 00 FE FF 2B DE 2B C6 BF 00 00 FE FF B2 BC 2B FE 88 4C 24 38 88 4C 24 42 88 4C 24 47 C6 44 24 34 78 C6 44 24 35 61 88 54 24 3A C6 44 24 3E 66 C6 44 24 41 33 C6 44 24 43 D4 C6 44 24 44 74 88 54 24 46 C6 44 24 40 80 C6 44 24 39 62 C7 44 24 10 }', 'B\\x00|\\x00B\\x00x\\x00B\\x00t\\x00B\\x00p\\x00B\\x00l\\x00B\\x00h\\x00B\\x00d\\x00B\\x00`\\x00B\\x00\\\\\\x00B\\x00X\\x00B\\x00T\\x00B\\x00P\\x00B\\x00L\\x00B\\x00H\\x00B\\x00D\\x00B\\x00@\\x00B\\x00<\\x00B\\x008\\x00B\\x004\\x00B\\x000\\x00B\\x00,\\x00B\\x00(\\x00B\\x00$\\x00B\\x00 \\x00B\\x00', ' delete[]', 'constructor or from DllMain.']'"
+            },
+            {
+              "Hit": "PID 5432 triggered the Yara rule 'RedLine' with data '['#\\x00+\\x003\\x00;\\x00C\\x00S\\x00c\\x00s\\x00', '{ 68 10 84 2D 2C 71 EA 7E 2C 71 EA 7E 2C 71 EA 7E 32 23 7F 7E 3F 71 EA 7E 0B B7 91 7E 2B 71 EA 7E 2C 71 EB 7E 5C 71 EA 7E 32 23 6E 7E 1C 71 EA 7E 32 23 69 7E A2 71 EA 7E 32 23 7B 7E 2D 71 EA 7E }', '{ 83 EC 38 53 B0 C4 88 44 24 2B 88 44 24 2F B0 3F 88 44 24 30 88 44 24 31 88 44 24 33 55 56 8B F1 B8 0C 00 FE FF 2B C6 89 44 24 14 B8 0D 00 FE FF 2B C6 89 44 24 1C B8 02 00 FE FF 2B C6 89 44 24 18 B3 32 B8 0E 00 FE FF 2B C6 88 5C 24 32 88 5C 24 41 89 44 24 28 57 B1 4D BB 0B 00 FE FF B8 03 00 FE FF 2B DE 2B C6 BF 00 00 FE FF B2 BC 2B FE 88 4C 24 38 88 4C 24 42 88 4C 24 47 C6 44 24 34 78 C6 44 24 35 61 88 54 24 3A C6 44 24 3E 66 C6 44 24 41 33 C6 44 24 43 D4 C6 44 24 44 74 88 54 24 46 C6 44 24 40 80 C6 44 24 39 62 C7 44 24 10 }', 'B\\x00|\\x00B\\x00x\\x00B\\x00t\\x00B\\x00p\\x00B\\x00l\\x00B\\x00h\\x00B\\x00d\\x00B\\x00`\\x00B\\x00\\\\\\x00B\\x00X\\x00B\\x00T\\x00B\\x00P\\x00B\\x00L\\x00B\\x00H\\x00B\\x00D\\x00B\\x00@\\x00B\\x00<\\x00B\\x008\\x00B\\x004\\x00B\\x000\\x00B\\x00,\\x00B\\x00(\\x00B\\x00$\\x00B\\x00 \\x00B\\x00', ' delete[]', 'constructor or from DllMain.']'"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "deletes_executed_files",
+          "description": "Deletes executed files from disk",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "file": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP"
+            },
+            {
+              "file": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP001.TMP"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nOkay, I need to create a Yara rule based on the provided trace data. The goal is to find three bypass patterns that could help an attacker exit the program without being detected.\n\nFirst, looking at Phase 1: the factual outcome is the program exits. Now, in each phase of the trace, there's a call instruction (like E8 ...). So, for each call, if we skip the execution after the call, it might cause the program to continue instead of exiting.\n\nPhase 2 asks about counterfactuals—skipping each suspicious instruction and seeing if the exit is avoided. The hypothesis is that skipping these calls would prevent the exit because the subsequent code isn't executed.\n\nIn Phase 3, I evaluate each hypothesis. Skipping a call (E8 ...) should lead to continuing execution instead of exiting. So each call is a potential bypass point.\n\nNow, for each call instruction, I need to create a pattern that includes it and some context around it so Yara can match it specifically without false positives.\n\nLooking at the trace data:\n\n1. The first call is E8 04 05 00 in the first section (line ~37). The next few lines after the call are TEST, JZ, and then other instructions leading to exit. So skipping this call should prevent those specific tests from executing.\n\n2. Another call occurs later: E8 B5 D9 ... at line ~46-48. After that, there's a series of conditional jumps (74/75), TEST, JZ, and so on. Skipping this would skip the subsequent code.\n\n3. The third call is near the end: E8 DE 10 ... around line ~92. Following it are calls to functions like CDE13Ch, which includes a loop with conditional jumps. Skipping this call should prevent those loops from running and exit earlier.\n\nFor each of these calls, I'll create patterns that include the call instruction followed by four wildcard bytes (for the offset) and some context after the jump. Each pattern will be 6-20 bytes long.\n\nAlso, ensuring that all address/offset bytes are replaced with ?? as per the wildcard rules. Opcode and register encodings should stay concrete.\n\nFinally, I'll format each pattern correctly with spaces between hex bytes and wrap them in { }. Then, include these patterns in the strings section of the Yara rule along with their names.\n</think>\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule targeting call instructions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? B5 D9 74 ?? ?? ?? ?? FF C0 }\n        $pattern2 = { E8 DE 10 ?? ?? ?? ?? FF CE 75 C0 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\81c87773f7f1c9f8\\iter2_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule targeting call instructions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? B5 D9 74 ?? ?? ?? ?? FF C0 }\n        $pattern2 = { E8 DE 10 ?? ?? ?? ?? FF CE 75 C0 }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1445",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 0,
+    "new_signatures": 12,
+    "new_signature_names": [
+      "antidebug_setunhandledexceptionfilter",
+      "injection_rwx",
+      "antivm_checks_available_memory",
+      "packer_entropy",
+      "procmem_yara",
+      "persistence_autorun",
+      "dropper",
+      "antidebug_guardpages",
+      "static_pe_pdbpath",
+      "deletes_executed_files",
+      "language_check_registry",
+      "createtoolhelp32snapshot_module_enumeration"
+    ],
+    "new_signature_details": [
+      {
+        "name": "antivm_checks_available_memory",
+        "description": "Checks available memory",
+        "categories": [
+          "antivm"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10598
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10603
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10606
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "static_pe_pdbpath",
+        "description": "The PE file contains a PDB path",
+        "categories": [
+          "static"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 80,
+        "references": [
+          "https://www.fireeye.com/blog/threat-research/2019/08/definitive-dossier-of-devilish-debug-details-part-one-pdb-paths-malware.html"
+        ],
+        "data": [
+          {
+            "pdbpath": "wextract.pdb"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "antidebug_setunhandledexceptionfilter",
+        "description": "SetUnhandledExceptionFilter detected (possible anti-debug)",
+        "categories": [
+          "anti-debug"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 40,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 8968,
+            "cid": 19
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "language_check_registry",
+        "description": "Checks system language via registry key (possible geofencing)",
+        "categories": [
+          "location_discovery",
+          "geofence"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "regkey": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Nls\\CustomLocale\\en-US"
+          },
+          {
+            "regkey": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Nls\\ExtendedLocale\\en-US"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "antidebug_guardpages",
+        "description": "Guard pages use detected - possible anti-debugging.",
+        "categories": [
+          "anti-debug"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10458
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10461
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10462
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10537
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10538
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10544
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10545
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10546
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10547
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10548
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10549
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10552
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10556
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10578
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10585
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10591
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10593
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10600
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10601
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10604
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10605
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10607
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10608
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10618
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10698
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10728
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10729
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10730
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10731
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10732
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10733
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10734
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10735
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10736
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10737
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10738
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10739
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10740
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10741
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10742
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10743
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10744
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10745
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10746
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10747
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10748
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10749
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10750
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10751
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10752
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10753
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10754
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10755
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10760
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10762
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10769
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10771
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10773
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10775
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10777
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10778
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10779
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10780
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10781
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10782
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10783
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10784
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10785
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10786
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10787
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10788
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10789
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10790
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10791
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10792
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10793
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10794
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10795
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10796
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10797
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10798
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10799
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10800
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10801
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10802
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10803
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10804
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10805
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10806
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10807
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10808
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10820
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10821
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10826
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10827
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10828
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10829
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10830
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10836
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10837
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10843
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10844
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10846
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10847
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10849
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10851
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10854
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10863
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10864
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10866
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10867
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10868
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10869
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10870
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10871
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10872
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10873
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10874
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10875
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10876
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10877
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10878
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10879
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10880
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10881
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10882
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10883
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10889
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10890
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10892
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10893
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10895
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10896
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10906
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10907
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10908
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10920
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10921
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10922
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10923
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10924
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10930
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10931
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10933
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10934
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10940
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10941
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10942
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10943
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10944
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10950
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10951
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10953
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10954
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11265
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11266
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11267
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11268
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11269
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11270
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11271
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11277
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11280
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11286
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11287
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11288
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11289
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11290
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11297
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11298
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11300
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11301
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11332
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11333
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11335
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11398
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11400
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11506
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11507
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11631
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11649
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11650
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11651
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11652
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11653
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11659
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11660
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11662
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11663
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11672
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11679
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11680
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11691
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11693
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11694
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11695
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11703
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11704
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11705
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11706
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11707
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11708
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11709
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11710
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11711
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11712
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11713
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11714
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11715
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11716
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11717
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11718
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11719
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11720
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11721
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11722
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11723
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11745
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11746
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11747
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 11753
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "createtoolhelp32snapshot_module_enumeration",
+        "description": "Enumerates the modules from a process (may be used to locate base addresses in process injection)",
+        "categories": [
+          "discovery"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10246
+          },
+          {
+            "module": "pid 5432 module ntdll.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10248
+          },
+          {
+            "module": "pid 5432 module KERNEL32.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10249
+          },
+          {
+            "module": "pid 5432 module KERNELBASE.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10250
+          },
+          {
+            "module": "pid 5432 module apphelp.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10251
+          },
+          {
+            "module": "pid 5432 module AcLayers.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10252
+          },
+          {
+            "module": "pid 5432 module msvcrt.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10253
+          },
+          {
+            "module": "pid 5432 module USER32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10254
+          },
+          {
+            "module": "pid 5432 module win32u.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10255
+          },
+          {
+            "module": "pid 5432 module GDI32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10256
+          },
+          {
+            "module": "pid 5432 module gdi32full.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10257
+          },
+          {
+            "module": "pid 5432 module msvcp_win.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10258
+          },
+          {
+            "module": "pid 5432 module ucrtbase.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10259
+          },
+          {
+            "module": "pid 5432 module SHELL32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10260
+          },
+          {
+            "module": "pid 5432 module SHLWAPI.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10261
+          },
+          {
+            "module": "pid 5432 module OLEAUT32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10262
+          },
+          {
+            "module": "pid 5432 module combase.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10263
+          },
+          {
+            "module": "pid 5432 module RPCRT4.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10264
+          },
+          {
+            "module": "pid 5432 module SETUPAPI.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10265
+          },
+          {
+            "module": "pid 5432 module cfgmgr32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10266
+          },
+          {
+            "module": "pid 5432 module bcrypt.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10267
+          },
+          {
+            "module": "pid 5432 module MPR.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10268
+          },
+          {
+            "module": "pid 5432 module sfc.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10269
+          },
+          {
+            "module": "pid 5432 module WINSPOOL.DRV"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10270
+          },
+          {
+            "module": "pid 5432 module sfc_os.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10271
+          },
+          {
+            "module": "pid 5432 module IMM32.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10272
+          },
+          {
+            "module": "pid 5432 module CRYPT32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10273
+          },
+          {
+            "module": "pid 5432 module WS2_32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10274
+          },
+          {
+            "module": "pid 5432 module ADVAPI32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10275
+          },
+          {
+            "module": "pid 5432 module sechost.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10276
+          },
+          {
+            "module": "pid 5432 module ole32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10277
+          },
+          {
+            "module": "pid 5432 module CRYPTBASE.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10278
+          },
+          {
+            "module": "pid 5432 module SspiCli.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10279
+          },
+          {
+            "module": "pid 5432 module msimg32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10280
+          },
+          {
+            "module": "pid 5432 module kernel.appcore.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10281
+          },
+          {
+            "module": "pid 5432 module bcryptPrimitives.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10282
+          },
+          {
+            "module": "pid 5432 module uxtheme.dll"
+          },
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 10283
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "packer_entropy",
+        "description": "The binary likely contains encrypted or compressed data",
+        "categories": [
+          "packer"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [
+          "http://www.forensickb.com/2013/03/file-entropy-explained.html",
+          "http://virii.es/U/Using%20Entropy%20Analysis%20to%20Find%20Encrypted%20and%20Packed%20Malware.pdf"
+        ],
+        "data": [
+          {
+            "section": {
+              "name": ".rsrc",
+              "raw_address": "0x00007c00",
+              "virtual_address": "0x0000c000",
+              "virtual_size": "0x00086000",
+              "size_of_data": "0x00085400",
+              "characteristics": "IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ",
+              "characteristics_raw": "0x40000040",
+              "entropy": "7.87"
+            }
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "dropper",
+        "description": "Drops a binary and executes it",
+        "categories": [
+          "dropper"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 50,
+        "references": [],
+        "data": [
+          {
+            "binary": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP\\baKg.exe"
+          },
+          {
+            "binary": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP001.TMP\\aaKl.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "injection_rwx",
+        "description": "Creates RWX memory",
+        "categories": [
+          "injection"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 50,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 5432,
+            "cid": 21
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "persistence_autorun",
+        "description": "Installs itself for autorun at Windows startup",
+        "categories": [
+          "persistence"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 8968,
+            "cid": 209
+          },
+          {
+            "type": "call",
+            "pid": 8044,
+            "cid": 208
+          },
+          {
+            "regkey": "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\wextract_cleanup0"
+          },
+          {
+            "data": "rundll32.exe C:\\Windows\\system32\\advpack.dll,DelNodeRunDLL32 \"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP\\\""
+          },
+          {
+            "regkey": "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\wextract_cleanup1"
+          },
+          {
+            "data": "rundll32.exe C:\\Windows\\system32\\advpack.dll,DelNodeRunDLL32 \"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP001.TMP\\\""
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "procmem_yara",
+        "description": "Yara detections observed in process dumps, payloads or dropped files",
+        "categories": [
+          "malware"
+        ],
+        "severity": 3,
+        "weight": 4,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "Hit": "PID  triggered the Yara rule 'Amadey' with data '['{ 8B D1 B8 FF FF FF 7F D1 EA 2B C2 3B C8 76 07 BB FF FF FF 7F EB 08 8D 04 0A 3B D8 0F 42 D8 }', '{ 8A 04 02 88 04 0F 41 8B 7D FC 8D 42 01 3B CB 7C }']'"
+          },
+          {
+            "Hit": "PID 5432 triggered the Yara rule 'RedLine' with data '['#\\x00+\\x003\\x00;\\x00C\\x00S\\x00c\\x00s\\x00', '{ 68 10 84 2D 2C 71 EA 7E 2C 71 EA 7E 2C 71 EA 7E 32 23 7F 7E 3F 71 EA 7E 0B B7 91 7E 2B 71 EA 7E 2C 71 EB 7E 5C 71 EA 7E 32 23 6E 7E 1C 71 EA 7E 32 23 69 7E A2 71 EA 7E 32 23 7B 7E 2D 71 EA 7E }', '{ 83 EC 38 53 B0 C4 88 44 24 2B 88 44 24 2F B0 3F 88 44 24 30 88 44 24 31 88 44 24 33 55 56 8B F1 B8 0C 00 FE FF 2B C6 89 44 24 14 B8 0D 00 FE FF 2B C6 89 44 24 1C B8 02 00 FE FF 2B C6 89 44 24 18 B3 32 B8 0E 00 FE FF 2B C6 88 5C 24 32 88 5C 24 41 89 44 24 28 57 B1 4D BB 0B 00 FE FF B8 03 00 FE FF 2B DE 2B C6 BF 00 00 FE FF B2 BC 2B FE 88 4C 24 38 88 4C 24 42 88 4C 24 47 C6 44 24 34 78 C6 44 24 35 61 88 54 24 3A C6 44 24 3E 66 C6 44 24 41 33 C6 44 24 43 D4 C6 44 24 44 74 88 54 24 46 C6 44 24 40 80 C6 44 24 39 62 C7 44 24 10 }', 'B\\x00|\\x00B\\x00x\\x00B\\x00t\\x00B\\x00p\\x00B\\x00l\\x00B\\x00h\\x00B\\x00d\\x00B\\x00`\\x00B\\x00\\\\\\x00B\\x00X\\x00B\\x00T\\x00B\\x00P\\x00B\\x00L\\x00B\\x00H\\x00B\\x00D\\x00B\\x00@\\x00B\\x00<\\x00B\\x008\\x00B\\x004\\x00B\\x000\\x00B\\x00,\\x00B\\x00(\\x00B\\x00$\\x00B\\x00 \\x00B\\x00', ' delete[]', 'constructor or from DllMain.']'"
+          },
+          {
+            "Hit": "PID 5432 triggered the Yara rule 'RedLine' with data '['#\\x00+\\x003\\x00;\\x00C\\x00S\\x00c\\x00s\\x00', '{ 68 10 84 2D 2C 71 EA 7E 2C 71 EA 7E 2C 71 EA 7E 32 23 7F 7E 3F 71 EA 7E 0B B7 91 7E 2B 71 EA 7E 2C 71 EB 7E 5C 71 EA 7E 32 23 6E 7E 1C 71 EA 7E 32 23 69 7E A2 71 EA 7E 32 23 7B 7E 2D 71 EA 7E }', '{ 83 EC 38 53 B0 C4 88 44 24 2B 88 44 24 2F B0 3F 88 44 24 30 88 44 24 31 88 44 24 33 55 56 8B F1 B8 0C 00 FE FF 2B C6 89 44 24 14 B8 0D 00 FE FF 2B C6 89 44 24 1C B8 02 00 FE FF 2B C6 89 44 24 18 B3 32 B8 0E 00 FE FF 2B C6 88 5C 24 32 88 5C 24 41 89 44 24 28 57 B1 4D BB 0B 00 FE FF B8 03 00 FE FF 2B DE 2B C6 BF 00 00 FE FF B2 BC 2B FE 88 4C 24 38 88 4C 24 42 88 4C 24 47 C6 44 24 34 78 C6 44 24 35 61 88 54 24 3A C6 44 24 3E 66 C6 44 24 41 33 C6 44 24 43 D4 C6 44 24 44 74 88 54 24 46 C6 44 24 40 80 C6 44 24 39 62 C7 44 24 10 }', 'B\\x00|\\x00B\\x00x\\x00B\\x00t\\x00B\\x00p\\x00B\\x00l\\x00B\\x00h\\x00B\\x00d\\x00B\\x00`\\x00B\\x00\\\\\\x00B\\x00X\\x00B\\x00T\\x00B\\x00P\\x00B\\x00L\\x00B\\x00H\\x00B\\x00D\\x00B\\x00@\\x00B\\x00<\\x00B\\x008\\x00B\\x004\\x00B\\x000\\x00B\\x00,\\x00B\\x00(\\x00B\\x00$\\x00B\\x00 \\x00B\\x00', ' delete[]', 'constructor or from DllMain.']'"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "deletes_executed_files",
+        "description": "Deletes executed files from disk",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "file": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP000.TMP"
+          },
+          {
+            "file": "C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP001.TMP"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "<think>\nOkay, I need to create a Yara rule based on the provided trace data. The goal is to find three bypass patterns that could help an attacker exit the program without being detected.\n\nFirst, looking at Phase 1: the factual outcome is the program exits. Now, in each phase of the trace, there's a call instruction (like E8 ...). So, for each call, if we skip the execution after the call, it might cause the program to continue instead of exiting.\n\nPhase 2 asks about counterfactuals—skipping each suspicious instruction and seeing if the exit is avoided. The hypothesis is that skipping these calls would prevent the exit because the subsequent code isn't executed.\n\nIn Phase 3, I evaluate each hypothesis. Skipping a call (E8 ...) should lead to continuing execution instead of exiting. So each call is a potential bypass point.\n\nNow, for each call instruction, I need to create a pattern that includes it and some context around it so Yara can match it specifically without false positives.\n\nLooking at the trace data:\n\n1. The first call is E8 04 05 00 in the first section (line ~37). The next few lines after the call are TEST, JZ, and then other instructions leading to exit. So skipping this call should prevent those specific tests from executing.\n\n2. Another call occurs later: E8 B5 D9 ... at line ~46-48. After that, there's a series of conditional jumps (74/75), TEST, JZ, and so on. Skipping this would skip the subsequent code.\n\n3. The third call is near the end: E8 DE 10 ... around line ~92. Following it are calls to functions like CDE13Ch, which includes a loop with conditional jumps. Skipping this call should prevent those loops from running and exit earlier.\n\nFor each of these calls, I'll create patterns that include the call instruction followed by four wildcard bytes (for the offset) and some context after the jump. Each pattern will be 6-20 bytes long.\n\nAlso, ensuring that all address/offset bytes are replaced with ?? as per the wildcard rules. Opcode and register encodings should stay concrete.\n\nFinally, I'll format each pattern correctly with spaces between hex bytes and wrap them in { }. Then, include these patterns in the strings section of the Yara rule along with their names.\n</think>\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule targeting call instructions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? B5 D9 74 ?? ?? ?? ?? FF C0 }\n        $pattern2 = { E8 DE 10 ?? ?? ?? ?? FF CE 75 C0 }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\81c87773f7f1c9f8\\iter2_v2.yar"
+  },
+  "best_score": 12,
+  "optimization_history": [
+    "Iteration 2: bypass_failed - YARA pattern did not match",
+    "Iteration 3: SUCCESS - 12 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    ""
+  ]
+}

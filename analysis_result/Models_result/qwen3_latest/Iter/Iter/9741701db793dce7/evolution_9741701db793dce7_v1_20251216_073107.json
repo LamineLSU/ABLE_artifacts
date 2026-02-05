@@ -1,0 +1,83 @@
+{
+  "sha256": "9741701db793dce797654c13c8e6599ac6723583b7bb27d4184018f55d98c907",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "rule ExitCallWithPushZero\n{\n    meta:\n        description = \"Detects a call to ExitProcess preceded by a push 0\"\n        cape_options = \"bp0=$a+0,action0=skip,count=0\"\n    strings:\n        $a = { 6A 00 FF 15 ?? ?? ?? ?? }\n    condition:\n        $a\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1419",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Adjust the skip offset to skip only the PUSH instruction without affecting the CALL's address resolution."
+      ],
+      "debugger_log": "=== 3924.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 22:51:53 2025\nBreakpoint 0 hit by instruction at 0x0515AC02 (thread 4856) EAX=0xa EBX=0x5271d68 ECX=0x5271c14 EDX=0x5271d9c EDI=0x5271bec ESP=0xafef20 *ESP=0x0 EBP=0xafef34\n0x0515AC02  6A00                     PUSH      0x0                           \nActionDispatcher: skipping instruction.\n0x0515AC04  FF1530806B07             CALL      0x05158E29                    \nBreakpoint 0 hit by instruction at 0x0515AC02 (thread 4856) EBX=0x5271d68 ECX=0x5271c14 EDX=0x5271db8 ESI=0x1 EDI=0x5271bec ESP=0xafef24 *ESP=0x0 EBP=0xafef34\n0x0515AC02  6A00                     PUSH      0x0                           \nActionDispatcher: skipping instruction.\n0x0515AC04  FF1530806B07             CALL      0x0515CC40                    \n",
+      "raw_response": "To effectively identify the behavior of a malicious process that attempts to exit or terminate itself, we can craft YARA rules that detect the presence of specific instruction sequences commonly used in such scenarios. These patterns are based on the observed code flow and the use of `call` and `test` instructions to conditionally trigger a termination.\n\n---\n\n### ✅ **YARA Rule Patterns**\n\nHere are three distinct YARA patterns that can be used to detect the execution of a termination routine:\n\n---\n\n#### **Pattern 0: Exit Call with Push Zero**\nThis pattern identifies the sequence where a `push 0` is followed by a `call` to a memory location (which may point to `ExitProcess` or similar).\n\n```yara\nrule ExitCallWithPushZero\n{\n    meta:\n        description = \"Detects a call to ExitProcess preceded by a push 0\"\n    strings:\n        $a = { 6A 00 FF 15 ?? ?? ?? ?? }\n    condition:\n        $a\n}\n```\n\n- **Explanation:**  \n  - `6A 00` = `push 0`  \n  - `FF 15` = `call` with a 4-byte displacement  \n  - `?? ?? ?? ??` = Placeholder for the actual memory address (which may vary)\n\n---\n\n#### **Pattern 1: Conditional Exit via Test and Jump**\nThis pattern detects a conditional exit flow where a `test` is followed by a `jz` (jump if zero), likely used to skip over the exit code.\n\n```yara\nrule ConditionalExitViaTest\n{\n    meta:\n        description = \"Detects a conditional exit via test and jump\"\n    strings:\n        $b = { E8 ?? ?? ?? ?? 85 C0 74 0E }\n    condition:\n        $b\n}\n```\n\n- **Explanation:**  \n  - `E8 ?? ?? ?? ??` = `call` to a function (could be `ExitProcess`)  \n  - `85 C0` = `test eax, eax`  \n  - `74 0E` = `jz` to a location 14 bytes ahead (often used to skip over the exit code)\n\n---\n\n#### **Pattern 2: Full Exit Flow with Surrounding Instructions**\nThis pattern captures a more complete flow, including the call to a function, a test, and a conditional jump to an exit point.\n\n```yara\nrule FullExitFlow\n{\n    meta:\n        description = \"Detects a full exit flow including call, test, and conditional jump\"\n    strings:\n        $c = { E8 B7 F7 FF FF 6A 00 FF 15 ?? ?? ?? ?? }\n    condition:\n        $c\n}\n```\n\n- **Explanation:**  \n  - `E8 B7 F7 FF FF` = `call` to a specific address (could be `ExitProcess`)  \n  - `6A 00` = `push 0`  \n  - `FF 15 ?? ?? ?? ??` = `call` to a memory location  \n  - The full sequence captures a complete flow that may be used for termination\n\n---\n\n### 🔍 **Summary**\n\nThese YARA patterns are designed to detect the following behaviors:\n\n- **Pattern 0:** A direct call to an exit function (`ExitProcess`) with a `push 0` preceding it.\n- **Pattern 1:** A conditional exit via a `test` and `jz` instruction, which may be used to skip over exit code if certain conditions are met.\n- **Pattern 2:** A more complete exit flow, including a call to a function, a `push 0`, and a final call to an exit routine.\n\nThese rules can be used in conjunction with threat intelligence or sandbox environments to detect potentially malicious code that attempts to terminate itself or evade analysis.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\9741701db793dce7\\iter0_v1.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 85 C0 74 ?? }\n        $pattern1 = { 74 ?? E8 ?? ?? ?? ?? }\n        $pattern2 = { 6A 00 FF 15 ?? ?? ?? ?? }\n\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1420",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Replace the generic pattern with one targeting the specific ExitProcess call in the original trace, including more context bytes to ensure specificity."
+      ],
+      "debugger_log": "=== 7652.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 20:00:48 2025\nBreakpoint 2 hit by instruction at 0x00422FE2 (thread 7616) EAX=0x1 EBX=0x7f5000 ECX=0x8ffb9c EDX=0x8ffb00 EDI=0x40717b ESP=0x8ffb70 *ESP=0x1 EBP=0x8ffbe4\nBreak at 0x00422FE2 in 9741701db793dce79765.exe (RVA 0x22fe2, thread 7616, Stack 0x008F2000-0x00900000, ImageBase 0x00400000)\n0x00422FE2  6A00                     PUSH      0x0                           \nActionDispatcher: skipping instruction.\n0x00422FE4  FF1504704200             CALL      GetProcessHeap                \nBreakpoint 2 hit by instruction at 0x00422FE2 (thread 7616) EAX=0xa EBX=0x7f5000 ECX=0x8ffb9c EDX=0x8ffb00 EDI=0x40717b ESP=0x8ffb70 *ESP=0xa EBP=0x8ffbe4\n0x00422FE2  6A00                     PUSH      0x0                           \nActionDispatcher: skipping instruction.\n0x00422FE4  FF1504704200             CALL      GetProcessHeap                \nBreakpoint 2 hit by instruction at 0x00422FE2 (thread 7616) EAX=0x3a EBX=0x7f5000 ECX=0x8ffb9c EDX=0x8ffb00 EDI=0x40717b ESP=0x8ffb70 *ESP=0x3a EBP=0x8ffbe4\n0x00422FE2  6A00                     PUSH      0x0                           \nActionDispatcher: skipping instruction.\n0x00422FE4  FF1504704200             CALL      GetProcessHeap                \nBreakpoint 2 hit by instruction at 0x00422FE2 (thread 7616) EAX=0xb EBX=0x7f5000 ECX=0x8ffb9c EDX=0x8ffb00 EDI=0x40717b ESP=0x8ffb70 *ESP=0xb EBP=0x8ffbe4\n0x00422FE2  6A00                     PUSH      0x0                           \nActionDispatcher: skipping instruction.\n0x00422FE4  FF1504704200             CALL      GetProcessHeap                \nBreakpoint 2 hit by instruction at 0x00422FE2 (thread 7616) EAX=0x7 EBX=0x7f5000 ECX=0x8ffb9c EDX=0x8ffb00 EDI=0x40717b ESP=0x8ffb70 *ESP=0x7 EBP=0x8ffbe4\n0x00422FE2  6A00                     PUSH      0x0                           \nActionDispatcher: skipping instruction.\n0x00422FE4  FF1504704200             CALL      GetProcessHeap                \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 85 C0 74 ?? }\n        $pattern1 = { 74 ?? E8 ?? ?? ?? ?? }\n        $pattern2 = { 6A 00 FF15 ?? ?? ?? ?? }\n\n    condition:\n        all of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\9741701db793dce7\\iter1_v1.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 0E E8 ?? ?? ?? ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? FF 15 ?? ?? ?? ?? }\n        $pattern2 = { 6A 00 FF 15 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1421",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 5264.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 20:08:35 2025\nBreakpoint 1 hit by instruction at 0x053BABDE (thread 4504) EAX=0x5411d5c EBX=0x5411bcc ECX=0x53bac50 EDX=0x5411c00 ESI=0x5411c14 EDI=0x5411bec ESP=0x9cf374 *ESP=0x53babb0 EBP=0x9cf384\n0x053BABDE  E87D40AD65               CALL      0x65ad4082                    \nActionDispatcher: skipping instruction.\n0x053BABE3  FF1574903C05             CALL      0x053B91FD                    \nBreakpoint 2 hit by instruction at 0x053BAC02 (thread 4504) EAX=0xa EBX=0x5411d68 ECX=0x5411c14 EDX=0x5411d9c EDI=0x5411bec ESP=0x9cf370 *ESP=0x0 EBP=0x9cf384\n0x053BAC02  6A00                     PUSH      0x0                           \nActionDispatcher: skipping instruction.\n0x053BAC04  FF1530803C05             CALL      0x053B8E29                    \nBreakpoint 2 hit by instruction at 0x053BAC02 (thread 4504) EBX=0x5411d68 ECX=0x5411c14 EDX=0x5411db8 ESI=0x1 EDI=0x5411bec ESP=0x9cf374 *ESP=0x0 EBP=0x9cf384\n0x053BAC02  6A00                     PUSH      0x0                           \nActionDispatcher: skipping instruction.\n0x053BAC04  FF1530803C05             CALL      0x053BCC40                    \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 0E E8 ?? ?? ?? ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? FF 15 ?? ?? ?? ?? }\n        $pattern2 = { 6A 00 FF 15 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\9741701db793dce7\\iter2_v1.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

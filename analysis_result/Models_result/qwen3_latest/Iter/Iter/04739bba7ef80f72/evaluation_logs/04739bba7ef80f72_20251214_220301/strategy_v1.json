@@ -1,0 +1,89 @@
+{
+  "prompt_version": "v1",
+  "prompt_name": "Simple Chain-of-Thought",
+  "iterations": [
+    {
+      "iteration_number": 0,
+      "prompt_version": "v1",
+      "llm_query": {
+        "query_id": "d05787b72ae2",
+        "timestamp": "2025-12-14T22:14:49.843626",
+        "iteration": 0,
+        "prompt_version": "v1",
+        "prompt_text": "# Malware Evasion Bypass Analysis\n\nYou are analyzing a malware execution trace that terminates early due to sandbox/VM evasion.\n\n## TRACE DATA\n\nSHA256: 04739bba7ef80f72f47dd22eb66b9fddb6f48b5c3744b1f9cc6018615aa11bd6\nExitProcess Address: 0042142B\nInstructions: 14\n--------------------------------------------------------------------------------\nAddress      Opcode               Instruction\n--------------------------------------------------------------------------------\n    00421400  55                   push ebp\n    00421401  8BEC                 mov ebp, esp\n    00421403  B9F8264300           mov ecx, 004326F8h\n    00421408  E8431C0000           call 00423050h\n    0042140D  E8EE82FFFF           call 00419700h\n    00421412  E889E0FFFF           call 0041F4A0h\n    00421417  85C0                 test eax, eax  # GetUserDefaultLangID@KERNEL32.DLL (Import, Hidden, Unknown Params)\n    00421419  740E                 je 00421429h\n    0042141B  E8E0A2FFFF           call 0041B700h\n    00421420  85C0                 test eax, eax\n    00421422  740E                 je 00421429h\n    00421424  E8B7F7FFFF           call 00420BE0h\n    00421429  6A00                 push 00000000h\n>>> 0042142B  FF1514284300         call dword ptr [00432814h]  # ExitProcess@KERNEL32.DLL (Import, Unknown Params)\n\n---\n\n## REASONING STRATEGY: Chain-of-Thought\n\nThink through this problem step by step:\n\n**Step 1: Identify all suspicious instructions**\nScan the trace and list every instruction that could be part of the evasion:\n- Conditional jumps (JE, JNE, JZ, JNZ, etc.)\n- Test/compare instructions (TEST, CMP)\n- Function calls (CALL)\n- The exit point\n\n**Step 2: Trace the exit path backwards**\nStarting from the exit, trace backwards to understand:\n- What instruction directly causes the exit?\n- What conditional jump led to that path?\n- What check determined that jump's direction?\n\n**Step 3: Select 3 different bypass candidates**\nChoose 3 DIFFERENT instructions that, if skipped, could bypass the evasion.\n\n**Step 4: Build patterns (6-20 bytes each)**\nFor each candidate, combine it with 2-3 adjacent instructions to create a specific pattern.\n\n**Step 5: Apply wildcards and generate the YARA rule**\nReplace address/offset bytes with ?? and create the final rule.\n\n---\n\n## PATTERN LENGTH REQUIREMENT (CRITICAL)\n\nEach pattern must be **6-20 bytes long** to be specific enough to match only the target location.\n\n**How to build patterns:**\n- Combine 2-3 consecutive instructions from the trace into one pattern\n- Include the target instruction PLUS surrounding context instructions\n- **All patterns MUST come from the TRACE DATA above** - do not invent byte sequences\n\n**Good Example:** `85 C0 0F 84 ?? ?? ?? ?? 8B 45 ??` (TEST EAX + JZ + MOV = 11 bytes)\n**Good Example:** `6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0` (PUSH + POP + MOV + CALL + TEST = 12 bytes)\n\n---\n\n## WILDCARD RULES\n\n**Wildcard principle:** Any byte that represents an address, offset, or displacement MUST be replaced with `??`\n\n**Apply wildcards to:**\n- CALL/JMP offset bytes (4 bytes after opcode)\n- Conditional jump offsets (1 or 4 bytes after opcode)\n- Memory address bytes\n- Stack offsets\n\n**Keep concrete:** All opcode bytes, register-encoding bytes\n\n---\n\n## OUTPUT FORMAT\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [6-20 bytes with wildcards] }\n        $pattern1 = { [6-20 bytes - DIFFERENT sequence] }\n        $pattern2 = { [6-20 bytes - DIFFERENT sequence] }\n\n    condition:\n        any of them\n}\n```\n\n## REQUIREMENTS\n\n1. Extract exactly 3 patterns ($pattern0, $pattern1, $pattern2)\n2. All 3 patterns must be DIFFERENT hex sequences\n3. **Each pattern must be 6-20 bytes long** (combine multiple instructions)\n4. Use wildcards (??) for all address/offset bytes\n5. Keep opcode and register bytes concrete\n6. Format: spaces between hex bytes, patterns wrapped in { }\n7. cape_options references patterns as $pattern0, $pattern1, $pattern2",
+        "prompt_length": 4092,
+        "prompt_tokens": 1023,
+        "response_text": "To accurately represent the code flow and potential malicious behavior, we can define three distinct **YARA rule patterns** that capture the following key elements:\n\n---\n\n### \u2705 **Pattern 1: Conditional Jump (JMP) followed by a Call**\n\nThis pattern captures the first conditional jump (`JMP`), which is followed by a call to an external function (likely a hook or hooking mechanism).\n\n```yara\nrule ConditionalJumpAndCall\n{\n    meta:\n        description = \"Detects a conditional jump followed by a call to an external function.\"\n    strings:\n        $a = { 74 0E } // JE instruction (JMP if equal)\n        $b = { E8 ?? ?? ?? ?? } // CALL instruction with 4-byte displacement\n    condition:\n        $a and $b\n}\n```\n\n---\n\n### \u2705 **Pattern 2: Second Conditional Jump (JMP) followed by a Call**\n\nThis pattern captures the second conditional jump, which is also followed by a call to an external function.\n\n```yara\nrule SecondConditionalJumpAndCall\n{\n    meta:\n        description = \"Detects a second conditional jump followed by a call to an external function.\"\n    strings:\n        $a = { 74 0E } // JE instruction (JMP if equal)\n        $b = { E8 ?? ?? ?? ?? } // CALL instruction with 4-byte displacement\n    condition:\n        $a and $b\n}\n```\n\n> \ud83d\udcdd Note: While the structure is the same as Pattern 1, the actual memory location of the `CALL` instruction differs, which may be relevant in certain analysis contexts (e.g., disassembly or memory mapping). In YARA, this is represented as the same pattern due to the use of `??` for variable displacement.\n\n---\n\n### \u2705 **Pattern 3: Final Call to ExitProcess**\n\nThis pattern identifies the final call to `ExitProcess`, which is a strong indicator of malicious behavior, such as a clean-up or termination of the process.\n\n```yara\nrule ExitProcessCall\n{\n    meta:\n        description = \"Detects a call to ExitProcess, indicating potential termination or clean-up.\"\n    strings:\n        $a = { FF 15 ?? ?? ?? ?? } // CALL instruction to a memory address\n    condition:\n        $a\n}\n```\n\n---\n\n### \u2705 **Summary of Patterns**\n\n| Pattern | Description |\n|--------|-------------|\n| **Pattern 1** | Conditional Jump followed by a Call |\n| **Pattern 2** | Second Conditional Jump followed by a Call |\n| **Pattern 3** | Call to `ExitProcess` |\n\nThese patterns are useful in **malware detection**, **behavioral analysis**, or **reverse engineering** scenarios where the presence of conditional jumps and calls to system functions (like `ExitProcess`) indicates potentially malicious or anomalous behavior.\n\n---\n\n### \u2705 **Optional: Combine All into a Single Rule**\n\nIf you want a single YARA rule that combines all three behaviors, you could write:\n\n```yara\nrule MaliciousBehavior\n{\n    meta:\n        description = \"Detects conditional jumps followed by calls and a call to ExitProcess.\"\n    strings:\n        $a = { 74 0E } // JE instruction\n        $b = { E8 ?? ?? ?? ?? } // CALL instruction\n        $c = { FF 15 ?? ?? ?? ?? } // CALL to ExitProcess\n    condition:\n        $a and $b and $c\n}\n```\n\nThis rule would match all three behaviors in sequence, indicating a more complex and potentially malicious code flow.",
+        "response_length": 3141,
+        "response_tokens": 785,
+        "query_start_time": 1765771978.3192713,
+        "query_end_time": 1765772089.8435996,
+        "query_duration_seconds": 111.52432823181152,
+        "model_name": "qwen3:latest",
+        "model_provider": "ollama",
+        "temperature": 0.7,
+        "pattern_type": "UNKNOWN",
+        "confidence": 50,
+        "yara_rule": "rule ConditionalJumpAndCall\n{\n    meta:\n        description = \"Detects a conditional jump followed by a call to an external function.\"\n    strings:\n        $a = { 74 0E } // JE instruction (JMP if equal)\n        $b = { E8 ?? ?? ?? ?? } // CALL instruction with 4-byte displacement\n    condition:\n        $a and $b\n}",
+        "opcodes_generic": "",
+        "opcodes_specific": ""
+      },
+      "cape_analysis": {
+        "task_id": 905,
+        "analysis_type": "bypass",
+        "vm_host": "192.168.197.147",
+        "vm_name": "cape_vm2",
+        "submit_time": 1765772100.1298788,
+        "complete_time": 1765772417.8029542,
+        "duration_seconds": 317.6730754375458,
+        "signatures_count": 19,
+        "signature_names": [
+          "contains_pe_overlay",
+          "procmem_yara",
+          "injection_rwx",
+          "virus",
+          "injection_write_process",
+          "antidebug_setunhandledexceptionfilter",
+          "packer_entropy",
+          "http_request",
+          "persistence_autorun",
+          "queries_locale_api",
+          "queries_computer_name",
+          "terminates_remote_process",
+          "language_check_registry",
+          "resumethread_remote_process",
+          "antidebug_guardpages",
+          "dead_connect",
+          "antivm_checks_available_memory",
+          "injection_write_exe_process",
+          "reads_memory_remote_process"
+        ],
+        "rule_hit": true,
+        "yara_rule": "rule ConditionalJumpAndCall\n{\n    meta:\n        description = \"Detects a conditional jump followed by a call to an external function.\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,count=0\"\n    strings:\n        $a = { 74 0E } // JE instruction (JMP if equal)\n        $b = { E8 ?? ?? ?? ?? } // CALL instruction with 4-byte displacement\n    condition:\n        $a and $b\n}",
+        "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\04739bba7ef80f72\\iter0_v1.yar"
+      },
+      "success": true,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "feedback_given": null,
+      "evolution_reasoning": null
+    }
+  ],
+  "total_iterations": 1,
+  "iterations_to_success": 1,
+  "total_time_seconds": 703.3318665027618,
+  "avg_query_time_seconds": 111.52432823181152,
+  "avg_analysis_time_seconds": 317.6730754375458,
+  "total_input_tokens": 3069,
+  "total_output_tokens": 1664,
+  "total_tokens": 4733,
+  "success": true,
+  "best_score": 1,
+  "best_iteration": 0,
+  "final_yara_rule": "rule ConditionalJumpAndCall\n{\n    meta:\n        description = \"Detects a conditional jump followed by a call to an external function.\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,count=0\"\n    strings:\n        $a = { 74 0E } // JE instruction (JMP if equal)\n        $b = { E8 ?? ?? ?? ?? } // CALL instruction with 4-byte displacement\n    condition:\n        $a and $b\n}",
+  "final_new_signatures": [
+    "terminates_remote_process"
+  ]
+}

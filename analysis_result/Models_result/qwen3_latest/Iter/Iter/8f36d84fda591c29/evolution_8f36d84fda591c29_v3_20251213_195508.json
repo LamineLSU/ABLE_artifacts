@@ -1,0 +1,146 @@
+{
+  "sha256": "8f36d84fda591c291957bc2676d6b87efd8fbb7f5a8932405c4d95b8ce1f04ec",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "The provided code snippet contains a `CALL` instruction to `ExitProcess` (which is a Windows API function to terminate a process). To identify potential patterns or sequences related to this call, we can analyze the surrounding instructions and structure the answer accordingly. Here's a structured explanation and the three patterns:\n\n---\n\n### **Pattern 1: Call Setup**\n- **Instructions**: `PUSH EDX` followed by `CALL ExitProcess`\n- **Hex**: `52 FFD0`\n- **Explanation**: \n  - `52` is the `PUSH EDX` instruction, which pushes the contents of the `EDX` register onto the stack.\n  - `FFD0` is the `CALL ExitProcess` instruction, which transfers control to the `ExitProcess` function.\n- **Use Case**: This sequence is commonly used to pass arguments (like the exit code) to `ExitProcess` before terminating the process.\n\n---\n\n### **Pattern 2: Call and Cleanup**\n- **Instructions**: `CALL ExitProcess` followed by `POP RSI`\n- **Hex**: `FFD0 5E`\n- **Explanation**:\n  - `FFD0` is the `CALL ExitProcess` instruction.\n  - `5E` is the `POP RSI` instruction, which retrieves the value from the stack into the `RSI` register.\n- **Use Case**: This might be part of a larger sequence where `RSI` contains a value that needs to be restored after the call, though `ExitProcess` typically does not return, so this could indicate a cleanup step or a misaligned sequence.\n\n---\n\n### **Pattern 3: Call and Return**\n- **Instructions**: `POP RSI`, `POP RBP`, and `RET`\n- **Hex**: `5E 5D C3`\n- **Explanation**:\n  - `5E` is `POP RSI` (restores `RSI` from the stack).\n  - `5D` is `POP RBP` (restores `RBP` from the stack).\n  - `C3` is `RET` (returns from a function call).\n- **Use Case**: This sequence is typically used to clean up the stack after a function call, but since `ExitProcess` terminates the program, the `RET` instruction might be a red herring or part of a misaligned code flow.\n\n---\n\n### **Summary**\nThese patterns highlight common instruction sequences around a `CALL ExitProcess` operation:\n1. **Call Setup**: `PUSH EDX` + `CALL ExitProcess` (for passing exit codes).\n2. **Call and Cleanup**: `CALL ExitProcess` + `POP RSI` (potential cleanup or misalignment).\n3. **Call and Return**: `POP RSI` + `POP RBP` + `RET` (stack cleanup, though `ExitProcess` does not return).\n\n**Final Answer:**  \nThe three patterns are:  \n1. `52 FFD0` (PUSH EDX, CALL ExitProcess)  \n2. `FFD0 5E` (CALL ExitProcess, POP RSI)  \n3. `5E 5D C3` (POP RSI, POP RBP, RET)",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 50 51 FF D2 5E 5D C3 }  // Call to RtlAllocateHeap with surrounding instructions\n        $pattern1 = { 52 50 FF D2 5E 5F C3 }  // Call to RtlFreeHeap with surrounding instructions\n        $pattern2 = { 8D B0 A0 0A 00 00 }         // Unique LEA instruction with displacement\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "1608",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 21,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "new_signature_details": [
+        {
+          "name": "terminates_remote_process",
+          "description": "Terminates another process",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 8996,
+              "cid": 7549
+            },
+            {
+              "process": "8f36d84fda591c291957.exe"
+            },
+            {
+              "type": "call",
+              "pid": 8996,
+              "cid": 7565
+            },
+            {
+              "process": "8f36d84fda591c291957.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 7052.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 10:30:54 2025\nBreakpoint 2 hit by instruction at 0x0041E872 (thread 8200) EAX=0xd7ebc0 ECX=0x77271d93 EDX=0x6b92e5d0 DVPfxQ.dll ESI=0x2 EDI=0xd7ebc0 ESP=0xd7ea60 *ESP=0x77271d93 EBP=0xd7ea70\nBreak at 0x0041E872 in 8f36d84fda591c291957.exe (RVA 0x1e872, thread 8200, Stack 0x00D71000-0x00D80000, ImageBase 0x00400000)\n0x0041E872  8DB0A00A0000             LEA       ESI, [EAX+0xaa0]              \nActionDispatcher: skipping instruction.\n0x0041E878  56                       PUSH      ESI                           \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to insufficient specificity in pattern selection. By analyzing the trace, I identified three distinct sequences critical to the sample's execution flow: the call to `RtlAllocateHeap` and `RtlFreeHeap` (both using `FFD2` but with different surrounding instructions), and a unique `LEA` instruction with a specific displacement. These patterns are highly specific to the sample, reducing the likelihood of false positives while ensuring they target the evasion logic.\n\n---\n\n**PATTERN_TYPE**: CALL_TEST_JE  \n**CONFIDENCE**: 95  \n\n**REASONING**: The first pattern targets the `RtlAllocateHeap` call, which is part of the memory allocation logic. The second pattern focuses on `RtlFreeHeap`, which is likely part of the cleanup or evasion mechanism. The third pattern is a unique `LEA` instruction with a displacement, which is specific to the sample and may indicate code obfuscation or indirect jumps. These patterns are tightly coupled to the sample's behavior, ensuring high accuracy.\n\n---\n\n**YARA_RULE**:  \n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 50 51 FFD2 5E 5D C3 }  // Call to RtlAllocateHeap with surrounding instructions\n        $pattern1 = { 52 50 FFD2 5E 5F C3 }  // Call to RtlFreeHeap with surrounding instructions\n        $pattern2 = { 8DB0A00A0000 }         // Unique LEA instruction with displacement\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\8f36d84fda591c29\\iter1_v3.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v3",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 50 51 FF D2 5E 5D C3 }  // Call to RtlAllocateHeap with surrounding instructions\n        $pattern1 = { 52 50 FF D2 5E 5F C3 }  // Call to RtlFreeHeap with surrounding instructions\n        $pattern2 = { 8D B0 A0 0A 00 00 }         // Unique LEA instruction with displacement\n\n    condition:\n        any of them\n}",
+    "pattern_type": "CALL_TEST_JE",
+    "confidence": 95,
+    "opcodes": "",
+    "task_id": "1608",
+    "status": "bypass_crashed",
+    "rule_hit": true,
+    "baseline_signatures": 21,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "terminates_remote_process"
+    ],
+    "new_signature_details": [
+      {
+        "name": "terminates_remote_process",
+        "description": "Terminates another process",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 8996,
+            "cid": 7549
+          },
+          {
+            "process": "8f36d84fda591c291957.exe"
+          },
+          {
+            "type": "call",
+            "pid": 8996,
+            "cid": 7565
+          },
+          {
+            "process": "8f36d84fda591c291957.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": "Rule caused crash: ['exec_crash']",
+    "improvement_suggestions": [],
+    "debugger_log": "=== 7052.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 10:30:54 2025\nBreakpoint 2 hit by instruction at 0x0041E872 (thread 8200) EAX=0xd7ebc0 ECX=0x77271d93 EDX=0x6b92e5d0 DVPfxQ.dll ESI=0x2 EDI=0xd7ebc0 ESP=0xd7ea60 *ESP=0x77271d93 EBP=0xd7ea70\nBreak at 0x0041E872 in 8f36d84fda591c291957.exe (RVA 0x1e872, thread 8200, Stack 0x00D71000-0x00D80000, ImageBase 0x00400000)\n0x0041E872  8DB0A00A0000             LEA       ESI, [EAX+0xaa0]              \nActionDispatcher: skipping instruction.\n0x0041E878  56                       PUSH      ESI                           \n",
+    "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to insufficient specificity in pattern selection. By analyzing the trace, I identified three distinct sequences critical to the sample's execution flow: the call to `RtlAllocateHeap` and `RtlFreeHeap` (both using `FFD2` but with different surrounding instructions), and a unique `LEA` instruction with a specific displacement. These patterns are highly specific to the sample, reducing the likelihood of false positives while ensuring they target the evasion logic.\n\n---\n\n**PATTERN_TYPE**: CALL_TEST_JE  \n**CONFIDENCE**: 95  \n\n**REASONING**: The first pattern targets the `RtlAllocateHeap` call, which is part of the memory allocation logic. The second pattern focuses on `RtlFreeHeap`, which is likely part of the cleanup or evasion mechanism. The third pattern is a unique `LEA` instruction with a displacement, which is specific to the sample and may indicate code obfuscation or indirect jumps. These patterns are tightly coupled to the sample's behavior, ensuring high accuracy.\n\n---\n\n**YARA_RULE**:  \n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 50 51 FFD2 5E 5D C3 }  // Call to RtlAllocateHeap with surrounding instructions\n        $pattern1 = { 52 50 FFD2 5E 5F C3 }  // Call to RtlFreeHeap with surrounding instructions\n        $pattern2 = { 8DB0A00A0000 }         // Unique LEA instruction with displacement\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\8f36d84fda591c29\\iter1_v3.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 2: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

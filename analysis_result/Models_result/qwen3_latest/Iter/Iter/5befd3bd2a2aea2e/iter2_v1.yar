@@ -1,0 +1,13 @@
+rule SampleRule
+{
+    meta:
+        cape_options = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }
+
+    strings:
+        $a = { 55 8B EC FF 75 08 }
+        $b = { E8 ?? ?? ?? ?? 59 }
+        $c = { FF 75 08 FF 15 ?? ?? ?? ?? }
+
+    condition:
+        all of them
+}

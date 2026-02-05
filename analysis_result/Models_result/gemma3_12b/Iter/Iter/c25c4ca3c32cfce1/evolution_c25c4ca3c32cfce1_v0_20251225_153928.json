@@ -1,0 +1,135 @@
+{
+  "sha256": "c25c4ca3c32cfce10924b13da6d881c9cff7b81275d125b85ce96ec20c0200a3",
+  "prompt_version": "v0",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A 35 6A 00 6A 00 51 50 E8 74 0A 00 00 }\n        $pattern1 = { 8B 55 14 8B 45 10 8B 4D 0C 83 C4 14 }\n        $pattern2 = { 0C 8B 8B 06 83 C4 14 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "2132",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Instead of skipping `8B5514`, target a different, less critical instruction within the same code block.  A safer approach would be to target the `MOV EDX, [EBP+0x14]` instruction"
+      ],
+      "debugger_log": "=== 1992.log ===\nCAPE Sandbox - Debugger log: Fri Dec 26 04:55:40 2025\nBreakpoint 1 hit by instruction at 0x0041E336 (thread 1792) EAX=0x76929bb0 LookupPrivilegeValueW  EBX=0x1afcc8 ECX=0x76d11737 crypt32.dll EDX=0x4431737 ESI=0x1afb94 EDI=0x776e2ed0 NtProtectVirtualMemory  ESP=0x1aee2c *ESP=0x1aeee4 EBP=0x1aee44\nBreak at 0x0041E336 in regsvcs.exe (RVA 0x1e336, thread 1792, Stack 0x001A2000-0x001B0000, ImageBase 0x00400000)\n0x0041E336  8B5514                   MOV       EDX, [EBP+0x14]               \nActionDispatcher: skipping instruction.\n0x0041E339  8B4510                   MOV       EAX, [EBP+0x10]               \n",
+      "raw_response": "Okay, let's analyze the trace and craft a YARA rule with the specified constraints. I'll focus on areas that seem suspicious for evasion, specifically those involving indirect calls, register manipulation, and potential anti-debugging techniques.\n\nHere's the YARA rule:\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A 35 6A 00 6A 00 51 50 E8 74 0A 00 00 }\n        $pattern1 = { 8B 55 14 8B 45 10 8B 4D 0C 83 C4 14 }\n        $pattern2 = { 0C 8B 8B 06 6 ? ? 83 C4 14 }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation of Pattern Choices:**\n\n*   **$pattern0:** `6A 35 6A 00 6A 00 51 50 E8 74 0A 00 00` (15 bytes)\n    *   This pattern targets the series of `push` instructions (35h, 00h, 00h) followed by `push ecx`, `push eax` and then a `call`. This is a common pattern for setting up function arguments and calling another function. The `E8 74 0A 00 00` is a relative jump which is likely a call to a function within the same module.  This area is likely to be modified by an evasion technique.\n*   **$pattern1:** `8B 55 14 8B 45 10 8B 4D 0C 83 C4 14` (16 bytes)\n    *   This pattern captures a sequence of `mov` instructions, which are likely accessing data from the stack or memory.  The `83 C4 14` is adding 14h to the stack pointer. This could be a cleanup operation after a function call.  Evasion techniques might try to manipulate these instructions to alter data or control flow.\n*   **$pattern2:** `0C 8B 8B 06 6 ? ? 83 C4 14` (11 bytes)\n    *   This pattern captures the `or al, 8Bh` instruction, followed by `mov eax, dword ptr [esi]` and a `add esp, 14h`. The `??` represents unknown bytes. This section seems to be related to modifying a register (AL) and potentially interacting with a pointer (ESI). Evasion techniques could target this to alter program state.\n\n**Why these patterns meet the requirements:**\n\n*   **Length:** Each pattern is between 6 and 20 bytes.\n*   **Different Sequences:** The hex sequences are distinct.\n*   **Wildcards:**  The `??` are used where necessary to represent addresses/offsets.\n*   **Concrete Bytes:**  Opcode bytes and register-encoding bytes are kept concrete.\n*   **Trace Data:**  All patterns are extracted directly from the provided trace data.\n*   **Format:** The YARA rule is correctly formatted.\n\n**Important Considerations:**\n\n*   **Effectiveness:**  The effectiveness of this rule will depend on the specific evasion technique used by the malware.\n*   **False Positives:**  There's always a risk of false positives.  More sophisticated analysis and testing would be needed to refine the rule and minimize false positives.\n*   **Dynamic Analysis:**  This rule is based on static analysis of the trace. Dynamic analysis (running the malware in a controlled environment) would provide more insights.\n*   **CAPE Options:** The cape_options are set up to skip these patterns, effectively bypassing them. This is useful for testing and debugging.\n",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\c25c4ca3c32cfce1\\iter0_v0.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 16 50 51 FF D2 5E 5D C3 }\n        $pattern1 = { E8 74 0A 00 00 8B 55 14 8B 45 10 8B 4D 0C 83 C4 14 }\n        $pattern2 = { 6A 35 6A 00 51 50 E8 74 0A 00 00 8B 55 0C 0C 8B }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "2133",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "new_signature_details": [
+        {
+          "name": "terminates_remote_process",
+          "description": "Terminates another process",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 3424,
+              "cid": 3959
+            },
+            {
+              "process": "c25c4ca3c32cfce10924.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B16 50 51 FF D2 5E 5D C3 }\n        $pattern1 = { E8 74 0A 00 00 8B 55 14 8B 45 10 8B 4D 0C 83 C4 14 }\n        $pattern2 = { 6A 35 6A 00 51 50 E8 74 0A 00 00 8B 55 0C 0C 8B }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\c25c4ca3c32cfce1\\iter1_v0.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v0",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 16 50 51 FF D2 5E 5D C3 }\n        $pattern1 = { E8 74 0A 00 00 8B 55 14 8B 45 10 8B 4D 0C 83 C4 14 }\n        $pattern2 = { 6A 35 6A 00 51 50 E8 74 0A 00 00 8B 55 0C 0C 8B }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "2133",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 16,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "terminates_remote_process"
+    ],
+    "new_signature_details": [
+      {
+        "name": "terminates_remote_process",
+        "description": "Terminates another process",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 3424,
+            "cid": 3959
+          },
+          {
+            "process": "c25c4ca3c32cfce10924.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B16 50 51 FF D2 5E 5D C3 }\n        $pattern1 = { E8 74 0A 00 00 8B 55 14 8B 45 10 8B 4D 0C 83 C4 14 }\n        $pattern2 = { 6A 35 6A 00 51 50 E8 74 0A 00 00 8B 55 0C 0C 8B }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\c25c4ca3c32cfce1\\iter1_v0.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 2: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    ""
+  ]
+}

@@ -1,0 +1,444 @@
+{
+  "sha256": "70f60b192056d200088fdcd3863de5c26b6e10e7e7b38ca71375a930d6645014",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To determine which instruction, if skipped, would prevent the call to the `ExitProcess` function at address `0041B90C`, we must trace the logical flow of the code and understand the conditions under which the `ExitProcess` function is invoked.\n\n---\n\n### **Code Flow Overview**\n\nThe code follows this general flow:\n\n1. **Initial Check (cmp eax, 0x01):**  \n   The function starts by comparing the value in `eax` with `0x01`. If they are equal, it jumps to a location labeled `0041B900`.\n\n2. **FS Pointer Check (test al, 0x01):**  \n   If the initial comparison fails, it proceeds to a second check involving the `fs` segment. This involves:\n   - Loading a value from the `fs:0x30` segment.\n   - Adding `0x68` to it.\n   - Shifting the result right by 8 bits (`shr eax, 8`).\n   - Testing the least significant bit of `al` (`test al, 0x01`).\n\n3. **Conditional Jump (jne 0041B900):**  \n   If the bit is set, it jumps to `0041B900`. If not, it continues.\n\n4. **Call to TerminateProcess:**  \n   If the bit is not set, it proceeds to call the `TerminateProcess` function (likely at address `0041B8FA`), which is part of the sandbox detection logic.\n\n5. **Call to ExitProcess (0041B90C):**  \n   After calling `TerminateProcess`, the code eventually reaches the instruction at `0041B90C`, which is the call to `ExitProcess`.\n\n---\n\n### **Understanding the Logic**\n\nThe `ExitProcess` call at `0041B90C` is **only executed** if the earlier `test al, 0x01` instruction is **not** satisfied (i.e., the bit is **not** set). This implies that the `ExitProcess` call is part of the **fallback** path when the sandbox detection logic concludes that the environment is **not** a sandbox.\n\nThus, the `ExitProcess` call is **dependent** on the result of the `test al, 0x01` instruction. If that instruction is **skipped**, the code would not proceed to the `ExitProcess` call.\n\n---\n\n### **Conclusion**\n\nTo prevent the call to `ExitProcess` at `0041B90C`, the instruction at `0041B8EC` (`test al, 0x01`) must be skipped. This is because the `ExitProcess` call is only executed **after** that instruction is processed and the bit is not set.\n\nTherefore, the correct instruction to skip is:\n\n$$\n\\boxed{0041B8EC}\n$$",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 F7 25 00 00 83 F8 01 74 20 } // Call+CMP+JE evasion check\n        $pattern1 = { FF 15 40 F1 42 00 } // TerminateProcess API check\n        $pattern2 = { FF 15 A0 F1 42 00 } // ExitProcess exit decision\n\n    condition:\n        all of them\n}",
+      "pattern_type": "CALL_TEST_JE | API_CHECK | EXIT_PROCESS",
+      "confidence": 85,
+      "opcodes": "",
+      "task_id": "1719",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 26,
+      "new_signatures": 2,
+      "new_signature_names": [
+        "antivm_generic_system",
+        "antivm_checks_available_memory"
+      ],
+      "new_signature_details": [
+        {
+          "name": "antivm_checks_available_memory",
+          "description": "Checks available memory",
+          "categories": [
+            "antivm"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 3764,
+              "cid": 19767
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "antivm_generic_system",
+          "description": "Checks the system manufacturer, likely for anti-virtualization",
+          "categories": [
+            "anti-vm"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [],
+          "new_data": [
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 3764
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 3764
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 3764
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 3764
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 3764
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 3764
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 3764
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 3764
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 3764
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 3764
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 3764
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 3764
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            }
+          ],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to incorrect pattern formation. I'm improving by targeting the evasion check (Strategy A) with the CMP+JE sequence, the API check (Strategy B) with the TerminateProcess call, and the exit decision (Strategy C) with the ExitProcess call. These patterns are concrete from the trace, ensuring specificity while allowing flexibility for variants.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | EXIT_PROCESS\n\n**CONFIDENCE**: 85\n\n**REASONING**: These patterns target critical evasion logic (CMP+JE), API checks (TerminateProcess), and the exit decision (ExitProcess). They are concrete from the trace and avoid wildcards where possible, reducing false positives while maintaining flexibility for variants. The first pattern targets the evasion check, the second the API check, and the third the exit decision.\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 F7 25 00 00 83 F8 01 74 20 } // Call+CMP+JE evasion check\n        $pattern1 = { FF 15 40 F1 42 00 } // TerminateProcess API check\n        $pattern2 = { FF 15 A0 F1 42 00 } // ExitProcess exit decision\n\n    condition:\n        all of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\70f60b192056d200\\iter1_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 F7 25 00 00 83 F8 01 74 20 } // Call+CMP+JE evasion check\n        $pattern1 = { FF 15 40 F1 42 00 } // TerminateProcess API check\n        $pattern2 = { FF 15 A0 F1 42 00 } // ExitProcess exit decision\n\n    condition:\n        all of them\n}",
+    "pattern_type": "CALL_TEST_JE | API_CHECK | EXIT_PROCESS",
+    "confidence": 85,
+    "opcodes": "",
+    "task_id": "1719",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 26,
+    "new_signatures": 2,
+    "new_signature_names": [
+      "antivm_generic_system",
+      "antivm_checks_available_memory"
+    ],
+    "new_signature_details": [
+      {
+        "name": "antivm_checks_available_memory",
+        "description": "Checks available memory",
+        "categories": [
+          "antivm"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 3764,
+            "cid": 19767
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "antivm_generic_system",
+        "description": "Checks the system manufacturer, likely for anti-virtualization",
+        "categories": [
+          "anti-vm"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [],
+        "new_data": [
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 3764
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 3764
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 3764
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 3764
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 3764
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 3764
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 3764
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 3764
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 3764
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 3764
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 3764
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 3764
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          }
+        ],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to incorrect pattern formation. I'm improving by targeting the evasion check (Strategy A) with the CMP+JE sequence, the API check (Strategy B) with the TerminateProcess call, and the exit decision (Strategy C) with the ExitProcess call. These patterns are concrete from the trace, ensuring specificity while allowing flexibility for variants.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | EXIT_PROCESS\n\n**CONFIDENCE**: 85\n\n**REASONING**: These patterns target critical evasion logic (CMP+JE), API checks (TerminateProcess), and the exit decision (ExitProcess). They are concrete from the trace and avoid wildcards where possible, reducing false positives while maintaining flexibility for variants. The first pattern targets the evasion check, the second the API check, and the third the exit decision.\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 F7 25 00 00 83 F8 01 74 20 } // Call+CMP+JE evasion check\n        $pattern1 = { FF 15 40 F1 42 00 } // TerminateProcess API check\n        $pattern2 = { FF 15 A0 F1 42 00 } // ExitProcess exit decision\n\n    condition:\n        all of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\70f60b192056d200\\iter1_v2.yar"
+  },
+  "best_score": 2,
+  "optimization_history": [
+    "Iteration 2: SUCCESS - 2 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

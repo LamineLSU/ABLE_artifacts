@@ -1,0 +1,133 @@
+{
+  "sha256": "e9b9ee1dc81aa5f6446ae52d861ae97fd211a3ccf58746e7154ce384457d3460",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Detects potential bypass patterns involving ExitProcess, ShellExecuteW, and CreateMutexA checks\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n        author = \"Security Researcher\"\n        date = \"2023-10-15\"\n        license = \"BSD (3-clause)\"\n\n    strings:\n        $pattern0 = { 0F 84 ?? ?? ?? ?? 6A 00 E8 ?? ?? ?? ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 F8 20 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { E8 ?? ?? ?? ?? 8B 0D ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1617",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 23,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Detects potential bypass patterns involving ExitProcess, ShellExecuteW, and CreateMutexA checks\"\n        author = \"Security Researcher\"\n        date = \"2023-10-15\"\n        license = \"BSD (3-clause)\"\n\n    strings:\n        $pattern0 = { 0F 84 ?? ?? ?? ?? 6A 00 E8 ?? ?? ?? ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 F8 20 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { E8 ?? ?? ?? ?? 8B 0D ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        all of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\e9b9ee1dc81aa5f6\\iter0_v2.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 3D 20 00 00 00 0F 82 ?? ?? ?? ?? }  // cmp eax, 20h + jnle\n        $pattern1 = { FF 15 34 73 45 00 }                  // ShellExecuteW call\n        $pattern2 = { FF 15 7C 72 45 00 }                  // ExitProcess call\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE | API_CHECK | CMP_SETZ",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "1618",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 23,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "new_signature_details": [
+        {
+          "name": "terminates_remote_process",
+          "description": "Terminates another process",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 9016,
+              "cid": 3317
+            },
+            {
+              "process": "Windows Data Start.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 7848.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 19:31:45 2025\nBreakpoint 2 hit by instruction at 0x0044177E (thread 5376) EBX=0x67d530de ECX=0x3 ESP=0xaff884 *ESP=0x3 EBP=0xaff888\nBreak at 0x0044177E in Windows Data Start.exe (RVA 0x4177e, thread 5376, Stack 0x00AF2000-0x00B00000, ImageBase 0x00400000)\n0x0044177E  FF157C724500             CALL      DWORD [0x45727c]              \nActionDispatcher: skipping instruction.\n0x00441784  CC                       INT 3                                   \n",
+      "raw_response": "**EVOLUTION_REASONING**: The initial pattern matched the wrong location, likely due to generic or overlapping byte sequences. To refine, I focused on three distinct evasion checks: 1) A conditional check before ExitProcess (cmp eax, 20h + jnle), 2) the ShellExecuteW API call, and 3) the ExitProcess API call. These are critical points in the execution flow where evasion logic is likely implemented. Using exact bytes from the trace ensures specificity and avoids false positives.\n\n**PATTERN_TYPE**: [CALL_TEST_JE | API_CHECK | CMP_SETZ]  \n**CONFIDENCE**: 95  \n\n**REASONING**: The cmp eax, 20h + jnle sequence directly targets a conditional check for shell execution success. The ShellExecuteW and ExitProcess API calls are core to the sample's behavior, making them ideal for bypass detection. Specific byte sequences from the trace minimize false matches while ensuring coverage of evasion logic.\n\n**YARA_RULE**:  \n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 3D 20 00 00 00 0F 82 ?? ?? ?? ?? }  // cmp eax, 20h + jnle\n        $pattern1 = { FF 15 34 73 45 00 }                  // ShellExecuteW call\n        $pattern2 = { FF 15 7C 72 45 00 }                  // ExitProcess call\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\e9b9ee1dc81aa5f6\\iter1_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 3D 20 00 00 00 0F 82 ?? ?? ?? ?? }  // cmp eax, 20h + jnle\n        $pattern1 = { FF 15 34 73 45 00 }                  // ShellExecuteW call\n        $pattern2 = { FF 15 7C 72 45 00 }                  // ExitProcess call\n\n    condition:\n        any of them\n}",
+    "pattern_type": "CALL_TEST_JE | API_CHECK | CMP_SETZ",
+    "confidence": 95,
+    "opcodes": "",
+    "task_id": "1618",
+    "status": "bypass_crashed",
+    "rule_hit": true,
+    "baseline_signatures": 23,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "terminates_remote_process"
+    ],
+    "new_signature_details": [
+      {
+        "name": "terminates_remote_process",
+        "description": "Terminates another process",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 9016,
+            "cid": 3317
+          },
+          {
+            "process": "Windows Data Start.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": "Rule caused crash: ['exec_crash']",
+    "improvement_suggestions": [],
+    "debugger_log": "=== 7848.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 19:31:45 2025\nBreakpoint 2 hit by instruction at 0x0044177E (thread 5376) EBX=0x67d530de ECX=0x3 ESP=0xaff884 *ESP=0x3 EBP=0xaff888\nBreak at 0x0044177E in Windows Data Start.exe (RVA 0x4177e, thread 5376, Stack 0x00AF2000-0x00B00000, ImageBase 0x00400000)\n0x0044177E  FF157C724500             CALL      DWORD [0x45727c]              \nActionDispatcher: skipping instruction.\n0x00441784  CC                       INT 3                                   \n",
+    "raw_response": "**EVOLUTION_REASONING**: The initial pattern matched the wrong location, likely due to generic or overlapping byte sequences. To refine, I focused on three distinct evasion checks: 1) A conditional check before ExitProcess (cmp eax, 20h + jnle), 2) the ShellExecuteW API call, and 3) the ExitProcess API call. These are critical points in the execution flow where evasion logic is likely implemented. Using exact bytes from the trace ensures specificity and avoids false positives.\n\n**PATTERN_TYPE**: [CALL_TEST_JE | API_CHECK | CMP_SETZ]  \n**CONFIDENCE**: 95  \n\n**REASONING**: The cmp eax, 20h + jnle sequence directly targets a conditional check for shell execution success. The ShellExecuteW and ExitProcess API calls are core to the sample's behavior, making them ideal for bypass detection. Specific byte sequences from the trace minimize false matches while ensuring coverage of evasion logic.\n\n**YARA_RULE**:  \n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 3D 20 00 00 00 0F 82 ?? ?? ?? ?? }  // cmp eax, 20h + jnle\n        $pattern1 = { FF 15 34 73 45 00 }                  // ShellExecuteW call\n        $pattern2 = { FF 15 7C 72 45 00 }                  // ExitProcess call\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\e9b9ee1dc81aa5f6\\iter1_v2.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    ""
+  ]
+}

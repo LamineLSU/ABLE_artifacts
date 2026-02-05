@@ -1,0 +1,231 @@
+{
+  "sha256": "d3c518f1522f1b6533e369250db0828e2ddaa01625460b4113d20b7e624d3e19",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule TerminationFlow\n{\n    meta:\n        description = \"Detects code that leads to a process termination (e.g., ExitProcess)\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n        author = \"Security Researcher\"\n        date = \"2025-03-15\"\n        tags = [\"malware\", \"termination\", \"exitprocess\", \"control-flow\"]\n\n    strings:\n        // First test and jump (test eax, eax; je 0x0A)\n        $a = { 85 C0 74 0A } // test eax, eax; je 0x0A\n\n        // Second test and jump (test eax, eax; je 0x12)\n        $b = { 85 C0 74 12 } // test eax, eax; je 0x12\n\n        // Third test and jump (test eax, eax; je 0x05)\n        $c = { 85 C0 74 05 } // test eax, eax; je 0x05\n\n        // Call to ExitProcess (assuming it's at offset 0x20 from the start of the block)\n        $d = { E8 00 00 00 00 } // call 0x20\n\n    condition:\n        ( $a or $b or $c ) and $d\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1557",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To detect code that leads to an explicit `ExitProcess` call (or a similar termination routine), we can create a YARA rule that identifies the specific conditional jumps and test instructions that are typically used to control the flow of execution toward the termination point.\n\nHere's a **YARA rule** that matches the general pattern of such code, assuming the code includes the following structure:\n\n1. A `test eax, eax` instruction.\n2. A conditional `je` (jump if equal) instruction that leads to a different path.\n3. A sequence of similar test/jump instructions.\n4. A `call` to a termination function (e.g., `ExitProcess`).\n\nThis rule will match any code that contains the sequence of instructions that leads to the termination of a process, which is a common pattern in malware or malicious code.\n\n---\n\n### ✅ **YARA Rule: Detecting Code Leading to Termination**\n\n```yara\nrule TerminationFlow\n{\n    meta:\n        description = \"Detects code that leads to a process termination (e.g., ExitProcess)\"\n        author = \"Security Researcher\"\n        date = \"2025-03-15\"\n        tags = [\"malware\", \"termination\", \"exitprocess\", \"control-flow\"]\n\n    strings:\n        // First test and jump (test eax, eax; je 0x0A)\n        $a = { 85 C0 74 0A } // test eax, eax; je 0x0A\n\n        // Second test and jump (test eax, eax; je 0x12)\n        $b = { 85 C0 74 12 } // test eax, eax; je 0x12\n\n        // Third test and jump (test eax, eax; je 0x05)\n        $c = { 85 C0 74 05 } // test eax, eax; je 0x05\n\n        // Call to ExitProcess (assuming it's at offset 0x20 from the start of the block)\n        $d = { E8 00 00 00 00 } // call 0x20\n\n    condition:\n        ( $a or $b or $c ) and $d\n}\n```\n\n---\n\n### 🧠 **Explanation of the Rule**\n\n- **`test eax, eax`**:\n  - This is a common instruction used to check if the value in the `eax` register is zero.\n  - It sets the Zero Flag (ZF) in the EFLAGS register.\n\n- **`je` (Jump if Equal)**:\n  - This instruction jumps to a target address if the Zero Flag is set (i.e., if the result of the `test` was zero).\n  - The offset after `je` depends on the location of the target.\n\n- **`call` to `ExitProcess`**:\n  - The `call` instruction is used to invoke a function, such as `ExitProcess` in Windows or a similar termination routine in other OSes.\n  - The exact offset (`0x20`) is an example and can be adjusted based on the actual binary.\n\n---\n\n### 📌 **Usage Notes**\n\n- This rule assumes that the code is structured with conditional jumps and a termination call.\n- You can modify the offsets (`0x0A`, `0x12`, `0x05`, `0x20`) based on the actual disassembly of the target binary.\n- If you have the actual disassembly or hex dump, you can adjust the rule to match the exact opcodes.\n\n---\n\n### 📌 **Optional: Match Multiple Variants**\n\nIf you want to detect **multiple variations** of the same pattern (e.g., different offsets), you can add more strings like this:\n\n```yara\n        $e = { 85 C0 74 0F } // test eax, eax; je 0x0F\n        $f = { 85 C0 74 1A } // test eax, eax; je 0x1A\n```\n\nAnd update the `condition` accordingly.\n\n---\n\n### ✅ **Conclusion**\n\nThis YARA rule is a **pattern-based** detection mechanism that helps identify code flows that lead to the termination of a process. It is useful for malware analysis, reverse engineering, and forensic investigations. You can expand it further based on the actual code you're analyzing.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\d3c518f1522f1b65\\iter0_v2.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 53 E8 ?? ?? ?? ?? } // test, je, push, call (evasion check)\n        $pattern1 = { 85 C0 0F 84 33 FD FF FF } // test, je with offset (runtime validation)\n        $pattern2 = { FF 15 ?? ?? ?? ?? } // call to ExitProcess (termination trigger)\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE | API_CHECK | OTHER",
+      "confidence": 85,
+      "opcodes": "",
+      "task_id": "1558",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 2,
+      "new_signature_names": [
+        "queries_locale_api",
+        "queries_keyboard_layout"
+      ],
+      "new_signature_details": [
+        {
+          "name": "queries_keyboard_layout",
+          "description": "Queries the keyboard layout",
+          "categories": [
+            "location_discovery"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 3700,
+              "cid": 1456
+            },
+            {
+              "type": "call",
+              "pid": 3700,
+              "cid": 1480
+            },
+            {
+              "type": "call",
+              "pid": 3700,
+              "cid": 1514
+            },
+            {
+              "type": "call",
+              "pid": 3700,
+              "cid": 1632
+            },
+            {
+              "type": "call",
+              "pid": 3700,
+              "cid": 1635
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "queries_locale_api",
+          "description": "Queries the computer locale (possible geofencing)",
+          "categories": [
+            "location_discovery",
+            "geofence"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 3700,
+              "cid": 1247
+            },
+            {
+              "type": "call",
+              "pid": 3700,
+              "cid": 1414
+            },
+            {
+              "type": "call",
+              "pid": 3700,
+              "cid": 1644
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": "=== 3700.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 22:06:47 2025\nBreakpoint 2 hit by instruction at 0x040F7683 (thread 4716) EAX=0x1a EBX=0x2d ECX=0x42f1428 EDX=0x42f13d2 L\"kIQ13ZZ44.exe\" ESI=0x42f1378 L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP003.TMP\\kIQ13ZZ44.exe\" EDI=0x42f1420 ESP=0x19dfbc *ESP=0x1a EBP=0x19dfd4\n0x040F7683  FF15C45D2B04             CALL      DWORD [0x42b5dc4]             \nActionDispatcher: skipping instruction.\n0x040F7689  33D2                     XOR       EDX, EDX                      \nBreakpoint 2 hit by instruction at 0x040F7683 (thread 4716) EAX=0x5a ECX=0x42f14a4 EDX=0x42f1378 L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP003.TMP\\kIQ13ZZ44.exe\" ESI=0x42f1378 L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP003.TMP\\kIQ13ZZ44.exe\" EDI=0x42f149c ESP=0x19dfbc *ESP=0x5a EBP=0x19dfd4\n0x040F7683  FF15C45D2B04             CALL      DWORD [0x42b5dc4]             \nActionDispatcher: skipping instruction.\n0x040F7689  33D2                     XOR       EDX, EDX                      \nBreakpoint 2 hit by instruction at 0x040F7683 (thread 4716) EAX=0x96 EBX=0x21 ECX=0x42f59fc EDX=0x42f57ca L\"mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5...\" ESI=0x42f5788 L\"System.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Cult...\" EDI=0x42f59f4 ESP=0x19d2a0 *ESP=0x96 EBP=0x19d2b8\n0x040F7683  FF15C45D2B04             CALL      DWORD [0x42b5dc4]             \nActionDispatcher: skipping instruction.\n0x040F7689  33D2                     XOR       EDX, EDX                      \nBreakpoint 2 hit by instruction at 0x040F7683 (thread 4716) EAX=0x96 EBX=0x21 ECX=0x42f6414 EDX=0x42f61e2 L\"mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5...\" ESI=0x42f61a0 L\"System.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Cult...\" EDI=0x42f640c ESP=0x19cbd0 *ESP=0x96 EBP=0x19cbe8\n0x040F7683  FF15C45D2B04             CALL      DWORD [0x42b5dc4]             \nActionDispatcher: skipping instruction.\n0x040F7689  33D2                     XOR       EDX, EDX                      \n\n\n=== 5572.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 22:06:24 2025\nBreakpoint 2 hit by instruction at 0x00007FFA7F920D72 (thread 7788) RBX=0x45f2ca0 RCX=0x45f2ca0 RDX=0x45f2c80 RSI=0x45f2168 RDI=0x45f2c80 RSP=0xcfef90 \"(!_\" *RSP=0x45f2128 RBP=0xcff040 R8=0x2a220 R10=0x7ff4015b0018 R11=0x7ffa7f7f0038 R12=0xe39b40 R13=0xcff140 R14=0x45f2c08 \"@}\" R15=0x4 Xmm0.Low=0x45f2168 Xmm1.Low=0x45f2c48\n0x00007FFA7F920D72  FF15C0F2ECFF             CALL      QWORD [RIP-0x130d40]          \nActionDispatcher: skipping instruction.\n0x00007FFA7F920D78  90                       NOP                                     \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule matched but failed to find new signatures, likely due to overly generic patterns. By focusing on concrete sequences from the trace (e.g., test/jump pairs and call instructions), we increase specificity while targeting evasion logic. The three patterns capture distinct evasion checks and setup steps before termination, reducing false positives.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | OTHER\n\n**CONFIDENCE**: 85\n\n**REASONING**: The first pattern targets the initial test/jump sequence, which likely checks for debugger presence. The second pattern captures a later test/jump, possibly validating runtime conditions. The third pattern focuses on the call to `ExitProcess`, a common termination point, ensuring the rule avoids matching unrelated code. All patterns are derived directly from the trace, ensuring accuracy.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 53 E8 ?? ?? ?? ?? } // test, je, push, call (evasion check)\n        $pattern1 = { 85 C0 0F 84 33 FD FF FF } // test, je with offset (runtime validation)\n        $pattern2 = { FF 15 ?? ?? ?? ?? } // call to ExitProcess (termination trigger)\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\d3c518f1522f1b65\\iter1_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 53 E8 ?? ?? ?? ?? } // test, je, push, call (evasion check)\n        $pattern1 = { 85 C0 0F 84 33 FD FF FF } // test, je with offset (runtime validation)\n        $pattern2 = { FF 15 ?? ?? ?? ?? } // call to ExitProcess (termination trigger)\n\n    condition:\n        any of them\n}",
+    "pattern_type": "CALL_TEST_JE | API_CHECK | OTHER",
+    "confidence": 85,
+    "opcodes": "",
+    "task_id": "1558",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 16,
+    "new_signatures": 2,
+    "new_signature_names": [
+      "queries_locale_api",
+      "queries_keyboard_layout"
+    ],
+    "new_signature_details": [
+      {
+        "name": "queries_keyboard_layout",
+        "description": "Queries the keyboard layout",
+        "categories": [
+          "location_discovery"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 3700,
+            "cid": 1456
+          },
+          {
+            "type": "call",
+            "pid": 3700,
+            "cid": 1480
+          },
+          {
+            "type": "call",
+            "pid": 3700,
+            "cid": 1514
+          },
+          {
+            "type": "call",
+            "pid": 3700,
+            "cid": 1632
+          },
+          {
+            "type": "call",
+            "pid": 3700,
+            "cid": 1635
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "queries_locale_api",
+        "description": "Queries the computer locale (possible geofencing)",
+        "categories": [
+          "location_discovery",
+          "geofence"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 3700,
+            "cid": 1247
+          },
+          {
+            "type": "call",
+            "pid": 3700,
+            "cid": 1414
+          },
+          {
+            "type": "call",
+            "pid": 3700,
+            "cid": 1644
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": "=== 3700.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 22:06:47 2025\nBreakpoint 2 hit by instruction at 0x040F7683 (thread 4716) EAX=0x1a EBX=0x2d ECX=0x42f1428 EDX=0x42f13d2 L\"kIQ13ZZ44.exe\" ESI=0x42f1378 L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP003.TMP\\kIQ13ZZ44.exe\" EDI=0x42f1420 ESP=0x19dfbc *ESP=0x1a EBP=0x19dfd4\n0x040F7683  FF15C45D2B04             CALL      DWORD [0x42b5dc4]             \nActionDispatcher: skipping instruction.\n0x040F7689  33D2                     XOR       EDX, EDX                      \nBreakpoint 2 hit by instruction at 0x040F7683 (thread 4716) EAX=0x5a ECX=0x42f14a4 EDX=0x42f1378 L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP003.TMP\\kIQ13ZZ44.exe\" ESI=0x42f1378 L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP003.TMP\\kIQ13ZZ44.exe\" EDI=0x42f149c ESP=0x19dfbc *ESP=0x5a EBP=0x19dfd4\n0x040F7683  FF15C45D2B04             CALL      DWORD [0x42b5dc4]             \nActionDispatcher: skipping instruction.\n0x040F7689  33D2                     XOR       EDX, EDX                      \nBreakpoint 2 hit by instruction at 0x040F7683 (thread 4716) EAX=0x96 EBX=0x21 ECX=0x42f59fc EDX=0x42f57ca L\"mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5...\" ESI=0x42f5788 L\"System.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Cult...\" EDI=0x42f59f4 ESP=0x19d2a0 *ESP=0x96 EBP=0x19d2b8\n0x040F7683  FF15C45D2B04             CALL      DWORD [0x42b5dc4]             \nActionDispatcher: skipping instruction.\n0x040F7689  33D2                     XOR       EDX, EDX                      \nBreakpoint 2 hit by instruction at 0x040F7683 (thread 4716) EAX=0x96 EBX=0x21 ECX=0x42f6414 EDX=0x42f61e2 L\"mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5...\" ESI=0x42f61a0 L\"System.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Cult...\" EDI=0x42f640c ESP=0x19cbd0 *ESP=0x96 EBP=0x19cbe8\n0x040F7683  FF15C45D2B04             CALL      DWORD [0x42b5dc4]             \nActionDispatcher: skipping instruction.\n0x040F7689  33D2                     XOR       EDX, EDX                      \n\n\n=== 5572.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 22:06:24 2025\nBreakpoint 2 hit by instruction at 0x00007FFA7F920D72 (thread 7788) RBX=0x45f2ca0 RCX=0x45f2ca0 RDX=0x45f2c80 RSI=0x45f2168 RDI=0x45f2c80 RSP=0xcfef90 \"(!_\" *RSP=0x45f2128 RBP=0xcff040 R8=0x2a220 R10=0x7ff4015b0018 R11=0x7ffa7f7f0038 R12=0xe39b40 R13=0xcff140 R14=0x45f2c08 \"@}\" R15=0x4 Xmm0.Low=0x45f2168 Xmm1.Low=0x45f2c48\n0x00007FFA7F920D72  FF15C0F2ECFF             CALL      QWORD [RIP-0x130d40]          \nActionDispatcher: skipping instruction.\n0x00007FFA7F920D78  90                       NOP                                     \n",
+    "raw_response": "**EVOLUTION_REASONING**: The previous rule matched but failed to find new signatures, likely due to overly generic patterns. By focusing on concrete sequences from the trace (e.g., test/jump pairs and call instructions), we increase specificity while targeting evasion logic. The three patterns capture distinct evasion checks and setup steps before termination, reducing false positives.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | OTHER\n\n**CONFIDENCE**: 85\n\n**REASONING**: The first pattern targets the initial test/jump sequence, which likely checks for debugger presence. The second pattern captures a later test/jump, possibly validating runtime conditions. The third pattern focuses on the call to `ExitProcess`, a common termination point, ensuring the rule avoids matching unrelated code. All patterns are derived directly from the trace, ensuring accuracy.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 53 E8 ?? ?? ?? ?? } // test, je, push, call (evasion check)\n        $pattern1 = { 85 C0 0F 84 33 FD FF FF } // test, je with offset (runtime validation)\n        $pattern2 = { FF 15 ?? ?? ?? ?? } // call to ExitProcess (termination trigger)\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\d3c518f1522f1b65\\iter1_v2.yar"
+  },
+  "best_score": 2,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: SUCCESS - 2 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    ""
+  ]
+}

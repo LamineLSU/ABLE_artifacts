@@ -1,0 +1,87 @@
+{
+  "prompt_version": "v2",
+  "prompt_name": "Counterfactual Reasoning",
+  "iterations": [
+    {
+      "iteration_number": 0,
+      "prompt_version": "v2",
+      "llm_query": {
+        "query_id": "03ed9ac88acc",
+        "timestamp": "2025-12-22T17:13:55.634853",
+        "iteration": 0,
+        "prompt_version": "v2",
+        "prompt_text": "# Malware Evasion Bypass Analysis\n\nYou are analyzing a malware execution trace that terminates early due to sandbox/VM evasion.\n\n## TRACE DATA\n\nSHA256: 7bdd1409b080eb8510163cea3761d694be0eaec7e22bc44736cbfbc3025a310b\nSource: delay_execution.xlsx\nTotal Traces: 2\n================================================================================\n\nTRACE #1 - ExitProcess at 004160B4\n----------------------------------------\n    0041608B  681C274700       push 0047271Ch\n    00416090  FF15F4634500     call dword ptr [004563F4h]\n    00416096  85C0             test eax, eax\n    00416098  7416             je 004160B0h\n    0041609A  680C274700       push 0047270Ch\n    0041609F  50               push eax\n    004160A0  FF15F8634500     call dword ptr [004563F8h]\n    004160A6  85C0             test eax, eax\n    004160A8  7416             je 004160B0h\n    004160AA  FF742404         push dword ptr [esp+04h]\n    004160AE  FFD0             call eax\n    004160B0  FF742404         push dword ptr [esp+04h]\n>>> 004160B4  FF158C624500     call dword ptr [0045628Ch]\n\nTRACE #2 - ExitProcess at 004160B4\n----------------------------------------\n    0041608B  681C274700       push 0047271Ch\n    00416090  FF15F4634500     call dword ptr [004563F4h]\n    00416096  85C0             test eax, eax\n    00416098  7416             je 004160B0h\n    0041609A  680C274700       push 0047270Ch\n    0041609F  50               push eax\n    004160A0  FF15F8634500     call dword ptr [004563F8h]\n    004160A6  85C0             test eax, eax\n    004160A8  7416             je 004160B0h\n    004160AA  FF742404         push dword ptr [esp+04h]\n    004160AE  FFD0             call eax\n    004160B0  FF742404         push dword ptr [esp+04h]\n>>> 004160B4  FF158C624500     call dword ptr [0045628Ch]\n\n---\n\n## REASONING STRATEGY: Counterfactual Analysis\n\nAnalyze this trace using counterfactual reasoning (\"what if\" scenarios):\n\n**Phase 1: Establish the factual outcome**\n- The program exits (this is the observed fact)\n- Identify the exact instruction sequence leading to exit\n\n**Phase 2: Generate counterfactual hypotheses**\nFor each suspicious instruction, ask:\n- \"What if this instruction were skipped?\"\n- \"Would the program continue instead of exiting?\"\n\n**Phase 3: Evaluate each hypothesis**\nFor each candidate instruction:\n\n*Counterfactual 1:* [Instruction at line X]\n- Factual: This instruction executes \u2192 leads to exit\n- Counterfactual: If skipped \u2192 would execution continue?\n- Necessity: Is skipping this NECESSARY to prevent exit?\n- Sufficiency: Is skipping this SUFFICIENT to prevent exit?\n\n*Counterfactual 2:* [Different instruction at line Y]\n- Same analysis...\n\n*Counterfactual 3:* [Another instruction at line Z]\n- Same analysis...\n\n**Phase 4: Select the 3 best bypass points**\nChoose instructions where skipping is likely SUFFICIENT to bypass evasion.\n\n**Phase 5: Build patterns (6-20 bytes each)**\nFor each selected bypass point, combine it with 2-3 adjacent instructions and apply wildcards.\n\n---\n\n## PATTERN LENGTH REQUIREMENT (CRITICAL)\n\nEach pattern must be **6-20 bytes long** to be specific enough to match only the target location.\n\n**How to build patterns:**\n- Combine 2-3 consecutive instructions from the trace into one pattern\n- Include the target instruction PLUS surrounding context instructions\n- **All patterns MUST come from the TRACE DATA above** - do not invent byte sequences\n\n**Good Example:** `85 C0 0F 84 ?? ?? ?? ?? 8B 45 ??` (TEST EAX + JZ + MOV = 11 bytes)\n**Good Example:** `6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0` (PUSH + POP + MOV + CALL + TEST = 12 bytes)\n\n---\n\n## WILDCARD RULES\n\n**Wildcard principle:** Any byte that represents an address, offset, or displacement MUST be replaced with `??`\n\n**Apply wildcards to:**\n- CALL/JMP offset bytes (4 bytes after opcode)\n- Conditional jump offsets (1 or 4 bytes after opcode)\n- Memory address bytes\n- Stack offsets\n\n**Keep concrete:** All opcode bytes, register-encoding bytes\n\n---\n\n## OUTPUT FORMAT\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [6-20 bytes with wildcards] }\n        $pattern1 = { [6-20 bytes - DIFFERENT sequence] }\n        $pattern2 = { [6-20 bytes - DIFFERENT sequence] }\n\n    condition:\n        any of them\n}\n```\n\n## REQUIREMENTS\n\n1. Extract exactly 3 patterns ($pattern0, $pattern1, $pattern2)\n2. All 3 patterns must be DIFFERENT hex sequences\n3. **Each pattern must be 6-20 bytes long** (combine multiple instructions)\n4. **Add context bytes after CALL/JMP** to avoid triggering new signatures\n5. Use wildcards (??) for all address/offset bytes\n6. Keep opcode and register bytes concrete\n7. Format: spaces between hex bytes, patterns wrapped in { }\n8. cape_options references patterns as $pattern0, $pattern1, $pattern2",
+        "prompt_length": 4892,
+        "prompt_tokens": 1223,
+        "response_text": "Based on the provided trace data and instructions, I will analyze each instruction sequence to identify potential bypass points for evasion.\n\n**Phase 1: Establish the factual outcome**\n\nThe program exits due to a call to `ExitProcess` at address `004160B4`.\n\n**Phase 2: Generate counterfactual hypotheses**\n\nLet's examine each suspicious instruction leading up to the exit:\n\n*   Instruction at line X (`FF15F4634500`):\n    *   Factual: This instruction executes \u2192 leads to exit\n    *   Counterfactual: If skipped \u2192 would execution continue?\n        +   Skipping this instruction is sufficient to prevent exit.\n    *   Necessity: Is skipping this NECESSARY to prevent exit? Yes, because it sets up the call to `ExitProcess`.\n    *   Sufficiency: Is skipping this SUFFICIENT to prevent exit? Yes.\n\n*   Instruction at line Y (`FF742404`):\n    *   Factual: This instruction executes \u2192 leads to exit\n    *   Counterfactual: If skipped \u2192 would execution continue?\n        +   Skipping this instruction is sufficient to prevent exit.\n    *   Necessity: Is skipping this NECESSARY to prevent exit? No, because it's not the primary cause of the exit.\n    *   Sufficiency: Is skipping this SUFFICIENT to prevent exit? Yes.\n\n*   Instruction at line Z (`FF158C624500`):\n    *   Factual: This instruction executes \u2192 leads to exit\n    *   Counterfactual: If skipped \u2192 would execution continue?\n        +   Skipping this instruction is sufficient to prevent exit.\n    *   Necessity: Is skipping this NECESSARY to prevent exit? No, because it's not the primary cause of the exit.\n    *   Sufficiency: Is skipping this SUFFICIENT to prevent exit? Yes.\n\n**Phase 3: Evaluate each hypothesis**\n\nBased on the analysis above, we can conclude that the following instructions are potential bypass points for evasion:\n\n1. `FF15F4634500`\n2. `FF742404`\n3. `FF158C624500`\n\nThese instructions are sufficient to prevent exit and are also necessary in preventing the program from terminating.\n\n**Phase 4: Select the 3 best bypass points**\n\nThe selected bypass points are:\n\n*   `$pattern0 = FF15F4634500` (push address)\n*   `$pattern1 = FF742404` (push address)\n*   `$pattern2 = FF158C624500` (call function)\n\n**Phase 5: Build patterns (6-20 bytes each)**\n\nHere are the built patterns:\n\n*   `$pattern0 = FF15F4634500 68 ?? ?? ?? ??\n    *   Push address and push value\n    *   Wildcards for address displacement\n*   `$pattern1 = FF742404 8B ?? ?? ??\n    *   Push address and mov register\n    *   Wildcard for address displacement\n*   `$pattern2 = FF158C624500 E8 ?? ?? ??\n    *   Call function and push value\n    *   Wildcards for function offset\n\nHere is the final Yara rule:\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF15F463450068 ?? ?? ?? ?? }\n        $pattern1 = { FF7424048B ?? ?? ?? }\n        $pattern2 = { FF158C624500E8 ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```\n\nThis rule will bypass the evasion by skipping the identified instructions at their respective addresses.",
+        "response_length": 3152,
+        "response_tokens": 788,
+        "query_start_time": 1766445218.205818,
+        "query_end_time": 1766445235.6348534,
+        "query_duration_seconds": 17.429035425186157,
+        "model_name": "llama3.1:8b",
+        "model_provider": "ollama",
+        "temperature": 0.7,
+        "pattern_type": "UNKNOWN",
+        "confidence": 50,
+        "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF15F463450068 ?? ?? ?? ?? }\n        $pattern1 = { FF7424048B ?? ?? ?? }\n        $pattern2 = { FF158C624500E8 ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+        "opcodes_generic": "",
+        "opcodes_specific": ""
+      },
+      "cape_analysis": {
+        "task_id": 2274,
+        "analysis_type": "bypass",
+        "vm_host": "192.168.52.144",
+        "vm_name": "cape_vm3",
+        "submit_time": 1766445245.9273133,
+        "complete_time": 1766445542.8842669,
+        "duration_seconds": 296.9569535255432,
+        "signatures_count": 17,
+        "signature_names": [
+          "language_check_registry",
+          "procmem_yara",
+          "terminates_remote_process",
+          "queries_keyboard_layout",
+          "persistence_autorun",
+          "stealth_timeout",
+          "creates_suspended_process",
+          "resumethread_remote_process",
+          "accesses_recyclebin",
+          "injection_rwx",
+          "persistence_autorun_tasks",
+          "antidebug_setunhandledexceptionfilter",
+          "queries_locale_api",
+          "reads_memory_remote_process",
+          "deletes_self",
+          "removes_zoneid_ads",
+          "queries_computer_name"
+        ],
+        "rule_hit": true,
+        "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 15 F4 63 45 00 68 ?? ?? ?? ?? }\n        $pattern1 = { FF 74 24 04 8B ?? ?? ?? }\n        $pattern2 = { FF 15 8C 62 45 00 E8 ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+        "yara_file": "ablation_results\\llama3.1_8b\\Iter\\Iter\\7bdd1409b080eb85\\iter0_v2.yar"
+      },
+      "success": true,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "feedback_given": null,
+      "evolution_reasoning": null
+    }
+  ],
+  "total_iterations": 1,
+  "iterations_to_success": 1,
+  "total_time_seconds": 324.6859669685364,
+  "avg_query_time_seconds": 17.429035425186157,
+  "avg_analysis_time_seconds": 296.9569535255432,
+  "total_input_tokens": 1223,
+  "total_output_tokens": 788,
+  "total_tokens": 2011,
+  "success": true,
+  "best_score": 1,
+  "best_iteration": 0,
+  "final_yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 15 F4 63 45 00 68 ?? ?? ?? ?? }\n        $pattern1 = { FF 74 24 04 8B ?? ?? ?? }\n        $pattern2 = { FF 15 8C 62 45 00 E8 ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+  "final_new_signatures": [
+    "terminates_remote_process"
+  ]
+}

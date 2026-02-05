@@ -1,0 +1,579 @@
+{
+  "sha256": "e0502d39c8e63b66265eefe36bae775d0178a4f897958164cf97276ff2b2b745",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 8B F0 } // Call to 00419136h + mov esi, eax\n        $pattern1 = { E8 ?? ?? ?? ?? 56 }    // Call to 0040684Dh + push esi\n        $pattern2 = { 56 FF 15 ?? ?? ?? ?? } // push esi + call ExitProcess\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1549",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 31,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Adjust the skip offset to align with the actual `ExitProcess` call address in the sandboxed environment. Verify the opcode sequence matches the target binary's runtime behavior."
+      ],
+      "debugger_log": "=== 1524.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 14:21:49 2025\nBreakpoint 0 hit by instruction at 0x06446D0D (thread 6628) EAX=0x6681348 \"L<E\" EBX=0x6681254 ECX=0x6454ba4 EDX=0x1 ESI=0x6681348 \"L<E\" EDI=0x1 ESP=0xb8f1ec \"H\u0013h\" *ESP=0x6681348 \"L<E\" EBP=0xb8f218\n0x06446D0D  E8B6C3BEFF               CALL      0xffbec3bb                    \nActionDispatcher: skipping instruction.\n0x06446D12  8BF0                     MOV       ESI, EAX                      \n\n\n=== 60.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 14:20:38 2025\nBreakpoint 0 hit by instruction at 0x07FF6D0D (thread 8948) EAX=0x5b81254 \"L<\" ECX=0x8004ba4 EDX=0x1 ESI=0x5b81254 \"L<\" ESP=0x11df1dc \"T\u0012\" *ESP=0x5b81254 \"L<\" EBP=0x11df208\n0x07FF6D0D  E8B6C32CFB               CALL      0xfb2cc3bb                    \nActionDispatcher: skipping instruction.\n0x07FF6D12  8BF0                     MOV       ESI, EAX                      \n\n\n=== 6880.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 14:21:52 2025\nBreakpoint 0 hit by instruction at 0x00580160 (thread 5052) EBX=0x25c ECX=0x1b761b38 EDX=0x4630000 EDI=0x63c ESP=0x4dc7f4 *ESP=0x63c EBP=0x4dc7fc\nBreak at 0x00580160 in schtasks.exe (RVA 0x20160, thread 5052, Stack 0x004CF000-0x004E0000, ImageBase 0x00560000)\n0x00580160  E833050000               CALL      0x538                         \nActionDispatcher: skipping instruction.\n0x00580165  8BF0                     MOV       ESI, EAX                      \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 8B F0 } // Call to 00419136h + mov esi, eax\n        $pattern1 = { E8 ?? ?? ?? ?? 56 }    // Call to 0040684Dh + push esi\n        $pattern2 = { 56 FF 15 ?? ?? ?? ?? } // push esi + call ExitProcess\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\e0502d39c8e63b66\\iter0_v3.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To effectively bypass detection and align with the observed behavior of the binary, we should focus on **targeting the initial API calls** that precede the `ExitProcess` call, rather than the exit itself. This strategy aligns with **Strategy A (evasion check in the first 30% of the trace)** and avoids the pitfalls of the previous rule that matched the exit call directly.\n\n---\n\n### 🧠 **Key Observations from the Trace**\n1. The binary calls several kernel32 APIs early in execution:\n   - `GetCommandLineA` at `004067A5` (`FF 15 BC A0 41 00`)\n   - `GetStartupInfoA` at `004067B3` (`FF 15 C0 A0 41 00`)\n   - `GetModuleHandleA` at `004067CF` (`FF 15 44 A2 41 00`)\n2. The `ExitProcess` call is at `004067E4` (`FF 15 28 A2 41 00`), but this is likely the **final step**, not the evasion check.\n3. The call to `0040684Dh` (before `ExitProcess`) is likely where the **evasion check** occurs.\n\n---\n\n### 🛠️ **Proposed Patterns**\nHere are **three distinct patterns** from the initial API calls, which are more likely to evade detection and align with the evasion logic:\n\n1. **Call to `GetCommandLineA`**  \n   ```assembly\n   FF 15 BC A0 41 00\n   ```\n   - This is a **call to `GetCommandLineA`**, which is a standard API used to retrieve command-line arguments. Targeting this ensures the rule avoids the exit call and focuses on earlier execution.\n\n2. **Call to `GetStartupInfoA`**  \n   ```assembly\n   FF 15 C0 A0 41 00\n   ```\n   - This is a **call to `GetStartupInfoA`**, which is used to initialize a structure for startup information. This is part of the initial setup and less likely to be flagged as an evasion check.\n\n3. **Call to `GetModuleHandleA`**  \n   ```assembly\n   FF 15 44 A2 41 00\n   ```\n   - This is a **call to `GetModuleHandleA`**, which retrieves the handle to the current module. Again, this is part of the initial setup and not directly related to the exit logic.\n\n---\n\n### 🧩 **Why These Patterns Work**\n- **Avoids the Exit Call**: By focusing on earlier API calls, the rule avoids the exit logic, which may be heavily monitored.\n- **Targets Evasion Logic**: The actual evasion logic may be embedded in the code that follows these API calls (e.g., the `0040684Dh` call). These patterns provide a **flexible base** for detecting the initial setup.\n- **Matches the First 30% of the Trace**: These calls occur early in the binary, aligning with **Strategy A** and making the rule more robust.\n\n---\n\n### 🧾 **Final Rule**\n```yaml\nrules:\n  - name: \"Early API Call Evasion\"\n    description: \"Detects early API calls that may be part of an evasion check.\"\n    patterns:\n      - FF 15 BC A0 41 00\n      - FF 15 C0 A0 41 00\n      - FF 15 44 A2 41 00\n    confidence: 0.85\n```\n\n---\n\n### ✅ **Outcome**\nBy targeting these **early API calls**, the rule avoids the exit logic and aligns with the evasion check logic, which is more likely to be hidden in the code that follows these calls. This approach should yield **new signatures** and improve detection accuracy.",
+      "yara_file": null
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v3",
+      "yara_rule": "rule ProcessInitializationCheck\n{\n    meta:\n        description = \"Detects a process initialization sequence leading to ExitProcess\"\n        cape_options = \"bp0=$getcmdline+0,action0=skip,bp1=$getstartup+0,action1=skip,bp2=$exitprocess+0,action2=skip,count=0\"\n        author = \"Your Name\"\n\n    strings:\n        $getcmdline = { FF 15 BC A0 41 00 }\n        $getstartup = { FF 15 C0 A0 41 00 }\n        $exitprocess = { FF 15 28 A2 41 00 }\n\n    condition:\n        all of ($getcmdline, $getstartup, $exitprocess)\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1550",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 31,
+      "new_signatures": 3,
+      "new_signature_names": [
+        "infostealer_browser",
+        "antivm_generic_system",
+        "terminates_remote_process"
+      ],
+      "new_signature_details": [
+        {
+          "name": "terminates_remote_process",
+          "description": "Terminates another process",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 776,
+              "cid": 179
+            },
+            {
+              "process": "svchost.exe"
+            },
+            {
+              "type": "call",
+              "pid": 776,
+              "cid": 410
+            },
+            {
+              "process": "svchost.exe"
+            },
+            {
+              "type": "call",
+              "pid": 776,
+              "cid": 476
+            },
+            {
+              "process": "svchost.exe"
+            },
+            {
+              "type": "call",
+              "pid": 776,
+              "cid": 543
+            },
+            {
+              "process": "svchost.exe"
+            },
+            {
+              "type": "call",
+              "pid": 1056,
+              "cid": 16
+            },
+            {
+              "process": "svchost.exe"
+            },
+            {
+              "type": "call",
+              "pid": 1056,
+              "cid": 17
+            },
+            {
+              "process": "svchost.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "antivm_generic_system",
+          "description": "Checks the system manufacturer, likely for anti-virtualization",
+          "categories": [
+            "anti-vm"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [],
+          "new_data": [
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 4788
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 4788
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 4788
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 4788
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 4788
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 4788
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 4788
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 4788
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 4788
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 4788
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            }
+          ],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "infostealer_browser",
+          "description": "Steals private information from local Internet browsers",
+          "categories": [
+            "infostealer"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 30,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 3176,
+              "cid": 3311
+            },
+            {
+              "type": "call",
+              "pid": 3176,
+              "cid": 3314
+            },
+            {
+              "type": "call",
+              "pid": 3176,
+              "cid": 3329
+            },
+            {
+              "file": "C:\\Users\\sanya\\AppData\\Local\\microsoft\\Edge\\user data\\Default\\edge profile.ico"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": "=== 6912.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 17:52:12 2025\nBreakpoint 0 hit by instruction at 0x004067A5 (thread 8896) EAX=0xcffce0 EBX=0xac6000 ECX=0x40679e EDX=0x40679e ESI=0x40679e EDI=0x40679e ESP=0xcffc38 *ESP=0x40679e EBP=0xcffc84\nBreak at 0x004067A5 in e0502d39c8e63b66265e.exe (RVA 0x67a5, thread 8896, Stack 0x00CF2000-0x00D00000, ImageBase 0x00400000)\n0x004067A5  FF15BCA04100             CALL      DWORD [0x41a0bc]              \nActionDispatcher: skipping instruction.\n0x004067AB  8365E400                 AND       DWORD [EBP-0x1c], 0x0         \nBreakpoint 1 hit by instruction at 0x004067B3 (thread 8896) EAX=0xcffc3c EBX=0xac6000 ECX=0x40679e EDX=0x40679e ESI=0x40679e EDI=0x40679e ESP=0xcffc34 *ESP=0xcffc3c EBP=0xcffc84\n0x004067B3  FF15C0A04100             CALL      DWORD [0x41a0c0]              \nActionDispatcher: skipping instruction.\n0x004067B9  E847000000               CALL      0x00406805                    \n",
+      "raw_response": "To construct a YARA rule that detects the presence of a specific code pattern, we need to focus on **known code sequences** that are likely to be part of a larger logic flow, such as API calls, conditional checks, or control flow instructions.\n\n---\n\n### 📌 **Key Observations from the Trace**\n\nFrom the provided instruction sequence, we can identify several **API calls** and **control flow** instructions:\n\n1. **`FF 15 BC A0 41 00`** – Call to `GetCommandLineA`\n2. **`FF 15 C0 A0 41 00`** – Call to `GetStartupInfoA`\n3. **`FF 15 44 A2 41 00`** – Call to `GetModuleHandleA`\n4. **`FF 15 28 A2 41 00`** – Call to `ExitProcess` (at `004067E4`)\n\nThese calls are part of a **standard process initialization** sequence. The `ExitProcess` call is the **final control flow instruction**, suggesting that the program is terminating after performing some operations.\n\n---\n\n### ✅ **Selected Patterns for YARA Rule**\n\nBased on the instructions, here are **three relevant code patterns** that could be used to construct a YARA rule:\n\n1. **`FF 15 BC A0 41 00`** – Call to `GetCommandLineA`  \n   This is an early API call, possibly used to retrieve command-line arguments or environment variables.\n\n2. **`FF 15 C0 A0 41 00`** – Call to `GetStartupInfoA`  \n   This API call is used to retrieve startup information, such as the command line and window station.\n\n3. **`FF 15 28 A2 41 00`** – Call to `ExitProcess`  \n   This is the final instruction in the code sequence, indicating the program is terminating.\n\n---\n\n### 🧠 **Why These Patterns Work**\n\n- These patterns are **specific and unique** to the API calls.\n- They are **not generic**, so they are less likely to be false positives.\n- They are **sequential** in the execution flow, making them good candidates for detection.\n\n---\n\n### 🔍 **YARA Rule Example**\n\nHere is a sample YARA rule that matches these patterns:\n\n```yara\nrule ProcessInitializationCheck\n{\n    meta:\n        description = \"Detects a process initialization sequence leading to ExitProcess\"\n        author = \"Your Name\"\n\n    strings:\n        $getcmdline = { FF 15 BC A0 41 00 }\n        $getstartup = { FF 15 C0 A0 41 00 }\n        $exitprocess = { FF 15 28 A2 41 00 }\n\n    condition:\n        all of ($getcmdline, $getstartup, $exitprocess)\n}\n```\n\n---\n\n### 📌 **Notes**\n\n- This rule assumes that the code is **not obfuscated** and follows a **standard initialization sequence**.\n- If the code is obfuscated or uses **different API calls**, additional patterns may be needed.\n- You can extend the rule to include more patterns if needed, such as `GetProcAddress`, `LoadLibrary`, or other initialization routines.\n\n---\n\n### ✅ **Conclusion**\n\nThe patterns identified (`GetCommandLineA`, `GetStartupInfoA`, and `ExitProcess`) are **specific to the execution flow** and can be used effectively in a YARA rule to detect this kind of behavior. These patterns are reliable and can help in identifying suspicious or benign code depending on the context.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\e0502d39c8e63b66\\iter2_v3.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v3",
+    "yara_rule": "rule ProcessInitializationCheck\n{\n    meta:\n        description = \"Detects a process initialization sequence leading to ExitProcess\"\n        cape_options = \"bp0=$getcmdline+0,action0=skip,bp1=$getstartup+0,action1=skip,bp2=$exitprocess+0,action2=skip,count=0\"\n        author = \"Your Name\"\n\n    strings:\n        $getcmdline = { FF 15 BC A0 41 00 }\n        $getstartup = { FF 15 C0 A0 41 00 }\n        $exitprocess = { FF 15 28 A2 41 00 }\n\n    condition:\n        all of ($getcmdline, $getstartup, $exitprocess)\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1550",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 31,
+    "new_signatures": 3,
+    "new_signature_names": [
+      "infostealer_browser",
+      "antivm_generic_system",
+      "terminates_remote_process"
+    ],
+    "new_signature_details": [
+      {
+        "name": "terminates_remote_process",
+        "description": "Terminates another process",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 776,
+            "cid": 179
+          },
+          {
+            "process": "svchost.exe"
+          },
+          {
+            "type": "call",
+            "pid": 776,
+            "cid": 410
+          },
+          {
+            "process": "svchost.exe"
+          },
+          {
+            "type": "call",
+            "pid": 776,
+            "cid": 476
+          },
+          {
+            "process": "svchost.exe"
+          },
+          {
+            "type": "call",
+            "pid": 776,
+            "cid": 543
+          },
+          {
+            "process": "svchost.exe"
+          },
+          {
+            "type": "call",
+            "pid": 1056,
+            "cid": 16
+          },
+          {
+            "process": "svchost.exe"
+          },
+          {
+            "type": "call",
+            "pid": 1056,
+            "cid": 17
+          },
+          {
+            "process": "svchost.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "antivm_generic_system",
+        "description": "Checks the system manufacturer, likely for anti-virtualization",
+        "categories": [
+          "anti-vm"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [],
+        "new_data": [
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 4788
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 4788
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 4788
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 4788
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 4788
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 4788
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 4788
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 4788
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 4788
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 4788
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          }
+        ],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "infostealer_browser",
+        "description": "Steals private information from local Internet browsers",
+        "categories": [
+          "infostealer"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 30,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 3176,
+            "cid": 3311
+          },
+          {
+            "type": "call",
+            "pid": 3176,
+            "cid": 3314
+          },
+          {
+            "type": "call",
+            "pid": 3176,
+            "cid": 3329
+          },
+          {
+            "file": "C:\\Users\\sanya\\AppData\\Local\\microsoft\\Edge\\user data\\Default\\edge profile.ico"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": "=== 6912.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 17:52:12 2025\nBreakpoint 0 hit by instruction at 0x004067A5 (thread 8896) EAX=0xcffce0 EBX=0xac6000 ECX=0x40679e EDX=0x40679e ESI=0x40679e EDI=0x40679e ESP=0xcffc38 *ESP=0x40679e EBP=0xcffc84\nBreak at 0x004067A5 in e0502d39c8e63b66265e.exe (RVA 0x67a5, thread 8896, Stack 0x00CF2000-0x00D00000, ImageBase 0x00400000)\n0x004067A5  FF15BCA04100             CALL      DWORD [0x41a0bc]              \nActionDispatcher: skipping instruction.\n0x004067AB  8365E400                 AND       DWORD [EBP-0x1c], 0x0         \nBreakpoint 1 hit by instruction at 0x004067B3 (thread 8896) EAX=0xcffc3c EBX=0xac6000 ECX=0x40679e EDX=0x40679e ESI=0x40679e EDI=0x40679e ESP=0xcffc34 *ESP=0xcffc3c EBP=0xcffc84\n0x004067B3  FF15C0A04100             CALL      DWORD [0x41a0c0]              \nActionDispatcher: skipping instruction.\n0x004067B9  E847000000               CALL      0x00406805                    \n",
+    "raw_response": "To construct a YARA rule that detects the presence of a specific code pattern, we need to focus on **known code sequences** that are likely to be part of a larger logic flow, such as API calls, conditional checks, or control flow instructions.\n\n---\n\n### 📌 **Key Observations from the Trace**\n\nFrom the provided instruction sequence, we can identify several **API calls** and **control flow** instructions:\n\n1. **`FF 15 BC A0 41 00`** – Call to `GetCommandLineA`\n2. **`FF 15 C0 A0 41 00`** – Call to `GetStartupInfoA`\n3. **`FF 15 44 A2 41 00`** – Call to `GetModuleHandleA`\n4. **`FF 15 28 A2 41 00`** – Call to `ExitProcess` (at `004067E4`)\n\nThese calls are part of a **standard process initialization** sequence. The `ExitProcess` call is the **final control flow instruction**, suggesting that the program is terminating after performing some operations.\n\n---\n\n### ✅ **Selected Patterns for YARA Rule**\n\nBased on the instructions, here are **three relevant code patterns** that could be used to construct a YARA rule:\n\n1. **`FF 15 BC A0 41 00`** – Call to `GetCommandLineA`  \n   This is an early API call, possibly used to retrieve command-line arguments or environment variables.\n\n2. **`FF 15 C0 A0 41 00`** – Call to `GetStartupInfoA`  \n   This API call is used to retrieve startup information, such as the command line and window station.\n\n3. **`FF 15 28 A2 41 00`** – Call to `ExitProcess`  \n   This is the final instruction in the code sequence, indicating the program is terminating.\n\n---\n\n### 🧠 **Why These Patterns Work**\n\n- These patterns are **specific and unique** to the API calls.\n- They are **not generic**, so they are less likely to be false positives.\n- They are **sequential** in the execution flow, making them good candidates for detection.\n\n---\n\n### 🔍 **YARA Rule Example**\n\nHere is a sample YARA rule that matches these patterns:\n\n```yara\nrule ProcessInitializationCheck\n{\n    meta:\n        description = \"Detects a process initialization sequence leading to ExitProcess\"\n        author = \"Your Name\"\n\n    strings:\n        $getcmdline = { FF 15 BC A0 41 00 }\n        $getstartup = { FF 15 C0 A0 41 00 }\n        $exitprocess = { FF 15 28 A2 41 00 }\n\n    condition:\n        all of ($getcmdline, $getstartup, $exitprocess)\n}\n```\n\n---\n\n### 📌 **Notes**\n\n- This rule assumes that the code is **not obfuscated** and follows a **standard initialization sequence**.\n- If the code is obfuscated or uses **different API calls**, additional patterns may be needed.\n- You can extend the rule to include more patterns if needed, such as `GetProcAddress`, `LoadLibrary`, or other initialization routines.\n\n---\n\n### ✅ **Conclusion**\n\nThe patterns identified (`GetCommandLineA`, `GetStartupInfoA`, and `ExitProcess`) are **specific to the execution flow** and can be used effectively in a YARA rule to detect this kind of behavior. These patterns are reliable and can help in identifying suspicious or benign code depending on the context.",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\e0502d39c8e63b66\\iter2_v3.yar"
+  },
+  "best_score": 3,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: SUCCESS - 3 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    ""
+  ]
+}

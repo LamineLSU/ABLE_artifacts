@@ -1,0 +1,16 @@
+rule Corrected_Exit_Call_Detection
+{
+    meta:
+        description = "Detects calls to exit functions in a specific code pattern"
+        cape_options = "bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0"
+        author = "Security Analyst"
+        date = "2023-10-05"
+
+    strings:
+        $a = { 8B FF 55 8B EC FF 75 08 }
+        $b = { FF 75 08 E8 ?? ?? ?? ?? 59 }
+        $c = { FF 75 08 FF 15 ?? ?? ?? ?? }
+
+    condition:
+        any of them
+}

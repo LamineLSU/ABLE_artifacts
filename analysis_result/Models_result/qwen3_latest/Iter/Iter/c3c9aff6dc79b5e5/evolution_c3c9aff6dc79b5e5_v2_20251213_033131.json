@@ -1,0 +1,83 @@
+{
+  "sha256": "c3c9aff6dc79b5e5b273e0df686f7896cae920de3ffd171cecdede3a1402725c",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule EvasionPatterns\n{\n    meta:\n        description = \"Detects evasion patterns involving function calls and conditional checks\"\n        cape_options = \"bp0=$p1+0,action0=skip,bp1=$p2+0,action1=skip,bp2=$p3+0,action2=skip,count=0\"\n    \n    strings:\n        $p1 = { 68 00 00 00 00 E8 ?? ?? ?? ?? }\n        $p2 = { 68 ?? ?? ?? ?? E8 ?? ?? ?? ?? }\n        $p3 = { 85 C0 0F 84 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "776",
+      "status": "bypass_failed",
+      "rule_hit": false,
+      "baseline_signatures": 1,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "YARA pattern did not match",
+      "improvement_suggestions": [
+        "Update the YARA strings to match the actual opcodes in the trace. Replace `68`/`E8` with `FF15` for call instructions and adjust the conditional jump to match `74` instead of `0F 84`."
+      ],
+      "debugger_log": null,
+      "raw_response": "The provided code includes several key operations that may be part of an evasion mechanism, such as conditional checks, function calls, and control flow manipulations. Below are three distinct patterns extracted from the code that could be used in a YARA rule to detect or bypass such evasion mechanisms.\n\n---\n\n### **Pattern 1: Push 0x00000000 followed by Call to ExitProcess**\n\n**Description:**  \nThis pattern represents the sequence of a `push` instruction that pushes a 32-bit value (`0x00000000`) onto the stack, followed by a `call` to the `ExitProcess` function. This is a direct call to terminate the process, which could be part of an evasion strategy.\n\n**Byte Sequence:**\n```\n68 00 00 00 00 E8 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `68 00 00 00 00` → `push 0x00000000` (pushing a 32-bit zero value)\n- `E8 ?? ?? ?? ??` → `call` to `ExitProcess` (relative offset to the function)\n\n**Use Case:**  \nThis pattern could be used to detect or bypass a direct termination call, potentially preventing the program from exiting prematurely.\n\n---\n\n### **Pattern 2: Push [Address] followed by Call to TrackPopupMenu**\n\n**Description:**  \nThis pattern represents a `push` instruction that pushes a memory address onto the stack, followed by a `call` to the `TrackPopupMenu` function. This may be used to simulate a UI interaction or to bypass UI-related checks.\n\n**Byte Sequence:**\n```\n68 ?? ?? ?? ?? E8 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `68 ?? ?? ?? ??` → `push` of a 32-bit memory address (unknown value)\n- `E8 ?? ?? ?? ??` → `call` to `TrackPopupMenu` (relative offset)\n\n**Use Case:**  \nThis pattern could be used to detect or bypass UI-related checks, such as verifying the presence of a menu or other UI elements.\n\n---\n\n### **Pattern 3: Test EAX, EAX followed by Conditional Jump (JZ)**\n\n**Description:**  \nThis pattern represents a conditional check where the `EAX` register is tested against zero, followed by a jump if zero (`JZ`). This is often used to verify the success of a function call or to determine the flow of execution.\n\n**Byte Sequence:**\n```\n85 C0 0F 84 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `85 C0` → `test eax, eax` (checks if EAX is zero)\n- `0F 84 ?? ?? ?? ??` → `jz` (jump if zero, with relative offset)\n\n**Use Case:**  \nThis pattern could be used to detect or bypass conditional checks that determine whether to proceed with further execution or terminate the process.\n\n---\n\n### **Final Answer**\n\n```yara\nrule EvasionPatterns\n{\n    meta:\n        description = \"Detects evasion patterns involving function calls and conditional checks\"\n    \n    strings:\n        $p1 = { 68 00 00 00 00 E8 ?? ?? ?? ?? }\n        $p2 = { 68 ?? ?? ?? ?? E8 ?? ?? ?? ?? }\n        $p3 = { 85 C0 0F 84 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```\n\nThese patterns can be used to detect or bypass evasion mechanisms in malware that rely on conditional checks, function calls, or direct termination.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\c3c9aff6dc79b5e5\\iter0_v2.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 15 ?? ?? ?? ?? 85 C0 74 ?? }  // Call to IsWindowVisible + test+je\n        $pattern1 = { 83 7D 10 00 75 32 }               // cmp+je (stack offset 0x10)\n        $pattern2 = { FF 15 ?? ?? ?? ?? }               // General call instruction (API check)\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE, API_CHECK, CALL",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "777",
+      "status": "bypass_failed",
+      "rule_hit": false,
+      "baseline_signatures": 1,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "YARA pattern did not match",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to mismatched patterns. The trace shows critical evasion logic involving `test eax, eax` followed by `je` (e.g., `85C0 7410`) and `cmp` + `jne` (e.g., `83 7D 10 00 75 32`). These sequences are likely used to conditionally skip code, making them ideal for bypassing checks. The `call` instructions (e.g., `FF15 ?? ?? ?? ??`) are also key as they trigger API calls that may be monitored. Using concrete byte sequences from the trace ensures specificity while allowing flexibility for address variations.\n\n**PATTERN_TYPE**: CALL_TEST_JE, API_CHECK, CALL\n\n**CONFIDENCE**: 95\n\n**REASONING**: The patterns are derived directly from the trace and target critical evasion logic. The `test+je` and `cmp+jne` sequences are likely used to skip termination logic, while the `call` instructions are central to API interactions. These patterns are specific to the trace and avoid false positives by using exact byte sequences.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF15 ?? ?? ?? ?? 85 C0 74 ?? }  // Call to IsWindowVisible + test+je\n        $pattern1 = { 83 7D 10 00 75 32 }               // cmp+je (stack offset 0x10)\n        $pattern2 = { FF15 ?? ?? ?? ?? }               // General call instruction (API check)\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\c3c9aff6dc79b5e5\\iter1_v2.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A 00 FF 15 ?? ?? ?? ?? }\n        $pattern1 = { EB ?? 83 7D 10 00 }\n        $pattern2 = { 6A 02 FF 15 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "778",
+      "status": "bypass_failed",
+      "rule_hit": false,
+      "baseline_signatures": 1,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "YARA pattern did not match",
+      "improvement_suggestions": [
+        "Rewrite the patterns to align with the actual opcodes in the trace. For example, target the `call` instructions directly or adjust wildcards to account for address variations."
+      ],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A 00 FF 15 ?? ?? ?? ?? }\n        $pattern1 = { EB ?? 83 7D 10 00 }\n        $pattern2 = { 6A 02 FF 15 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\c3c9aff6dc79b5e5\\iter2_v2.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: bypass_failed - YARA pattern did not match",
+    "Iteration 2: bypass_failed - YARA pattern did not match",
+    "Iteration 3: bypass_failed - YARA pattern did not match"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

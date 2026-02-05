@@ -1,0 +1,85 @@
+{
+  "sha256": "4f319d971fd23958cbb4a4a2dcc608c2cba461194011e526d693c25a909e8505",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "rule EvasionCheck\n{\n    meta:\n        description = \"Detects potential evasion techniques involving heap operations and control flow checks.\"\n        cape_options = \"bp0=$call_freeheap+0,action0=skip,bp1=$test_eax_jz+0,action1=skip,bp2=$call_0041ead7+0,action2=skip,count=0\"\n\n    strings:\n        // Pattern 0: Call to RtlFreeHeap with surrounding pushes and pops\n        $call_freeheap = { 50 51 FF D2 59 59 }\n\n        // Pattern 1: Test EAX and conditional jump (jz)\n        $test_eax_jz = { 85 C0 0F 84 ?? ?? ?? ?? }\n\n        // Pattern 2: Call to 0041EAD7h with surrounding pushes and LEA\n        $call_0041ead7 = { 51 8D B0 ?? ?? ?? ?? 56 50 E8 ?? ?? ?? ?? }\n\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1024",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Update the YARA patterns to target `RtlAllocateHeap` and adjust the control flow checks to match the actual instruction sequences. Replace the `RtlFreeHeap` pattern with `RtlAllocateHeap` and refine the `jno`/`and`/`cmp` logic."
+      ],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule EvasionCheck\n{\n    meta:\n        description = \"Detects potential evasion techniques involving heap operations and control flow checks.\"\n\n    strings:\n        // Pattern 0: Call to RtlFreeHeap with surrounding pushes and pops\n        $call_freeheap = { 50 51 FF D2 59 59 }\n\n        // Pattern 1: Test EAX and conditional jump (jz)\n        $test_eax_jz = { 85 C0 0F 84 ?? ?? ?? ?? }\n\n        // Pattern 2: Call to 0041EAD7h with surrounding pushes and LEA\n        $call_0041ead7 = { 51 8D B0 ?? ?? ?? ?? 56 50 E8 ?? ?? ?? ?? }\n\n    condition:\n        all of them\n}\n```\n\n### Explanation:\n- **Pattern 0**: This identifies the sequence of pushing `EAX` and `ECX`, followed by a call to `RtlFreeHeap` (indicated by `FF D2`), and then popping `ECX` twice. This is a common pattern in heap manipulation or memory cleanup routines.\n  \n- **Pattern 1**: The `TEST EAX, EAX` followed by a `JZ` (Jump if Zero) is often used to check if a value is zero, which can be part of a condition check to bypass security mechanisms or evade detection.\n\n- **Pattern 2**: This identifies a call to a specific offset (`0041EAD7h`) with surrounding operations, such as `LEA` and `PUSH`, which could be used to manipulate the stack or redirect execution flow, potentially for evasion purposes.\n\n### Notes:\n- Wildcards (`??`) are used for address offsets to account for potential variations due to ASLR or other memory randomization techniques.\n- The `all of them` condition ensures that all three patterns must be present in the same memory region for a match, increasing the confidence in detecting evasion behavior.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\4f319d971fd23958\\iter0_v1.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v1",
+      "yara_rule": "rule MaliciousCodeDetection\n{\n    meta:\n        author = \"SecurityTeam\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n        description = \"Detects malicious code using specific API and control flow patterns\"\n\n    strings:\n        $a = { FF D2 ?? ?? ?? ?? } // Call to RtlAllocateHeap\n        $b = { 3D E4 3A C8 1B 21 40 BC 71 C6 } // cmp, and, jno sequence\n        $c = { 50 E8 74 0A 00 00 } // Push followed by call\n\n    condition:\n        all of ($a, $b, $c)\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "1025",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Replace the generic `$c` pattern with a more specific one targeting the original trace's `PUSH esi` (opcode `56`) and adjacent instructions. Add context bytes to ensure specificity."
+      ],
+      "debugger_log": "=== 4816.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 19:44:33 2025\nBreakpoint 2 hit by instruction at 0x0041E05D (thread 4828) EAX=0xdcec24 EBX=0xdcfa00 ECX=0x4fe1737 EDX=0xdce87c ESI=0xdcf8a8 EDI=0xdcec24 ESP=0xdce838 *ESP=0xdcf8a8 EBP=0xdce84c\nBreak at 0x0041E05D in 4f319d971fd23958cbb4.exe (RVA 0x1e05d, thread 4828, Stack 0x00DC1000-0x00DD0000, ImageBase 0x00400000)\n0x0041E05D  50                       PUSH      EAX                           \nActionDispatcher: skipping instruction.\n0x0041E05E  E8740A0000               CALL      0x0041EAD7                    \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule failed to bypass detection because it matched the wrong location. By focusing on the call to RtlAllocateHeap (FFD2) and the subsequent control flow checks (cmp, and, jno), we target evasion points that are critical for detection. These patterns are derived directly from the trace, ensuring specificity and reducing false positives.\n\n**PATTERN_TYPE**: CALL_TEST_JE  \n**CONFIDENCE**: 95  \n\n**REASONING**: These patterns capture the call to RtlAllocateHeap (a common API check), the cmp and jno sequence (indicative of conditional logic), and a push-call pair (common in obfuscation). They are highly likely to be present in malicious code and are specific to the analyzed sample.  \n\n**YARA_RULE**:  \n```yara\nrule MaliciousCodeDetection\n{\n    meta:\n        author = \"SecurityTeam\"\n        description = \"Detects malicious code using specific API and control flow patterns\"\n\n    strings:\n        $a = { FF D2 ?? ?? ?? ?? } // Call to RtlAllocateHeap\n        $b = { 3D E4 3A C8 1B 21 40 BC 71 C6 } // cmp, and, jno sequence\n        $c = { 50 E8 74 0A 00 00 } // Push followed by call\n\n    condition:\n        all of ($a, $b, $c)\n}\n```  \n\n**CAPE_OPTIONS**:  \n```json\n{\n    \"CAPE_Skip\": true,\n    \"CAPE_Skip_Reason\": \"Detected potential evasion logic\"\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\4f319d971fd23958\\iter1_v1.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 ?? 56 6A ?? E8 ?? ?? ?? ?? 85 C0 }\n        $pattern1 = { 8B 45 ?? 56 6A ?? E8 ?? ?? ?? ?? 8B 4D ?? }\n        $pattern2 = { 8B 45 ?? 56 6A ?? E8 ?? ?? ?? ?? 8B 06 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1026",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Update the YARA patterns to match the actual opcodes used in the target code, such as `FFD2`, and refine wildcards to avoid overmatching."
+      ],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 ?? 56 6A ?? E8 ?? ?? ?? ?? 85 C0 }\n        $pattern1 = { 8B 45 ?? 56 6A ?? E8 ?? ?? ?? ?? 8B 4D ?? }\n        $pattern2 = { 8B 45 ?? 56 6A ?? E8 ?? ?? ?? ?? 8B 06 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\4f319d971fd23958\\iter2_v1.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

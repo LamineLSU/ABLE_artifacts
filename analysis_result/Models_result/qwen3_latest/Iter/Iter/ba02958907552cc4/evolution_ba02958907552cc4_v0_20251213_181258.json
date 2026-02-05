@@ -1,0 +1,301 @@
+{
+  "sha256": "ba02958907552cc4d7f61b4fe2a448ed64994404d0f8a54a30ae0e14c5fe3af4",
+  "prompt_version": "v0",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v0",
+      "yara_rule": "rule SandboxEvasionCheck {\n    meta:\n        description = \"Detects sandbox evasion checks by analyzing ExitProcess and handle validation patterns\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n        author = \"Your Name\"\n        date = \"2023-10-05\"\n\n    strings:\n        $pattern0 = { 53 FF 15 ?? ?? ?? ?? }\n        $pattern1 = { 85 C0 74 12 6A 5B }\n        $pattern2 = { 50 FF 15 ?? ?? ?? ?? }\n\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "958",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule SandboxEvasionCheck {\n    meta:\n        description = \"Detects sandbox evasion checks by analyzing ExitProcess and handle validation patterns\"\n        author = \"Your Name\"\n        date = \"2023-10-05\"\n\n    strings:\n        $pattern0 = \"53 FF 15 ?? ?? ?? ??\"\n        $pattern1 = \"85 C0 74 12 6A 5B\"\n        $pattern2 = \"50 FF 15 ?? ?? ?? ??\"\n\n    condition:\n        all of them\n}\n```\n\n**cape_options**:\n```\ncape_options = {\n    \"pattern0\": \"$pattern0\",\n    \"pattern1\": \"$pattern1\",\n    \"pattern2\": \"$pattern2\"\n}\n```\n\n**Explanation**:\n1. **$pattern0** (8 bytes): Captures the `push ebx` followed by a call to `ExitProcess` (`FF 15 ...`). This is a direct indicator of the malware terminating itself in a sandboxed environment.\n2. **$pattern1** (6 bytes): Detects a conditional check (`test eax, eax` followed by a `je`) and a subsequent `push 0x5B`, which may validate a handle or flag sandboxed conditions.\n3. **$pattern2** (8 bytes): Identifies a `push eax` followed by a call to `CloseHandle` (`FF 15 ...`), suggesting resource cleanup or sandbox detection logic. \n\nThese patterns collectively target common sandbox evasion techniques, such as immediate termination or handle validation.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\ba02958907552cc4\\iter0_v0.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 85 C0 }\n        $pattern2 = { 8B 85 ?? ?? ?? ?? 03 C3 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE | API_CHECK | CMP_SETZ",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "959",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Replace `$pattern1` with a more specific pattern targeting the original trace's code. Use context bytes from the original trace to narrow the match."
+      ],
+      "debugger_log": "=== 1668.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 09:25:50 2025\nBreakpoint 1 hit by instruction at 0x00AC6FD0 (thread 2888) EAX=0xac0000 \"MZ\" ba02958907552cc4d7f6.exe ECX=0xe0 EDX=0x10b ESI=0xac10bc ba02958907552cc4d7f6.exe EDI=0xac69b0 ba02958907552cc4d7f6.exe ESP=0x98fae8 *ESP=0xac0000 \"MZ\" ba02958907552cc4d7f6.exe EBP=0x98faec\nBreak at 0x00AC6FD0 in ba02958907552cc4d7f6.exe (RVA 0x6fd0, thread 2888, Stack 0x00982000-0x00990000, ImageBase 0x00AC0000)\n0x00AC6FD0  E87FFFFFFF               CALL      0xffffff84                    \nActionDispatcher: skipping instruction.\n0x00AC6FD5  85C0                     TEST      EAX, EAX                      \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt matched the wrong location, likely due to overly generic patterns. By focusing on specific sequences from the trace (e.g., `test eax, eax` followed by `je`, function calls with subsequent checks, and arithmetic operations), the new patterns target critical evasion logic. These sequences are more precise, reducing false positives and aligning with the sample’s termination logic.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | CMP_SETZ\n\n**CONFIDENCE**: 95\n\n**REASONING**:  \n1. **Pattern0** (`85 C0 0F 84 ?? ?? ?? ??`) captures the early `test eax, eax` followed by a conditional jump, a common evasion check.  \n2. **Pattern1** (`E8 ?? ?? ?? ?? 85 C0`) identifies a function call followed by a `test eax, eax`, indicating post-call validation.  \n3. **Pattern2** (`8B 85 ?? ?? ?? ?? 03 C3`) targets memory reads and arithmetic operations, which may precede termination logic.  \nThese patterns are derived directly from the trace, ensuring accuracy and minimizing false matches.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 85 C0 }\n        $pattern2 = { 8B 85 ?? ?? ?? ?? 03 C3 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\ba02958907552cc4\\iter1_v0.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? }  // test eax, eax + je (evasion check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? }         // call to ExitProcess (exit trigger)\n        $pattern2 = { 53 6A 40 53 68 ?? ?? ?? ?? 33 C9 E8 ?? ?? ?? ?? }  // setup before exit (ebx pushes + call)\n\n    condition:\n        any of them\n}",
+      "pattern_type": "API_CHECK",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "960",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 3,
+      "new_signature_names": [
+        "queries_keyboard_layout",
+        "queries_locale_api",
+        "reads_self"
+      ],
+      "new_signature_details": [
+        {
+          "name": "queries_keyboard_layout",
+          "description": "Queries the keyboard layout",
+          "categories": [
+            "location_discovery"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 8660,
+              "cid": 1424
+            },
+            {
+              "type": "call",
+              "pid": 8660,
+              "cid": 1447
+            },
+            {
+              "type": "call",
+              "pid": 8660,
+              "cid": 1481
+            },
+            {
+              "type": "call",
+              "pid": 8660,
+              "cid": 1599
+            },
+            {
+              "type": "call",
+              "pid": 8660,
+              "cid": 1602
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "queries_locale_api",
+          "description": "Queries the computer locale (possible geofencing)",
+          "categories": [
+            "location_discovery",
+            "geofence"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 8660,
+              "cid": 1213
+            },
+            {
+              "type": "call",
+              "pid": 8660,
+              "cid": 1378
+            },
+            {
+              "type": "call",
+              "pid": 8660,
+              "cid": 1608
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "reads_self",
+          "description": "Reads data out of its own binary image",
+          "categories": [
+            "generic"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 30,
+          "references": [],
+          "data": [
+            {
+              "self_read": "process: bLP25lG.exe, pid: 8660, offset: 0x3030785c3030785c, length: 0x00001000"
+            },
+            {
+              "self_read": "process: bLP25lG.exe, pid: 8660, offset: 0x3939785c6331785c, length: 0x00000200"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": "=== 8660.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 08:48:41 2025\nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x16 EBX=0x2d ECX=0x4ee1518 EDX=0x4ee14c6 L\"bLP25lG.exe\" ESI=0x4ee146c L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP002.TMP\\bLP25lG.exe\" EDI=0x4ee1510 ESP=0x11aeb7c *ESP=0x16 EBP=0x11aeb94\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x5a ECX=0x4ee1590 EDX=0x4ee146c L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP002.TMP\\bLP25lG.exe\" ESI=0x4ee146c L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP002.TMP\\bLP25lG.exe\" EDI=0x4ee1588 ESP=0x11aeb7c *ESP=0x5a EBP=0x11aeb94\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x14 ECX=0x4ee5274 EDX=0x4ee512c L\"@tzres.dll,-210\" ESI=0x4ee512c L\"@tzres.dll,-210\" EDI=0x4ee526c ESP=0x11ae96c *ESP=0x14 EBP=0x11ae984\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x8 EBX=0xb ECX=0x4ee5298 EDX=0x4ee5142 L\"-210\" ESI=0x4ee512c L\"@tzres.dll,-210\" EDI=0x4ee5290 ESP=0x11ae96c *ESP=0x8 EBP=0x11ae984\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x1a ECX=0x4ee5988 EDX=0x4ee22e8 L\".NETFramework,Version=v4.0\" ESI=0x4ee22e8 L\".NETFramework,Version=v4.0\" EDI=0x4ee5980 ESP=0x11ae198 *ESP=0x1a EBP=0x11ae1b0\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x18 EBX=0xe ECX=0x4ee59b0 EDX=0x4ee2304 L\"Version=v4.0\" ESI=0x4ee22e8 L\".NETFramework,Version=v4.0\" EDI=0x4ee59a8 ESP=0x11ae198 *ESP=0x18 EBP=0x11ae1b0\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x96 EBX=0x21 ECX=0x4ee9480 EDX=0x4ee924e L\"mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5...\" ESI=0x4ee920c L\"System.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Cult...\" EDI=0x4ee9478 ESP=0x11ae2f0 *ESP=0x96 EBP=0x11ae308\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x96 EBX=0x21 ECX=0x4ee9e8c EDX=0x4ee9c5a L\"mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5...\" ESI=0x4ee9c18 L\"System.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Cult...\" EDI=0x4ee9e84 ESP=0x11adc20 *ESP=0x96 EBP=0x11adc38\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \n\n\n=== 8876.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 08:48:23 2025\nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192490 RSI=0x4192190 RDI=0x4192490 RSP=0x8ff050 *RSP=0 R8=0x8fec14 R9=0x8fec18 R11=0x1 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0x100000341200007f Xmm1.Low=0x521200007ffb2178 Xmm1.High=0x7ffa7fe8f38500\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x41924c8 RSI=0x4192190 RDI=0x41924c8 RSP=0x8ff050 *RSP=0 R11=0x8fefa0 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0x100000341200007f Xmm1.Low=0x521200007ffb2178 Xmm1.High=0x7ffa7fe8f38500\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192500 RSI=0x4192190 RDI=0x4192500 RSP=0x8ff050 *RSP=0x4192490 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192538 RSI=0x4192190 RDI=0x4192538 RSP=0x8ff050 *RSP=0 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192570 RSI=0x4192190 RDI=0x4192570 RSP=0x8ff050 \"8%\u0019\" *RSP=0x4192538 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x41925a8 RSI=0x4192190 RDI=0x41925a8 RSP=0x8ff050 \"8%\u0019\" *RSP=0x4192538 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x41925e0 RSI=0x4192190 RDI=0x41925e0 RSP=0x8ff050 \"8%\u0019\" *RSP=0x4192538 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192618 RSI=0x4192190 RDI=0x4192618 RSP=0x8ff050 \"8%\u0019\" *RSP=0x4192538 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192650 RSI=0x4192190 RDI=0x4192650 RSP=0x8ff050 \"\u0018&\u0019\" *RSP=0x4192618 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192688 RSI=0x4192190 RDI=0x4192688 RSP=0x8ff050 \"\u0018&\u0019\" *RSP=0x4192618 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule caused a crash due to overly generic patterns. By using concrete bytes from the original trace (e.g., `85 C0 0F 84`, `FF 15`, and `53 6A40 53 68`), the patterns now target specific evasion checks and exit logic. These sequences are less likely to match unrelated code, reducing false positives and crashes.\n\n**PATTERN_TYPE**: API_CHECK\n\n**CONFIDENCE**: 95\n\n**REASONING**: These patterns directly reference the evasion logic (test+je) and the exit mechanism (ExitProcess call) from the original trace. Using exact bytes from the trace ensures specificity, while wildcards allow for variant tolerance. This avoids matching unrelated code and reduces crash risk.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? }  // test eax, eax + je (evasion check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? }         // call to ExitProcess (exit trigger)\n        $pattern2 = { 53 6A40 53 68 ?? ?? ?? ?? 33 C9 E8 ?? ?? ?? ?? }  // setup before exit (ebx pushes + call)\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\ba02958907552cc4\\iter2_v0.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v0",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? }  // test eax, eax + je (evasion check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? }         // call to ExitProcess (exit trigger)\n        $pattern2 = { 53 6A 40 53 68 ?? ?? ?? ?? 33 C9 E8 ?? ?? ?? ?? }  // setup before exit (ebx pushes + call)\n\n    condition:\n        any of them\n}",
+    "pattern_type": "API_CHECK",
+    "confidence": 95,
+    "opcodes": "",
+    "task_id": "960",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 15,
+    "new_signatures": 3,
+    "new_signature_names": [
+      "queries_keyboard_layout",
+      "queries_locale_api",
+      "reads_self"
+    ],
+    "new_signature_details": [
+      {
+        "name": "queries_keyboard_layout",
+        "description": "Queries the keyboard layout",
+        "categories": [
+          "location_discovery"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 8660,
+            "cid": 1424
+          },
+          {
+            "type": "call",
+            "pid": 8660,
+            "cid": 1447
+          },
+          {
+            "type": "call",
+            "pid": 8660,
+            "cid": 1481
+          },
+          {
+            "type": "call",
+            "pid": 8660,
+            "cid": 1599
+          },
+          {
+            "type": "call",
+            "pid": 8660,
+            "cid": 1602
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "queries_locale_api",
+        "description": "Queries the computer locale (possible geofencing)",
+        "categories": [
+          "location_discovery",
+          "geofence"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 8660,
+            "cid": 1213
+          },
+          {
+            "type": "call",
+            "pid": 8660,
+            "cid": 1378
+          },
+          {
+            "type": "call",
+            "pid": 8660,
+            "cid": 1608
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "reads_self",
+        "description": "Reads data out of its own binary image",
+        "categories": [
+          "generic"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 30,
+        "references": [],
+        "data": [
+          {
+            "self_read": "process: bLP25lG.exe, pid: 8660, offset: 0x3030785c3030785c, length: 0x00001000"
+          },
+          {
+            "self_read": "process: bLP25lG.exe, pid: 8660, offset: 0x3939785c6331785c, length: 0x00000200"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": "=== 8660.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 08:48:41 2025\nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x16 EBX=0x2d ECX=0x4ee1518 EDX=0x4ee14c6 L\"bLP25lG.exe\" ESI=0x4ee146c L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP002.TMP\\bLP25lG.exe\" EDI=0x4ee1510 ESP=0x11aeb7c *ESP=0x16 EBP=0x11aeb94\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x5a ECX=0x4ee1590 EDX=0x4ee146c L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP002.TMP\\bLP25lG.exe\" ESI=0x4ee146c L\"C:\\Users\\sanya\\AppData\\Local\\Temp\\IXP002.TMP\\bLP25lG.exe\" EDI=0x4ee1588 ESP=0x11aeb7c *ESP=0x5a EBP=0x11aeb94\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x14 ECX=0x4ee5274 EDX=0x4ee512c L\"@tzres.dll,-210\" ESI=0x4ee512c L\"@tzres.dll,-210\" EDI=0x4ee526c ESP=0x11ae96c *ESP=0x14 EBP=0x11ae984\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x8 EBX=0xb ECX=0x4ee5298 EDX=0x4ee5142 L\"-210\" ESI=0x4ee512c L\"@tzres.dll,-210\" EDI=0x4ee5290 ESP=0x11ae96c *ESP=0x8 EBP=0x11ae984\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x1a ECX=0x4ee5988 EDX=0x4ee22e8 L\".NETFramework,Version=v4.0\" ESI=0x4ee22e8 L\".NETFramework,Version=v4.0\" EDI=0x4ee5980 ESP=0x11ae198 *ESP=0x1a EBP=0x11ae1b0\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x18 EBX=0xe ECX=0x4ee59b0 EDX=0x4ee2304 L\"Version=v4.0\" ESI=0x4ee22e8 L\".NETFramework,Version=v4.0\" EDI=0x4ee59a8 ESP=0x11ae198 *ESP=0x18 EBP=0x11ae1b0\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x96 EBX=0x21 ECX=0x4ee9480 EDX=0x4ee924e L\"mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5...\" ESI=0x4ee920c L\"System.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Cult...\" EDI=0x4ee9478 ESP=0x11ae2f0 *ESP=0x96 EBP=0x11ae308\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \nBreakpoint 1 hit by instruction at 0x07337683 (thread 8948) EAX=0x96 EBX=0x21 ECX=0x4ee9e8c EDX=0x4ee9c5a L\"mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5...\" ESI=0x4ee9c18 L\"System.Resources.ResourceReader, mscorlib, Version=4.0.0.0, Cult...\" EDI=0x4ee9e84 ESP=0x11adc20 *ESP=0x96 EBP=0x11adc38\n0x07337683  FF15C45D3407             CALL      DWORD [0x7345dc4]             \nActionDispatcher: skipping instruction.\n0x07337689  33D2                     XOR       EDX, EDX                      \n\n\n=== 8876.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 08:48:23 2025\nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192490 RSI=0x4192190 RDI=0x4192490 RSP=0x8ff050 *RSP=0 R8=0x8fec14 R9=0x8fec18 R11=0x1 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0x100000341200007f Xmm1.Low=0x521200007ffb2178 Xmm1.High=0x7ffa7fe8f38500\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x41924c8 RSI=0x4192190 RDI=0x41924c8 RSP=0x8ff050 *RSP=0 R11=0x8fefa0 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0x100000341200007f Xmm1.Low=0x521200007ffb2178 Xmm1.High=0x7ffa7fe8f38500\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192500 RSI=0x4192190 RDI=0x4192500 RSP=0x8ff050 *RSP=0x4192490 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192538 RSI=0x4192190 RDI=0x4192538 RSP=0x8ff050 *RSP=0 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192570 RSI=0x4192190 RDI=0x4192570 RSP=0x8ff050 \"8%\u0019\" *RSP=0x4192538 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x41925a8 RSI=0x4192190 RDI=0x41925a8 RSP=0x8ff050 \"8%\u0019\" *RSP=0x4192538 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x41925e0 RSI=0x4192190 RDI=0x41925e0 RSP=0x8ff050 \"8%\u0019\" *RSP=0x4192538 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192618 RSI=0x4192190 RDI=0x4192618 RSP=0x8ff050 \"8%\u0019\" *RSP=0x4192538 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192650 RSI=0x4192190 RDI=0x4192650 RSP=0x8ff050 \"\u0018&\u0019\" *RSP=0x4192618 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FE8FA77 (thread 7948) RAX=0x7ffa7fe8fa70 RCX=0x4192410 RDX=0x4192688 RSI=0x4192190 RDI=0x4192688 RSP=0x8ff050 \"\u0018&\u0019\" *RSP=0x4192618 R11=0x7ffa7fd60020 R12=0x7ffa7ff274a8 R13=0x8ff260 R14=0x4192410 R15=0x7ffa7ff273d0 Xmm0.Low=0xccccccccccb84890 Xmm0.High=0xccccb84850cccccc Xmm1.Low=0xe0ffcccccccccccc\n0x00007FFA7FE8FA77  7507                     JNZ       0x9                           \nActionDispatcher: skipping instruction.\n0x00007FFA7FE8FA79  33C0                     XOR       EAX, EAX                      \n",
+    "raw_response": "**EVOLUTION_REASONING**: The previous rule caused a crash due to overly generic patterns. By using concrete bytes from the original trace (e.g., `85 C0 0F 84`, `FF 15`, and `53 6A40 53 68`), the patterns now target specific evasion checks and exit logic. These sequences are less likely to match unrelated code, reducing false positives and crashes.\n\n**PATTERN_TYPE**: API_CHECK\n\n**CONFIDENCE**: 95\n\n**REASONING**: These patterns directly reference the evasion logic (test+je) and the exit mechanism (ExitProcess call) from the original trace. Using exact bytes from the trace ensures specificity, while wildcards allow for variant tolerance. This avoids matching unrelated code and reduces crash risk.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? }  // test eax, eax + je (evasion check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? }         // call to ExitProcess (exit trigger)\n        $pattern2 = { 53 6A40 53 68 ?? ?? ?? ?? 33 C9 E8 ?? ?? ?? ?? }  // setup before exit (ebx pushes + call)\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\ba02958907552cc4\\iter2_v0.yar"
+  },
+  "best_score": 3,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 3: SUCCESS - 3 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

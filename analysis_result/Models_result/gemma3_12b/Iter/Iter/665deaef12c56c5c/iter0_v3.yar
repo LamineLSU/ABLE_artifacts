@@ -1,0 +1,14 @@
+rule Bypass_Sample
+{
+    meta:
+        description = "Evasion bypass rule"
+        cape_options = "bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0"
+
+    strings:
+        $pattern0 = { 8B FF 55 8B EC FF 75 08 E8 C8 FF FF FF 59 FF 75 08 }  // Skip call 0040E7C3h (12 bytes)
+        $pattern1 = { 55 8B EC FF 75 08 FF 15 AC B0 41 00 }  // Skip call 0041B0ACh (12 bytes)
+        $pattern2 = { 55 8B EC FF 75 08 }  // Skip push dword ptr [ebp+08h] (9 bytes)
+
+    condition:
+        any of them
+}

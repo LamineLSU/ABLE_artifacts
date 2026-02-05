@@ -1,0 +1,71 @@
+{
+  "prompt_version": "v2",
+  "prompt_name": "Counterfactual Reasoning",
+  "iterations": [
+    {
+      "iteration_number": 2,
+      "prompt_version": "v2",
+      "llm_query": {
+        "query_id": "baad922347c8",
+        "timestamp": "2025-12-13T14:36:58.286768",
+        "iteration": 2,
+        "prompt_version": "v2",
+        "prompt_text": "# YARA Rule Correction Required\n\nYour previous YARA rule generation attempt failed validation. Please analyze the errors below and generate a CORRECTED rule.\n\n---\n\n## VALIDATION ERRORS\n\n- Generic pattern: $pattern0: Pattern too short (5 bytes, need at least 6)\n- Generic pattern: $pattern1: Pattern too short (3 bytes, need at least 6)\n\n---\n\n## YOUR PREVIOUS (INVALID) RULE\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? }  // First ExitProcess call (likely evasion check)\n        $pattern1 = { FF7508 }           // Stack manipulation with offset 08h\n        $pattern2 = { FF15 ?? ?? ?? ?? } // Second ExitProcess call (actual exit)\n\n    condition:\n        any of them\n}\n```\n\n---\n\n## ERROR ANALYSIS\n\n**Pattern Length Issue:** Your patterns are too short. Each pattern must be 10-20 bytes. Combine 2-4 consecutive instructions from the trace into each pattern.\n\n**\u26a0\ufe0f CRITICAL - Pattern Count Issue:** The rule must have EXACTLY 3 patterns named `$pattern0`, `$pattern1`, `$pattern2`. You currently have the wrong number. Go back to the trace and select 3 DIFFERENT evasion points.\n\n---\n\n## ORIGINAL TASK (for reference)\n\n# Malware Evasion Bypass Analysis\n\nYou are analyzing a malware execution trace that terminates early due to sandbox/VM evasion.\n\n## TRACE DATA\n\nSHA256: a2cc7061a035063d8ac5790c38bd123a632d43a1af2514dea36d0c5aaf66d200\nExitProcess Address: 00427B11\nInstructions: 7\n--------------------------------------------------------------------------------\nAddress      Opcode               Instruction\n--------------------------------------------------------------------------------\n    00427B0B  55                   push ebp\n    00427B0C  8BEC                 mov ebp, esp\n    00427B0E  FF7508               push dword ptr [ebp+08h]  # ASCII \\\n>>> 00427B11  E8C1FFFFFF           call 00427AD7h  # ___crtCorExitProcess@LIBCMT.LIB (Import, Unknown Params)\n    00427B16  59                   pop ecx\n    00427B17  FF7508               push dword ptr [ebp+08h]\n    00427B1A  FF155CC24C00         call dword ptr [004CC25Ch]  # ExitProcess@KERNEL32.DLL (Import, Unknown Params)\n\n---\n\n## REASONING STRATEGY: Counterfactual Analysis\n\nAnalyze this trace using counterfactual reasoning (\"what if\" scenarios):\n\n**Phase 1: Establish the factual outcome**\n- The program exits (this is the observed fact)\n- Identify the exact instruction sequence leading to exit\n\n**Phase 2: Generate counterfactual hypotheses**\nFor each suspicious instruction, ask:\n- \"What if this instruction were skipped?\"\n- \"Would the program continue instead of exiting?\"\n\n**Phase 3: Evaluate each hypothesis**\nFor each candidate instruction:\n\n*Counterfactual 1:* [Instruction at line X]\n- Factual: This instruction executes \u2192 leads to exit\n- Counterfactual: If skipped \u2192 would execution continue?\n- Necessity: Is skipping this NECESSARY to prevent exit?\n- Sufficiency: Is skipping this SUFFICIENT to prevent exit?\n\n*Counterfactual 2:* [Different instruction at line Y]\n- Same analysis...\n\n*Counterfactual 3:* [Another instruction at line Z]\n- Same analysis...\n\n**Phase 4: Select the 3 best bypass points**\nChoose instructions where skipping is likely SUFFICIENT to bypass evasion.\n\n**Phase 5: Build patterns (6-20 bytes each)**\nFor each selected bypass point, combine it with 2-3 adjacent instructions and apply wildcards.\n\n---\n\n## PATTERN LENGTH REQUIREMENT (CRITICAL)\n\nEach pattern must be **6-20 bytes long** to be specific enough to match only the target location.\n\n**How to build patterns:**\n- Combine 2-3 consecutive instructions from the trace into one pattern\n- Include the target instruction PLUS surrounding context instructions\n- **All patterns MUST come from the TRACE DATA above** - do not invent byte sequences\n\n**Good Example:** `85 C0 0F 84 ?? ?? ?? ?? 8B 45 ??` (TEST EAX + JZ + MOV = 11 bytes)\n**Good Example:** `6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0` (PUSH + POP + MOV + CALL + TEST = 12 bytes)\n\n---\n\n## WILDCARD RULES\n\n**Wildcard principle:** Any byte that represents an address, offset, or displacement MUST be replaced with `??`\n\n**Apply wildcards to:**\n- CALL/JMP offset bytes (4 bytes after opcode)\n- Conditional jump offsets (1 or 4 bytes after opcode)\n- Memory address bytes\n- Stack offsets\n\n**Keep concrete:** All opcode bytes, register-encoding bytes\n\n---\n\n## OUTPUT FORMAT\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [6-20 bytes with wildcards] }\n        $pattern1 = { [6-20 bytes - DIFFERENT sequence] }\n        $pattern2 = { [6-20 bytes - DIFFERENT sequence] }\n\n    condition:\n        any of them\n}\n```\n\n## REQUIREMENTS\n\n1. Extract exactly 3 patterns ($pattern0, $pattern1, $pattern2)\n2. All 3 patterns must be DIFFERENT hex sequences\n3. **Each pattern must be 6-20 bytes long** (combine multiple instructions)\n4. **Add context bytes after CALL/JMP** to avoid triggering new signatures\n5. Use wildcards (??) for all address/offset bytes\n6. Keep opcode and register bytes concrete\n7. Format: spaces between hex bytes, patterns wrapped in { }\n8. cape_options references patterns as $pattern0, $pattern1, $pattern2\n\n---\n\n## CORRECTION GUIDE\n\nBased on the validation errors above, generate a NEW corrected YARA rule.\n\n### \u26a0\ufe0f CRITICAL REQUIREMENTS (MUST FOLLOW)\n\n1. **EXACTLY 3 PATTERNS**: You MUST have `$pattern0`, `$pattern1`, `$pattern2` - no more, no less\n2. **CAPE_OPTIONS REQUIRED**: You MUST include cape_options in meta section for bypass to work\n3. **6-20 BYTES PER PATTERN**: Each pattern must be 6-20 bytes\n4. **WILDCARDS REQUIRED**: Replace address/offset bytes with `??` wildcards\n\n### Common Errors and How to Fix Them\n\n| Error Type | Problem | Solution |\n|------------|---------|----------|\n| **\"too short\"** | Pattern has < 6 bytes | Combine 2-3 consecutive instructions into one pattern. Include target + context. |\n| **\"address bytes\" / \"hardcoded\"** | Raw addresses in pattern | Replace ALL address/offset bytes with `??`. CALL offsets = 4 bytes after opcode. |\n| **\"duplicate patterns\"** | Two patterns are identical | Select DIFFERENT instruction sequences from the trace. |\n| **\"cape_options missing\"** | No bypass metadata | Add to meta: `cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"` |\n| **\"syntax error\"** | Invalid YARA format | Check: braces `{ }` around hex, spaces between bytes, pattern names start with `$` |\n| **\"not 3 patterns\"** | Wrong pattern count | Must have exactly `$pattern0`, `$pattern1`, `$pattern2` |\n\n### Byte-Level Fix Examples\n\n**CALL instruction (E8 + 4 offset bytes):**\n- Wrong: `E8 25 05 00 00` (hardcoded offset)\n- Right: `E8 ?? ?? ?? ??`\n\n**Conditional JMP short (74/75 + 1 offset byte):**\n- Wrong: `74 1A` or `75 0C`\n- Right: `74 ??` or `75 ??`\n\n**Conditional JMP near (0F 84/0F 85 + 4 offset bytes):**\n- Wrong: `0F 84 8A 00 00 00`\n- Right: `0F 84 ?? ?? ?? ??`\n\n**Memory access with displacement:**\n- Wrong: `8B 45 FC` (stack offset FC)\n- Right: `8B 45 ??`\n\n---\n\n### \u2705 CORRECT FORMAT TEMPLATE\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}\n```\n\n---\n\nGenerate ONLY the corrected YARA rule following the template above. You MUST have exactly 3 patterns with cape_options.",
+        "prompt_length": 7904,
+        "prompt_tokens": 1976,
+        "response_text": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 ?? E8 ?? ?? ?? ?? }\n        $pattern1 = { FF 75 ?? FF 15 ?? ?? ?? ?? }\n        $pattern2 = { 55 8B EC FF 75 ?? }\n\n    condition:\n        any of them\n}\n```",
+        "response_length": 399,
+        "response_tokens": 99,
+        "query_start_time": 1765658181.5115159,
+        "query_end_time": 1765658218.2867496,
+        "query_duration_seconds": 36.77523374557495,
+        "model_name": "qwen3:latest",
+        "model_provider": "ollama",
+        "temperature": 0.7,
+        "pattern_type": "UNKNOWN",
+        "confidence": 50,
+        "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 ?? E8 ?? ?? ?? ?? }\n        $pattern1 = { FF 75 ?? FF 15 ?? ?? ?? ?? }\n        $pattern2 = { 55 8B EC FF 75 ?? }\n\n    condition:\n        any of them\n}",
+        "opcodes_generic": "",
+        "opcodes_specific": ""
+      },
+      "cape_analysis": {
+        "task_id": 809,
+        "analysis_type": "bypass",
+        "vm_host": "192.168.197.148",
+        "vm_name": "cape_vm3",
+        "submit_time": 1765658228.6204908,
+        "complete_time": 1765658385.386654,
+        "duration_seconds": 156.76616311073303,
+        "signatures_count": 5,
+        "signature_names": [
+          "packer_entropy",
+          "exec_crash",
+          "injection_rwx",
+          "static_pe_pdbpath",
+          "antidebug_setunhandledexceptionfilter"
+        ],
+        "rule_hit": true,
+        "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 ?? E8 ?? ?? ?? ?? }\n        $pattern1 = { FF 75 ?? FF 15 ?? ?? ?? ?? }\n        $pattern2 = { 55 8B EC FF 75 ?? }\n\n    condition:\n        any of them\n}",
+        "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\a2cc7061a035063d\\iter2_v2.yar"
+      },
+      "success": false,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "feedback_given": "Rule caused crash: ['exec_crash']",
+      "evolution_reasoning": null
+    }
+  ],
+  "total_iterations": 1,
+  "iterations_to_success": null,
+  "total_time_seconds": 1041.0859215259552,
+  "avg_query_time_seconds": 36.77523374557495,
+  "avg_analysis_time_seconds": 156.76616311073303,
+  "total_input_tokens": 11269,
+  "total_output_tokens": 2612,
+  "total_tokens": 13881,
+  "success": false,
+  "best_score": 0,
+  "best_iteration": null,
+  "final_yara_rule": null,
+  "final_new_signatures": []
+}

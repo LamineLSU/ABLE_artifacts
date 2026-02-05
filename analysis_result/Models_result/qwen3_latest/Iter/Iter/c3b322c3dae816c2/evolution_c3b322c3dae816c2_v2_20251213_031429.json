@@ -1,0 +1,79 @@
+{
+  "sha256": "c3b322c3dae816c27c30f6cd99dc010447ff89564705268cc04371ee0f6c0d34",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To address the scenario where the program flow is directed to a call to `ExitProcess` (or a similar system call), we can identify three distinct instruction sequences that are critical to the flow of execution leading to the `ExitProcess` call. These sequences, if bypassed or skipped, would prevent the program from reaching the `ExitProcess` call and thus avoid termination.\n\n---\n\n### **Pattern 1: Jump to Cleanup Routine**\n**Instruction:**  \n`0xEB` (JMP) followed by the offset to a cleanup routine at `0x00955E85`\n\n**Code:**\n```asm\n0x009561CB: jmp 0x00955E85\n```\n\n**Explanation:**  \nThis `jmp` instruction directs execution to a cleanup routine. If this jump is skipped or altered, the program would not reach the cleanup routine and would not proceed to the `ExitProcess` call.\n\n**Pattern:**\n```\n0xEB 0x... 0x... 0x... 0x... 0x...\n```\n\n---\n\n### **Pattern 2: Conditional Jump (JE)**\n**Instruction:**  \n`0x74` (JE) followed by the offset to a conditional branch at `0x00955E83`\n\n**Code:**\n```asm\n0x0095618A: je 0x00955E83\n```\n\n**Explanation:**  \nThis conditional jump checks a flag and, if the condition is not met, skips to a different code path. If this jump is bypassed (e.g., the flag is not checked), the program may proceed to the `ExitProcess` call.\n\n**Pattern:**\n```\n0x74 0x... 0x... 0x... 0x... 0x...\n```\n\n---\n\n### **Pattern 3: Call to ExitProcess**\n**Instruction:**  \n`0xE8` (CALL) followed by the offset to `ExitProcess` at `0x009561F8`\n\n**Code:**\n```asm\n0x009561F8: call ExitProcess\n```\n\n**Explanation:**  \nThis is the actual call to terminate the process. If this call is skipped or replaced, the program will not terminate.\n\n**Pattern:**\n```\n0xE8 0x... 0x... 0x... 0x... 0x...\n```\n\n---\n\n### ✅ **Summary of Patterns**\n| Pattern | Instruction | Purpose |\n|--------|------------|--------|\n| **1** | `jmp 0x00955E85` | Redirects to cleanup code |\n| **2** | `je 0x00955E83` | Conditional jump to skip logic |\n| **3** | `call ExitProcess` | Direct call to terminate process |\n\nThese three patterns represent distinct points in the execution flow that, if altered or bypassed, would prevent the program from reaching the `ExitProcess` call and thus avoid termination.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 8B CE E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "774",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 39,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Refine the patterns to specifically target the original trace's instructions by adding more context bytes and ensuring skip offsets align with the trace's flow."
+      ],
+      "debugger_log": "=== 3712.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 13:42:56 2025\nBreakpoint 1 hit by instruction at 0x0023E41D (thread 8920) EAX=0xffce ECX=0xffce ESI=0x278bf0 cmd.exe EDI=0x7fe7 ESP=0x23efbd0 *ESP=0xffce EBP=0x23efbe4\nBreak at 0x0023E41D in cmd.exe (RVA 0xe41d, thread 8920, Stack 0x022F3000-0x023F0000, ImageBase 0x00230000)\n0x0023E41D  E8038A0000               CALL      0x8a08                        \nActionDispatcher: skipping instruction.\n0x0023E422  83C408                   ADD       ESP, 0x8                      \n\n\n=== 3756.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 13:41:57 2025\nBreakpoint 0 hit by instruction at 0x0040D250 (thread 7508) ECX=0x40d250 aSNf.exe EDX=0x8 ESI=0x41b190 aSNf.exe EDI=0x298 ESP=0x19e640 *ESP=0x40e84e aSNf.exe EBP=0x19e648\nBreak at 0x0040D250 in aSNf.exe (RVA 0xd250, thread 7508, Stack 0x00191000-0x001A0000, ImageBase 0x00400000)\n0x0040D250  8BFF                     MOV       EDI, EDI                      \nActionDispatcher: skipping instruction.\n0x0040D252  56                       PUSH      ESI                           \n\n\n=== 5020.log ===\nCAPE Sandbox - Debugger log: Sat Dec 13 13:42:40 2025\nBreakpoint 0 hit by instruction at 0x00007FFA7FCAC286 (thread 4200) RBX=0x3f689c8 RCX=0x3f68ba0 RDX=0x3f65110 RSI=0x3f686d8 RDI=0x3f68830 RSP=0x3fdbb0 *RSP=0x3f68ba0 RBP=0x6c R8=0x5 R9=0x3f68974 R10=0x42 R11=0x42 R12=0x3ea1450 R13=0x3fe3f0 R14=0x21 R15=0x3f687d0 Xmm0.Low=0x3f689c8 Xmm1.Low=0x3f68ba0\n0x00007FFA7FCAC286  E8CD84FCFF               CALL      0xfffffffffffc84d2            \nActionDispatcher: skipping instruction.\n0x00007FFA7FCAC28B  85C0                     TEST      EAX, EAX                      \nBreakpoint 0 hit by instruction at 0x00007FFA7FCAC286 (thread 4200) RBX=0x3f692a0 RCX=0x3f69478 RDX=0x3f65110 RSI=0x3f69010 RDI=0x3f69108 RSP=0x3fdb00 *RSP=0x3f69478 RBP=0x6c R8=0x5 R9=0x3f6924c R10=0x42 R11=0x42 R12=0x3ea1450 R13=0x3fe3f0 R14=0x21 R15=0x3f687d0 Xmm0.Low=0x3f692a0 Xmm1.Low=0x3f69478\n0x00007FFA7FCAC286  E8CD84FCFF               CALL      0xfffffffffffc84d2            \nActionDispatcher: skipping instruction.\n0x00007FFA7FCAC28B  85C0                     TEST      EAX, EAX                      \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 8B CE E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\c3b322c3dae816c2\\iter1_v2.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v2",
+      "yara_rule": "rule ExampleRule\n{\n    meta:\n        description = \"Matches a specific sequence of instructions from the provided trace.\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n    strings:\n        $a = { E8 25 05 00 00 85 C0 0F 84 ?? ?? ?? ?? }\n        $b = { FF 15 2C A1 95 00 }\n        $c = { 6A 5B 5A 8B CE E8 25 05 00 00 }\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "775",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 39,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "Here is the final answer, structured to meet the requirements of using exact byte sequences from the provided trace and ensuring that each pattern is distinct and valid within the specified length range.\n\n---\n\n### ✅ Final Answer\n\n```plaintext\nYou are to use the following patterns from the provided trace, ensuring that each pattern is exactly as found in the original code, and that all patterns are distinct and within the 6–20 byte length range:\n\n1. **Pattern 0** (Call followed by test and conditional jump):\n   - Bytes: `E8 25 05 00 00 85 C0 0F 84 ?? ?? ?? ??`  \n   - Description: A call instruction (`E8 25 05 00 00`) followed by a test (`85 C0`) and a conditional jump (`0F 84`).\n\n2. **Pattern 1** (Call to ExitProcess):\n   - Bytes: `FF 15 2C A1 95 00`  \n   - Description: A direct call to `ExitProcess` via a relative address (`FF 15`).\n\n3. **Pattern 2** (Push, Pop, and Register Move):\n   - Bytes: `6A 5B 5A 8B CE E8 25 05 00 00`  \n   - Description: A sequence of push (`6A 5B`), pop (`5A`), and move (`8B CE`) instructions followed by a call.\n\n---\n\n### ✅ Final YARA Rule (Example)\n\n```yara\nrule ExampleRule\n{\n    meta:\n        description = \"Matches a specific sequence of instructions from the provided trace.\"\n    strings:\n        $a = { E8 25 05 00 00 85 C0 0F 84 ?? ?? ?? ?? }\n        $b = { FF 15 2C A1 95 00 }\n        $c = { 6A 5B 5A 8B CE E8 25 05 00 00 }\n    condition:\n        all of them\n}\n```\n\n---\n\n### 📌 Notes\n\n- All byte sequences are **exact** as found in the original code.\n- The use of `?? ?? ?? ??` in pattern 0 ensures flexibility for offsets that may vary across instances.\n- Each pattern is **distinct** and within the required byte range (6–20 bytes).\n- This approach avoids false positives by leveraging the **exactness** of the trace data.\n\nLet me know if you'd like a version using wildcards for all offsets or for additional patterns!",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\c3b322c3dae816c2\\iter2_v2.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 2: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

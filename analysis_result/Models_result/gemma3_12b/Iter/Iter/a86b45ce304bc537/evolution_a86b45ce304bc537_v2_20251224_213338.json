@@ -1,0 +1,241 @@
+{
+  "sha256": "a86b45ce304bc537005a6dc78cfa0f694ae2cdf6c35ad3dc2f88fc50aaa2e388",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B 16 50 51 FF D0 5E 5D C3 }\n        $pattern1 = { 8D B0 7C 0C 00 00 56 50 E8 44 09 00 00 }\n        $pattern2 = { 52 8B 16 50 51 FF D2 5E 5D }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1760",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 17,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Instead of hardcoded skip offsets, introduce wildcards to allow for variations in the instruction sequence after the initial pattern match. Specifically, widen the skip offset in the rule to account for the potential branching and the subsequent instructions that might be executed after the `call edx`. The skip offset should be more generic to avoid jumping into invalid code."
+      ],
+      "debugger_log": null,
+      "raw_response": "Okay, let's analyze the trace and construct three bypass patterns following the provided guidelines. I'll focus on instructions that appear to be critical for the early exit, especially around the `call eax` at `0041A0C8`.\n\n**Phase 1 & 2: Identifying Potential Bypass Points**\n\nThe `call eax` at `0041A0C8` is the exit point. This suggests that `eax` holds an address that, when called, terminates the process. The value of `eax` is derived from prior instructions. We need to find a point where we can manipulate or prevent this call from happening.\n\n**Phase 3: Counterfactual Analysis & Pattern Selection**\n\nHere are three potential bypass points, along with reasoning:\n\n* **Pattern 1: Around the `call eax` (0041A0C8)**\n\nThis is the most direct approach.  If we can prevent the `call eax` from executing, the program might continue.  Let's look at the surrounding code:\n\n`0041A0C7  52               push edx`\n`0041A0C8  FFD0             call eax`\n`0041A0CA  5E               pop esi`\n`0041A0CB  5D               pop ebp`\n`0041A0CC  C3               ret`\n\n* **Pattern 2:  The `lea esi` instruction (0041A0B2)**\n\nThis instruction loads an effective address into `esi`.  This address might be used later in the `call eax` sequence.  Modifying this could alter the address in `eax`.\n\n`0041A0B2  8DB07C0C0000     lea esi, dword ptr [eax+00000C7Ch]`\n`0041A0B8  56               push esi`\n`0041A0B9  50               push eax`\n`0041A0BA  E844090000       call 0041A950h`\n\n* **Pattern 3:  The `push edx` and `call edx` sequence (0041A048-0041A04F)**\n\nThis sequence involves pushing `edx` onto the stack and then calling the value in `edx`.  This could be a function call, and altering this sequence might affect the flow of control.\n\n`0041A048  52               push edx`\n`0041A049  8B16             mov edx, dword ptr [esi]`\n`0041A04B  50               push eax`\n`0041A04C  51               push ecx`\n`0041A04D  FFD2             call edx`\n\n**Phase 4: Pattern Construction**\n\nNow, let's translate these into YARA patterns, ensuring they meet the length and wildcard requirements.\n\n**Pattern 1:  Bypass the `call eax`**\n\n`$pattern0 = { 52 8B16 50 51 FF D0 5E 5D C3 }`  (11 bytes) - This skips the call.\n\n**Pattern 2: Modify the `lea esi`**\n\n`$pattern1 = { 8D B0 7C 0C 00 00 56 50 E8 44 09 00 00 }` (13 bytes) - This skips the `lea` and `call`.\n\n**Pattern 3:  Alter the `call edx` sequence**\n\n`$pattern2 = { 52 8B 16 50 51 FF D2 5E 5D }` (11 bytes) - This skips the `call edx`.\n\n**Phase 5: YARA Rule**\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B16 50 51 FF D0 5E 5D C3 }\n        $pattern1 = { 8D B0 7C 0C 00 00 56 50 E8 44 09 00 00 }\n        $pattern2 = { 52 8B 16 50 51 FF D2 5E 5D }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation of Choices and Considerations:**\n\n*   **Length:** All patterns are within the 6-20 byte limit.\n*   **Wildcards:** No wildcards are needed as all bytes are either opcodes or immediate values.\n*   **Context:** The patterns include surrounding instructions to provide context and potentially reduce false positives.\n*   **CAPE Options:** The `cape_options` metadata provides instructions for a CAPE environment to automatically apply the bypasses.\n*   **Different Sequences:** The patterns are distinct hex sequences.\n\nThis solution provides three distinct bypass points based on analysis of the trace data.  Testing these patterns in a real-world scenario is crucial to validate their effectiveness and refine them further.\n",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\a86b45ce304bc537\\iter0_v2.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC 8B 45 08 8B 48 10 56 6A 35 6A 00 51 8D B0 74 0C 00 00 56 50 E8 44 09 00 00 }\n        $pattern1 = { 8B 55 14 8B 45 10 8B 4D 0C 83 C4 14 52 8B 16 50 51 FF D2 5E 5D C3 }\n        $pattern2 = { 4F 01 DE 1C CE A3 D6 DB E4 B1 04 89 6B A5 55 8B EC 8B 45 55 8B EC 8B 45 08 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1761",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 17,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Instead of skipping `8B5514` directly, we need to identify a safer instruction to skip that still allows the program to function correctly, or target a more generic pattern that encompasses a larger block of code.  A safer approach might be to skip a preceding instruction that doesn't have a direct dependency on the skipped instruction, or to modify the pattern to include more context."
+      ],
+      "debugger_log": "=== 1036.log ===\nCAPE Sandbox - Debugger log: Thu Dec 25 11:29:03 2025\nBreakpoint 1 hit by instruction at 0x0041A1DF (thread 6168) EAX=0x4800000 EBX=0xe0e000 ECX=0x76972994 advapi32.dll EDX=0x1b0 ESI=0xdffcbc EDI=0x41eb30 ESP=0xdfef78 *ESP=0xdff030 EBP=0xdfef90\nBreak at 0x0041A1DF in a86b45ce304bc537005a.exe (RVA 0x1a1df, thread 6168, Stack 0x00DF2000-0x00E00000, ImageBase 0x00400000)\n0x0041A1DF  8B5514                   MOV       EDX, [EBP+0x14]               \nActionDispatcher: skipping instruction.\n0x0041A1E2  8B4510                   MOV       EAX, [EBP+0x10]               \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8BEC 8B4508 8B4810 56 6A35 6A00 51 8DB0740C0000 56 50 E844090000 }\n        $pattern1 = { 8B5514 8B4510 8B4D0C 83C414 52 8B16 50 51 FFD2 5E 5D C3 }\n        $pattern2 = { 4F 01DE 1CCE A3D6DBE4B1 0489 6BA5558BEC8B45 55 8BEC 8B4508 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\a86b45ce304bc537\\iter1_v2.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B 16 50 51 FF D2 5E 5D C3 }\n        $pattern1 = { 55 8B EC 8B 45 08 8B 48 10 56 6A 35 6A 00 51 8D B0 74 0C 00 00 56 50 E8 44 09 00 00 }\n        $pattern2 = { 8B 55 0C 8B 06 83 C4 14 52 8B 16 50 51 FF D2 5E 5D C3 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1762",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 17,
+      "new_signatures": 2,
+      "new_signature_names": [
+        "accesses_public_folder",
+        "infostealer_browser"
+      ],
+      "new_signature_details": [
+        {
+          "name": "accesses_public_folder",
+          "description": "A file was accessed within the Public folder.",
+          "categories": [
+            "generic"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "file": "C:\\Users\\Public\\"
+            },
+            {
+              "file": "C:\\Users\\Public\\desktop.ini"
+            },
+            {
+              "file": "C:\\Users\\Public\\Desktop\\Microsoft Edge.lnk"
+            },
+            {
+              "file": "C:\\Users\\Public\\Desktop\\"
+            },
+            {
+              "file": "C:\\Users\\Public\\Desktop"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "infostealer_browser",
+          "description": "Steals private information from local Internet browsers",
+          "categories": [
+            "infostealer"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 30,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 3176,
+              "cid": 21882
+            },
+            {
+              "type": "call",
+              "pid": 3176,
+              "cid": 21893
+            },
+            {
+              "type": "call",
+              "pid": 3176,
+              "cid": 22127
+            },
+            {
+              "file": "C:\\Users\\sanya\\AppData\\Local\\microsoft\\Edge\\user data\\Default\\edge profile.ico"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B 16 50 51 FF D2 5E 5D C3 }\n        $pattern1 = { 55 8BEC 8B 45 08 8B 48 10 56 6A 35 6A 00 51 8D B0 74 0C 00 00 56 50 E8 44 09 00 00 }\n        $pattern2 = { 8B 55 0C 8B 06 83 C4 14 52 8B 16 50 51 FF D2 5E 5D C3 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\a86b45ce304bc537\\iter2_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B 16 50 51 FF D2 5E 5D C3 }\n        $pattern1 = { 55 8B EC 8B 45 08 8B 48 10 56 6A 35 6A 00 51 8D B0 74 0C 00 00 56 50 E8 44 09 00 00 }\n        $pattern2 = { 8B 55 0C 8B 06 83 C4 14 52 8B 16 50 51 FF D2 5E 5D C3 }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1762",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 17,
+    "new_signatures": 2,
+    "new_signature_names": [
+      "accesses_public_folder",
+      "infostealer_browser"
+    ],
+    "new_signature_details": [
+      {
+        "name": "accesses_public_folder",
+        "description": "A file was accessed within the Public folder.",
+        "categories": [
+          "generic"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "file": "C:\\Users\\Public\\"
+          },
+          {
+            "file": "C:\\Users\\Public\\desktop.ini"
+          },
+          {
+            "file": "C:\\Users\\Public\\Desktop\\Microsoft Edge.lnk"
+          },
+          {
+            "file": "C:\\Users\\Public\\Desktop\\"
+          },
+          {
+            "file": "C:\\Users\\Public\\Desktop"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "infostealer_browser",
+        "description": "Steals private information from local Internet browsers",
+        "categories": [
+          "infostealer"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 30,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 3176,
+            "cid": 21882
+          },
+          {
+            "type": "call",
+            "pid": 3176,
+            "cid": 21893
+          },
+          {
+            "type": "call",
+            "pid": 3176,
+            "cid": 22127
+          },
+          {
+            "file": "C:\\Users\\sanya\\AppData\\Local\\microsoft\\Edge\\user data\\Default\\edge profile.ico"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B 16 50 51 FF D2 5E 5D C3 }\n        $pattern1 = { 55 8BEC 8B 45 08 8B 48 10 56 6A 35 6A 00 51 8D B0 74 0C 00 00 56 50 E8 44 09 00 00 }\n        $pattern2 = { 8B 55 0C 8B 06 83 C4 14 52 8B 16 50 51 FF D2 5E 5D C3 }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\a86b45ce304bc537\\iter2_v2.yar"
+  },
+  "best_score": 2,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 3: SUCCESS - 2 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

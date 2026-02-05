@@ -1,0 +1,81 @@
+{
+  "sha256": "bbc8b42899356e85ecd2fb5277b7fbdf296094bdc006504147b0be21895ccdc8",
+  "prompt_version": "v0",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v0",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "The provided trace data shows a sequence of instructions leading to the call to the `ExitProcess` function, which is a common way for malware to terminate itself. Based on this, three distinct patterns can be identified that reflect key steps in the evasion or termination process:\n\n---\n\n### **Pattern 1: Push EBX Before Exit**  \nThis instruction sets up the `EBX` register, which is often used to pass parameters or context before calling a function like `ExitProcess`.\n\n**Pattern:**  \n`53 FF 15 ?? ?? ?? ??`  \n- `53` = `PUSH EBX`  \n- `FF 15` = `CALL` (with the address of `ExitProcess` in the following bytes)  \n- `?? ?? ?? ??` = Displacement (offset to the `ExitProcess` function)  \n\n**Length:** 7 bytes  \n**Purpose:** Prepares the call stack for terminating the process.\n\n---\n\n### **Pattern 2: Direct Call to ExitProcess**  \nThis is the core instruction that terminates the process. The `CALL` instruction points to the `ExitProcess` function.\n\n**Pattern:**  \n`FF 15 ?? ?? ?? ??`  \n- `FF 15` = `CALL`  \n- `?? ?? ?? ??` = Displacement (offset to `ExitProcess`)  \n\n**Length:** 6 bytes  \n**Purpose:** Directly invokes the system call to terminate the process.\n\n---\n\n### **Pattern 3: Jump to Exit Code**  \nThis instruction is likely a jump to the code that leads to the `ExitProcess` call, indicating a control flow redirection to the termination logic.\n\n**Pattern:**  \n`E9 ?? ?? ?? ??`  \n- `E9` = `JMP`  \n- `?? ?? ?? ??` = Displacement (offset to the `ExitProcess` call)  \n\n**Length:** 5 bytes  \n**Purpose:** Redirects execution to the termination logic, possibly to bypass certain checks or avoid detection.\n\n---\n\n### **Summary**  \nThese three patterns reflect a typical sequence used by malware to terminate itself gracefully, often to evade detection or clean up after its execution. The `PUSH EBX` and `JMP` instructions are used to control the flow of execution, while the `CALL ExitProcess` is the actual termination mechanism.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 74 12 6A 5B 5A 8B CE E8 25 05 00 00 }\n        $pattern1 = { 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { FF 15 2C A1 35 01 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "969",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 13,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Adjust the skip offset for `$pattern1` to skip over the `JZ` instruction (0x0F84) and ensure execution continues past the skipped code."
+      ],
+      "debugger_log": "=== 2908.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 03:48:20 2025\nBreakpoint 1 hit by instruction at 0x065387AE (thread 5312) ESI=0x68e132c EDI=0x2d2f210 ESP=0x19edd0 *ESP=0x6ab3f4eb \"ZY_^[]\" clr.dll EBP=0x19edf0\n0x065387AE  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x065387B0  0F847F000000             JZ        0x85                          \n",
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt likely failed due to overly generic or incorrect pattern selection. By focusing on concrete sequences from the original trace, especially the evasion checks (test eax, eax + je) and the ExitProcess call, we ensure specificity. The three patterns target distinct yet critical sections of the malware’s flow, increasing the likelihood of accurate detection without false positives.\n\n**PATTERN_TYPE**: CALL_TEST_JE  \n**CONFIDENCE**: 95  \n\n**REASONING**:  \n1. **Pattern0** captures the first evasion check (test eax, eax + je) with subsequent instructions, which likely validates EAX for termination logic.  \n2. **Pattern1** targets the second test/je sequence, which may represent a secondary condition check.  \n3. **Pattern2** directly references the ExitProcess call, a clear termination point. These patterns are derived verbatim from the trace, ensuring alignment with the malware’s actual behavior.  \n\n**YARA_RULE**:  \n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85C0 7412 6A5B 5A 8BCE E825050000 }\n        $pattern1 = { 85C0 0F84 ?? ?? ?? ?? }\n        $pattern2 = { FF152CA13501 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\bbc8b42899356e85\\iter1_v0.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v0",
+      "yara_rule": "rule ExampleRule\n{\n    meta:\n        description = \"Detects specific test and jump patterns and a call to ExitProcess\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n        author = \"Your Name\"\n        date = \"2023-10-10\"\n\n    strings:\n        // First test, je, and mov sequence\n        $a = { 85 C0 74 12 8B 45 FC }\n\n        // First JE instruction (0F 84) with wildcards\n        $b = { 0F 84 ?? ?? ?? ?? }\n\n        // Second test, je, and mov sequence\n        $c = { 85 C0 74 12 8B 4D F8 }\n\n    condition:\n        $a or $b or $c\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "970",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 13,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Replace the generic `$b` pattern with a more specific sequence from the original trace to ensure it only matches the intended `JE` instruction near `ExitProcess`."
+      ],
+      "debugger_log": "=== 1972.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 08:14:52 2025\nBreakpoint 1 hit by instruction at 0x04816DC5 (thread 7292) EAX=0x4c813bc EBX=0x4c81254 ECX=0x4c81540 EDX=0x13205 ESI=0x4c81424 ESP=0x113ed2c \"L\u0013\" *ESP=0x4c8134c \"L<\" EBP=0x113ed58\n0x04816DC5  0F84A0000000             JZ        0xa6                          \nActionDispatcher: skipping instruction.\n0x04816DCB  33DB                     XOR       EBX, EBX                      \n\n\n=== 5432.log ===\nCAPE Sandbox - Debugger log: Sun Dec 14 08:14:49 2025\nBreakpoint 1 hit by instruction at 0x06756DC5 (thread 7544) EAX=0x67a1504 ECX=0x67a1420 EDX=0x19e85 ESI=0x67a132c EDI=0x1 ESP=0x19ee1c \"T\u0012z\" *ESP=0x67a1254 \"L<v\" EBP=0x19ee48\n0x06756DC5  0F84A0000000             JZ        0xa6                          \nActionDispatcher: skipping instruction.\n0x06756DCB  33DB                     XOR       EBX, EBX                      \n",
+      "raw_response": "```yara\nrule ExampleRule\n{\n    meta:\n        description = \"Detects specific test and jump patterns and a call to ExitProcess\"\n        author = \"Your Name\"\n        date = \"2023-10-10\"\n\n    strings:\n        // First test, je, and mov sequence\n        $a = { 85 C0 74 12 8B 45 FC }\n\n        // First JE instruction (0F 84) with wildcards\n        $b = { 0F 84 ?? ?? ?? ?? }\n\n        // Second test, je, and mov sequence\n        $c = { 85 C0 74 12 8B 4D F8 }\n\n    condition:\n        $a or $b or $c\n}\n```\n\n### Explanation:\n1. **Pattern `$a`**:\n   - **Bytes**: `85 C0 74 12 8B 45 FC`\n   - **Meaning**: This sequence represents a `test eax, eax` (85 C0), followed by a `je` (74 12), and then a `mov eax, [ebp-04]` (8B 45 FC). This is a common pattern in code that checks if a value is zero and then performs a conditional jump.\n\n2. **Pattern `$b`**:\n   - **Bytes**: `0F 84 ?? ?? ?? ??`\n   - **Meaning**: This is a `jz` (or `je`) instruction with the 32-bit offset field (0F 84) followed by four bytes of wildcards. This pattern is used to detect any conditional jump that may be part of a larger control flow logic.\n\n3. **Pattern `$c`**:\n   - **Bytes**: `85 C0 74 12 8B 4D F8`\n   - **Meaning**: This is another test and jump sequence, similar to `$a`, but with a different memory operand (`[ebp-08]` instead of `[ebp-04]`). This could indicate a similar conditional check in a different part of the code.\n\n### Use Case:\nThis rule is useful for detecting potential control flow logic or anti-debugging techniques where conditional jumps and zero checks are used. It could be part of a larger detection strategy for malware or obfuscated code. The use of wildcards (`??`) in `$b` allows for flexibility in matching different jump targets.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\bbc8b42899356e85\\iter2_v0.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: bypass_crashed - Rule caused crash: ['exec_crash']"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

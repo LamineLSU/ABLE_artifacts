@@ -1,0 +1,81 @@
+{
+  "sha256": "adaa96068e4072db205354abc3394d59db0cc04248c7ed3022f95da4efa94438",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**Answer:**\n\nThe malware employs an evasion technique by checking for specific conditions and terminating via `ExitProcess` if detected. To bypass this, the following three instructions are critical to skip:\n\n1. **`FFD0` at `0041E86B`**  \n   - **Instruction**: `CALL EAX`  \n   - **Explanation**: This instruction directly calls `ExitProcess`, terminating the process. Skipping it prevents the termination, bypassing the evasion check.\n\n2. **`83C414` at `0041E867`**  \n   - **Instruction**: `ADD ESP, 14`  \n   - **Explanation**: This adjusts the stack pointer, likely preparing for a function call. Skipping it disrupts the stack state, potentially preventing the subsequent `CALL` to `ExitProcess`.\n\n3. **`52` at `0041E86A`**  \n   - **Instruction**: `PUSH EDX`  \n   - **Explanation**: This pushes the `EDX` register onto the stack, possibly for function call parameters. Skipping it modifies the stack state, interfering with the execution flow that leads to `ExitProcess`.\n\n**Final Answer:**  \n```  \n1. `FFD0` at `0041E86B` (CALL EAX)  \n2. `83C414` at `0041E867` (ADD ESP, 14)  \n3. `52` at `0041E86A` (PUSH EDX)  \n```",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 FF D0 }  // Push edx + Call eax (ExitProcess)\n        $pattern1 = { E8 04 13 00 00 }  // Call to 0041F143h\n        $pattern2 = { 8B 16 50 51 FF D2 }  // Mov edx,[esi] + Push eax/ecx + Call edx\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1137",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Modify the code to avoid the exact sequence 8B 16 50 51 FF D2. For example, re-order the push operations, use different registers (e.g., replace edx with ebx), or inline the call to RtlFreeHeap instead of using a register-indirect call."
+      ],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 FFD0 }  // Push edx + Call eax (ExitProcess)\n        $pattern1 = { E8 04 13 00 00 }  // Call to 0041F143h\n        $pattern2 = { 8B16 50 51 FF D2 }  // Mov edx,[esi] + Push eax/ecx + Call edx\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\adaa96068e4072db\\iter1_v1.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83 C4 14 E8 ?? ?? ?? ?? }  // Add ESP and call to 0041F143h\n        $pattern1 = { 83 C4 14 52 FF D2 }          // Add ESP, push EDX, call RtlFreeHeap\n        $pattern2 = { 8B 06 52 FF D0 }            // MOV EAX, [ESI], push EDX, call ExitProcess\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1138",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Modify the patterns to be more generic by using wildcards for register values or call addresses. For example, replace fixed values with `??` or `"
+      ],
+      "debugger_log": "=== 8080.log ===\nCAPE Sandbox - Debugger log: Fri Dec 12 04:47:31 2025\nBreakpoint 0 hit by instruction at 0x004099CF (thread 944) EAX=0x1 EBX=0xbde5c4 \"]\u0014\" ECX=0x6cd3bed3 ESI=0xbdd960 EDI=0xbdeb78 ESP=0xbdd634 *ESP=0xbdeb78 EBP=0xbdd900\nBreak at 0x004099CF in adaa96068e4072db2053.exe (RVA 0x99cf, thread 944, Stack 0x00BD0000-0x00BE0000, ImageBase 0x00400000)\n0x004099CF  83C414                   ADD       ESP, 0x14                     \nActionDispatcher: skipping instruction.\n0x004099D2  E88C5F0100               CALL      0x0041F963                    \n",
+      "raw_response": "```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83C414 E8 ?? ?? ?? ?? }  // Add ESP and call to 0041F143h\n        $pattern1 = { 83C414 52 FFD2 }          // Add ESP, push EDX, call RtlFreeHeap\n        $pattern2 = { 8B06 52 FFD0 }            // MOV EAX, [ESI], push EDX, call ExitProcess\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\adaa96068e4072db\\iter2_v1.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

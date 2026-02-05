@@ -1,0 +1,83 @@
+{
+  "sha256": "1ed1b4315c2525253918400777d7622581d7f8c161101e918999bd9d8c99be85",
+  "prompt_version": "v0",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 08 E8 ?? ?? ?? ?? }\n        $pattern1 = { FF 75 03 FF 15 ?? ?? ?? ?? }\n        $pattern2 = { 55 8B EC FF 75 08 E8 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1085",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 22,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Replace the generic pattern with a more specific one targeting the original trace's unique instruction sequence. Adjust the skip offset to avoid critical instructions."
+      ],
+      "debugger_log": "=== 5144.log ===\nCAPE Sandbox - Debugger log: Mon Dec 15 23:44:38 2025\nBreakpoint 0 hit by instruction at 0x03F5E4A8 (thread 5156) EAX=0x3f5e825 ECX=0xb9eff2bc EDX=0x19be02 ESI=0x19c430 EDI=0x224 ESP=0x19c1cc *ESP=0x3f5e862 EBP=0x19c1e4\n0x03F5E4A8  FF7508                   PUSH      DWORD [EBP+0x8]               \nActionDispatcher: skipping instruction.\n0x03F5E4AB  E8E8020000               CALL      0x03F5E798                    \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 08 E8 ?? ?? ?? ?? }\n        $pattern1 = { FF 75 03 FF 15 ?? ?? ?? ?? }\n        $pattern2 = { 55 8B EC FF 75 08 E8 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\1ed1b4315c252525\\iter0_v0.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v0",
+      "yara_rule": "rule ExitDecision\n{\n    meta:\n        description = \"Detects exit decision and evasion checks in the original trace\"\n        confidence = 75\n\n    strings:\n        $a = /FF 75 08 FF 15 ?? ?? ?? ??/  // push + call to ExitProcess\n        $b = /E8 C1 FFFF FF 59/             // call to ___crtCorExitProcess + pop ecx\n        $c = /55 8B EC FF 75 08/            // function prologue\n\n    condition:\n        all of ($a, $b, $c)\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Generated rule is a detection rule, not a bypass rule (missing cape_options)",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule caused a crash due to overly generic patterns matching unintended locations. To fix this, I focused on **Strategy A (Evasion Check)** and **Strategy B (Exit Decision)** by extracting unique instruction sequences from the original trace. I selected three distinct patterns:  \n1. A call to `ExitProcess` preceded by a `push` (targeting the exit decision point).  \n2. A call to `___crtCorExitProcess` followed by `pop ecx` (targeting the evasion check).  \n3. The function prologue (`push ebp`, `mov ebp, esp`, `push dword ptr [ebp+08h]`) (targeting early code structure).  \nThese patterns are specific enough to avoid false positives while remaining actionable.  \n\n**YARA Rule**:  \n```yara\nrule ExitDecision\n{\n    meta:\n        description = \"Detects exit decision and evasion checks in the original trace\"\n        confidence = 75\n\n    strings:\n        $a = /FF 75 08 FF 15 ?? ?? ?? ??/  // push + call to ExitProcess\n        $b = /E8 C1 FFFF FF 59/             // call to ___crtCorExitProcess + pop ecx\n        $c = /55 8B EC FF 75 08/            // function prologue\n\n    condition:\n        all of ($a, $b, $c)\n}\n```\n\n**Key Details**:  \n- **Pattern 1** (`$a`): Matches the `push` instruction followed by a call to `ExitProcess` (address is variable, so `??` wildcards are used).  \n- **Pattern 2** (`$b`): Targets the `call` to `___crtCorExitProcess` and subsequent `pop ecx` (specific to the trace).  \n- **Pattern 3** (`$c`): Captures the function prologue, ensuring alignment with the original code structure.  \n\nThis approach avoids false positives by anchoring patterns to unique sequences in the trace while remaining flexible for variations in memory addresses.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\1ed1b4315c252525\\iter1_v0.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v0",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass pattern based on ExitProcess and CRT exit function calls\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC FF 75 08 }  // push ebp, mov ebp, esp, push [ebp+08h]\n        $pattern1 = { FF 75 08 E8 ?? ?? ?? ?? }  // push [ebp+08h], call (offset replaced)\n        $pattern2 = { 59 FF 15 ?? ?? ?? ?? }  // pop ecx, call (address replaced)\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1086",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 22,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Refine the pattern to specifically target the original trace's ExitProcess call and surrounding instructions."
+      ],
+      "debugger_log": "=== 3028.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 00:32:57 2025\nBreakpoint 1 hit by instruction at 0x026364A8 (thread 9052) EAX=0x2636825 ECX=0x821fd7f7 EDX=0x19be02 ESI=0x19c430 EDI=0x218 ESP=0x19c1cc \"bhc\" *ESP=0x2636862 EBP=0x19c1e4\n0x026364A8  FF7508                   PUSH      DWORD [EBP+0x8]               \nActionDispatcher: skipping instruction.\n0x026364AB  E8E8020000               CALL      0x02636798                    \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass pattern based on ExitProcess and CRT exit function calls\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC FF7508 }  // push ebp, mov ebp, esp, push [ebp+08h]\n        $pattern1 = { FF7508 E8 ?? ?? ?? ?? }  // push [ebp+08h], call (offset replaced)\n        $pattern2 = { 59 FF15 ?? ?? ?? ?? }  // pop ecx, call (address replaced)\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\1ed1b4315c252525\\iter2_v0.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 2: error - Generated rule is a detection rule, not a bypass rule (missing cape_options)",
+    "Iteration 3: bypass_crashed - Rule caused crash: ['exec_crash']"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

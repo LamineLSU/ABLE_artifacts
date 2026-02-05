@@ -1,0 +1,14 @@
+rule Bypass_Sample
+{
+    meta:
+        description = "Evasion bypass rule"
+        cape_options = "bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0"
+
+    strings:
+        $pattern0 = { FF 15 08 50 44 00 8B F0 50 83 F8 11 74 05 8B C0 FC 58 85 F6 74 2B 90 8A C0 68 C0 9E E6 05 56 E8 CD D3 01 00 83 C4 0C 53 8A C9 8A C9 FC 5B 68 00 80 00 00 68 C0 41 C8 17 56 FF 15 28 50 44 00 5E 5B C3 }
+        $pattern1 = { 55 8B EC 83 E4 F8 83 EC 48 A1 64 56 45 00 33 C4 89 44 24 44 6A 40 8D 44 24 04 6A 00 50 E8 CD D3 01 00 83 C4 0C 8D 0C 24 51 C7 44 24 04 40 00 00 FF 15 0C 50 44 00 85 C0 75 1D 8B 44 24 0C 8B 4C 24 08 0F AC C1 14 C1 E8 14 85 C0 77 12 81 F9 09 03 00 00 73 08 FF 15 50 50 44 00 8B 4C 24 44 33 CC E8 4A D4 02 00 8B E5 5D }
+        $pattern2 = { FF 15 E0 84 45 00 8D 95 94 FE FF FF 8D 8D EC FE FF FF 52 C7 85 94 FE FF FF 3C 00 00 00 89 9D 98 FE FF FF 89 9D 9C FE FF FF C7 85 A0 FE FF FF D8 FA 44 00 C7 85 A4 FE FF FF 38 0A 45 00 89 8D A8 FE FF FF 89 9D AC FE FF FF 89 9D B0 FE FF FF 89 9D B4 FE FF FF FF 15 44 85 45 00 6A 3C 8D 85 94 FE FF FF 53 50 E8 CD D3 01 00 68 04 01 00 00 8D 8D EC FE FF FF 53 51 E8 CD D3 01 00 83 C4 18 53 }
+
+    condition:
+        any of them
+}

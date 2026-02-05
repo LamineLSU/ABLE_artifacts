@@ -1,0 +1,81 @@
+{
+  "sha256": "51c45fb238881bd25fd7435d8b8e44eee9cc56887a56a7e5f5bdef8ec8392465",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "rule ConditionalCallPattern1\n{\n    meta:\n        description = \"Pattern capturing the jump to push instruction and call\"\n        cape_options = \"bp0=$a+0,action0=skip,count=0\"\n    strings:\n        $a = { 0F 85 ?? ?? ?? ?? 6A 00 }\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1268",
+      "status": "bypass_failed",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "YARA pattern did not match",
+      "improvement_suggestions": [
+        "Adjust the pattern to account for non-consecutive instructions by using wildcards for the intervening bytes and refine the skip offset to avoid invalid execution jumps."
+      ],
+      "debugger_log": null,
+      "raw_response": "To detect the specific code flow that leads to the call at `00712405`, we can identify three distinct but related patterns that capture the control flow logic. Each pattern includes a combination of instructions that, when bypassed or modified, would prevent the execution of the call to the external function.\n\n---\n\n### ✅ Pattern 1: `jne` Instruction + `push` Instruction\n\n**Bytes:** `0F 85 ?? ?? ?? ?? 6A 00`  \n**Length:** 10 bytes\n\n- The `jne` instruction at `007123F0` is a conditional jump to the `push` instruction at `00712403`.\n- The `jne` instruction includes a 32-bit displacement, which is replaced with `??` in the YARA rule.\n- This pattern captures the jump logic and the subsequent `push` that prepares for the call.\n\n---\n\n### ✅ Pattern 2: `test` Instruction + `jne` Instruction\n\n**Bytes:** `85 C0 0F 85 ?? ?? ?? ??`  \n**Length:** 8 bytes\n\n- The `test` instruction at `007123EE` (`85 C0`) checks the `eax` register.\n- The `jne` instruction at `007123F0` is triggered if `eax` is not zero.\n- This pattern is useful for detecting the conditional check that leads to the jump.\n\n---\n\n### ✅ Pattern 3: `cmp` Instruction + `jc` Instruction\n\n**Bytes:** `83 7D E8 14 0F 82 ?? ?? ?? ??`  \n**Length:** 9 bytes\n\n- The `cmp` instruction at `007123F9` compares a value with `14h` at a specific memory address.\n- The `jc` instruction at `007123F9` is a conditional jump that depends on the result of the comparison.\n- This pattern is useful for identifying the conditional logic that leads to the control flow.\n\n---\n\n### 📌 Summary of YARA Rules\n\nYou can use the following YARA rules to detect this specific code flow:\n\n```yara\nrule ConditionalCallPattern1\n{\n    meta:\n        description = \"Pattern capturing the jump to push instruction and call\"\n    strings:\n        $a = { 0F 85 ?? ?? ?? ?? 6A 00 }\n    condition:\n        all of them\n}\n\nrule ConditionalCallPattern2\n{\n    meta:\n        description = \"Pattern capturing the test and conditional jump\"\n    strings:\n        $a = { 85 C0 0F 85 ?? ?? ?? ?? }\n    condition:\n        all of them\n}\n\nrule ConditionalCallPattern3\n{\n    meta:\n        description = \"Pattern capturing the compare and conditional jump\"\n    strings:\n        $a = { 83 7D E8 14 0F 82 ?? ?? ?? ?? }\n    condition:\n        all of them\n}\n```\n\n---\n\n### 📝 Notes\n\n- The `??` placeholders represent the 32-bit displacement bytes that are typically used for jumps or calls.\n- These patterns are designed to detect the **control flow logic** that leads to the call instruction at `00712405`.\n- These rules are particularly useful in malware analysis to identify potential API calls or indirect jumps that may be used for code injection or execution.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\51c45fb238881bd2\\iter0_v1.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 85 ?? ?? ?? ?? }  // test eax, eax + jne (evasion check)\n        $pattern1 = { 83 7D E8 14 0F 82 ?? ?? ?? ?? }  // cmp [ebp-18h], 14h + jc (conditional logic)\n        $pattern2 = { FF 96 ?? ?? ?? ?? }  // call ExitProcess (exit decision)\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE, CMP_SETZ, API_CHECK",
+      "confidence": 65,
+      "opcodes": "",
+      "task_id": "1269",
+      "status": "bypass_failed",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "YARA pattern did not match",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to incorrect pattern placement. The evasion check occurs at the `test eax, eax` followed by `jne` (Strategy A), while the conditional logic before exit is at `cmp [ebp-18h], 14h` → `jc` (Strategy B). The exit call itself (`call ExitProcess`) is a strong target (Strategy B). Using concrete bytes from the trace with wildcards for variable offsets ensures specificity without overgeneralization.\n\n**PATTERN_TYPE**: CALL_TEST_JE, CMP_SETZ, API_CHECK\n\n**CONFIDENCE**: 65\n\n**REASONING**: These patterns target critical evasion logic and exit decision points. The first pattern captures the `test eax, eax` → `jne` evasion check, the second targets the `cmp` → `jc` conditional logic, and the third directly identifies the `ExitProcess` call. Wildcards for offsets allow flexibility while maintaining trace-specific accuracy.\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 85 ?? ?? ?? ?? }  // test eax, eax + jne (evasion check)\n        $pattern1 = { 83 7D E8 14 0F 82 ?? ?? ?? ?? }  // cmp [ebp-18h], 14h + jc (conditional logic)\n        $pattern2 = { FF 96 ?? ?? ?? ?? }  // call ExitProcess (exit decision)\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\51c45fb238881bd2\\iter1_v1.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 85 ?? ?? ?? ?? }  // test eax, eax + jne (evasion check)\n        $pattern1 = { 83 7D E8 14 0F 82 ?? ?? ?? }  // cmp [ebp-18h], 14h + jc (exit decision)\n        $pattern2 = { FF 96 ?? ?? ?? ?? }  // call dword ptr [esi+000000B0h] (ExitProcess)\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE, CMP_SETZ, API_CHECK",
+      "confidence": 65,
+      "opcodes": "",
+      "task_id": "1270",
+      "status": "bypass_failed",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "YARA pattern did not match",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempts failed because the patterns didn't capture the exact instruction sequences from the trace. The first pattern targets the evasion check (test eax, eax + jne), the second focuses on the conditional check before ExitProcess (cmp + jc), and the third directly matches the ExitProcess call. These patterns are derived directly from the trace's opcode sequences, ensuring specificity while allowing for variant offsets.\n\n**PATTERN_TYPE**: CALL_TEST_JE, CMP_SETZ, API_CHECK\n\n**CONFIDENCE**: 65, 60, 50\n\n**REASONING**: The first pattern captures the evasion check logic (test eax, eax + jne) which is critical for bypassing detection. The second pattern targets the conditional check before ExitProcess (cmp + jc) which is a common exit decision point. The third pattern directly matches the ExitProcess API call, ensuring the rule hits the termination logic. All patterns are derived from the trace's exact opcode sequences, improving accuracy over generic wildcards.\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 85 ?? ?? ?? ?? }  // test eax, eax + jne (evasion check)\n        $pattern1 = { 83 7D E8 14 0F 82 ?? ?? ?? }  // cmp [ebp-18h], 14h + jc (exit decision)\n        $pattern2 = { FF 96 ?? ?? ?? ?? }  // call dword ptr [esi+000000B0h] (ExitProcess)\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\51c45fb238881bd2\\iter2_v1.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: bypass_failed - YARA pattern did not match",
+    "Iteration 2: bypass_failed - YARA pattern did not match",
+    "Iteration 3: bypass_failed - YARA pattern did not match"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

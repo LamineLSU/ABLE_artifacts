@@ -1,0 +1,14 @@
+rule Bypass_Sample_Evolved
+{
+    meta:
+        description = "Evasion bypass rule - evolved"
+        cape_options = "bp0=0,action0=skip,bp1=0,action1=skip,bp2=0,action2=skip,count=0"
+
+    strings:
+        $pattern0 = { 85 C0 74 12 6A 5B }
+        $pattern1 = { 5A 8B CE E8 74 FA }
+        $pattern2 = { 8B 85 F0 FE FF FF 8B 45 FC }
+
+    condition:
+        any of them
+}

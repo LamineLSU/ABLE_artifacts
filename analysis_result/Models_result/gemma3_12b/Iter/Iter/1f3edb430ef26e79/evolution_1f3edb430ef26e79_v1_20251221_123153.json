@@ -1,0 +1,126 @@
+{
+  "sha256": "1f3edb430ef26e7987d8b073a0314ee9632bc2d57767083eafeddf9209ade01d",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 ?? 50 8B 45 ?? }\n        $pattern1 = { 51 8B 45 ?? 8B 45 ?? }\n        $pattern2 = { 8B 45 ?? 52 8B 4D ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1283",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 17,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "new_signature_details": [
+        {
+          "name": "terminates_remote_process",
+          "description": "Terminates another process",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 7636,
+              "cid": 2713
+            },
+            {
+              "process": "1f3edb430ef26e7987d8.exe"
+            },
+            {
+              "type": "call",
+              "pid": 7636,
+              "cid": 2727
+            },
+            {
+              "process": "1f3edb430ef26e7987d8.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 2300.log ===\nCAPE Sandbox - Debugger log: Mon Dec 22 02:54:32 2025\nBreakpoint 0 hit by instruction at 0x0041FA9A (thread 7540) EAX=0x12ff104 EBX=0x12ff034 \"$\u001e5\" EDX=0x1351e10 \"\u0010\u001e5\" ESI=0x1351e10 \"\u0010\u001e5\" EDI=0x1357fb8 ESP=0x12fefb0 *ESP=0x12fefe0 EBP=0x12fefb0\nBreak at 0x0041FA9A in Regsvcs.exe (RVA 0x1fa9a, thread 7540, Stack 0x012F2000-0x01300000, ImageBase 0x00400000)\n0x0041FA9A  8B450C                   MOV       EAX, [EBP+0xc]                \nActionDispatcher: skipping instruction.\n0x0041FA9D  50                       PUSH      EAX                           \n",
+      "raw_response": "Okay, let's analyze the trace and craft three bypass patterns.\n\n**Step 1: Identify Suspicious Instructions**\n\nThe trace is complex and involves several calls to `0041EB47h`. This strongly suggests a hook or a check. The `int 9Ch` is also suspicious - it's a breakpoint.  The repeated patterns of `push/mov/call` indicate a possible function pointer table or similar structure.  The exit at `FFD0` (call eax) is the critical point, and likely where the evasion check happens.\n\n**Step 2: Trace the Exit Path Backwards**\n\nThe exit occurs at `0041E24F: FFD0 call eax`. This `call eax` is likely executing a function pointer that determines if the execution should continue or terminate (the evasion check). The preceding instructions build up the value in `eax`.\n\n**Step 3: Select Bypass Candidates**\n\nLet's choose three different instructions to bypass:\n\n1.  **`8B 45 10` (MOV EAX, [EBP+10h])**: This instruction loads a value from memory into `eax`.  Bypassing this would prevent the correct function pointer from being loaded.\n2.  **`8B 45 1C` (MOV EAX, [EBP+1Ch])**:  Similar to the above, this loads a value into `eax`.\n3.  **`8B 4D 24` (MOV ECX, [EBP+24h])**: This instruction loads a value from memory into `ECX`.  While not directly influencing `eax`, it's part of a larger pattern and might be related to the check.\n\n**Step 4: Build Patterns**\n\nHere are three patterns, combining the selected instructions with adjacent context.\n\n1.  **Pattern 0 (Bypass `MOV EAX, [EBP+10h]`):**\n    `8B 45 14 50 8B 45 10` (10 bytes) - includes the preceding `MOV EAX, [EBP+14h]` and `PUSH EAX`\n2.  **Pattern 1 (Bypass `MOV EAX, [EBP+1Ch]`):**\n    `51 8B 45 1C 8B 45 28` (10 bytes) - includes the preceding `PUSH ECX` and `MOV EAX, [EBP+28h]`\n3.  **Pattern 2 (Bypass `MOV ECX, [EBP+24h]`):**\n    `8B 45 18 52 8B 4D 24` (10 bytes) - includes the preceding `MOV EAX, [EBP+18h]` and `PUSH EDX`\n\n**Step 5: Apply Wildcards and Generate the YARA Rule**\n\nNow, let's create the YARA rule, applying wildcards to addresses and offsets.\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 ?? 50 8B 45 ?? }\n        $pattern1 = { 51 8B 45 ?? 8B 45 ?? }\n        $pattern2 = { 8B 45 ?? 52 8B 4D ?? }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation of Wildcards:**\n\n*   The `??` replace the memory addresses in `[EBP+offset]`\n*   The `??` in the patterns represent the memory offsets.\n\nThis rule targets the identified instructions, attempting to bypass the evasion check by skipping those instructions.  The `cape_options` will allow for dynamic bypassing during analysis.  The patterns are within the required 6-20 byte range.\n",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\1f3edb430ef26e79\\iter0_v1.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 0,
+    "prompt_version": "v1",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 ?? 50 8B 45 ?? }\n        $pattern1 = { 51 8B 45 ?? 8B 45 ?? }\n        $pattern2 = { 8B 45 ?? 52 8B 4D ?? }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1283",
+    "status": "bypass_crashed",
+    "rule_hit": true,
+    "baseline_signatures": 17,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "terminates_remote_process"
+    ],
+    "new_signature_details": [
+      {
+        "name": "terminates_remote_process",
+        "description": "Terminates another process",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 7636,
+            "cid": 2713
+          },
+          {
+            "process": "1f3edb430ef26e7987d8.exe"
+          },
+          {
+            "type": "call",
+            "pid": 7636,
+            "cid": 2727
+          },
+          {
+            "process": "1f3edb430ef26e7987d8.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": "Rule caused crash: ['exec_crash']",
+    "improvement_suggestions": [],
+    "debugger_log": "=== 2300.log ===\nCAPE Sandbox - Debugger log: Mon Dec 22 02:54:32 2025\nBreakpoint 0 hit by instruction at 0x0041FA9A (thread 7540) EAX=0x12ff104 EBX=0x12ff034 \"$\u001e5\" EDX=0x1351e10 \"\u0010\u001e5\" ESI=0x1351e10 \"\u0010\u001e5\" EDI=0x1357fb8 ESP=0x12fefb0 *ESP=0x12fefe0 EBP=0x12fefb0\nBreak at 0x0041FA9A in Regsvcs.exe (RVA 0x1fa9a, thread 7540, Stack 0x012F2000-0x01300000, ImageBase 0x00400000)\n0x0041FA9A  8B450C                   MOV       EAX, [EBP+0xc]                \nActionDispatcher: skipping instruction.\n0x0041FA9D  50                       PUSH      EAX                           \n",
+    "raw_response": "Okay, let's analyze the trace and craft three bypass patterns.\n\n**Step 1: Identify Suspicious Instructions**\n\nThe trace is complex and involves several calls to `0041EB47h`. This strongly suggests a hook or a check. The `int 9Ch` is also suspicious - it's a breakpoint.  The repeated patterns of `push/mov/call` indicate a possible function pointer table or similar structure.  The exit at `FFD0` (call eax) is the critical point, and likely where the evasion check happens.\n\n**Step 2: Trace the Exit Path Backwards**\n\nThe exit occurs at `0041E24F: FFD0 call eax`. This `call eax` is likely executing a function pointer that determines if the execution should continue or terminate (the evasion check). The preceding instructions build up the value in `eax`.\n\n**Step 3: Select Bypass Candidates**\n\nLet's choose three different instructions to bypass:\n\n1.  **`8B 45 10` (MOV EAX, [EBP+10h])**: This instruction loads a value from memory into `eax`.  Bypassing this would prevent the correct function pointer from being loaded.\n2.  **`8B 45 1C` (MOV EAX, [EBP+1Ch])**:  Similar to the above, this loads a value into `eax`.\n3.  **`8B 4D 24` (MOV ECX, [EBP+24h])**: This instruction loads a value from memory into `ECX`.  While not directly influencing `eax`, it's part of a larger pattern and might be related to the check.\n\n**Step 4: Build Patterns**\n\nHere are three patterns, combining the selected instructions with adjacent context.\n\n1.  **Pattern 0 (Bypass `MOV EAX, [EBP+10h]`):**\n    `8B 45 14 50 8B 45 10` (10 bytes) - includes the preceding `MOV EAX, [EBP+14h]` and `PUSH EAX`\n2.  **Pattern 1 (Bypass `MOV EAX, [EBP+1Ch]`):**\n    `51 8B 45 1C 8B 45 28` (10 bytes) - includes the preceding `PUSH ECX` and `MOV EAX, [EBP+28h]`\n3.  **Pattern 2 (Bypass `MOV ECX, [EBP+24h]`):**\n    `8B 45 18 52 8B 4D 24` (10 bytes) - includes the preceding `MOV EAX, [EBP+18h]` and `PUSH EDX`\n\n**Step 5: Apply Wildcards and Generate the YARA Rule**\n\nNow, let's create the YARA rule, applying wildcards to addresses and offsets.\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 ?? 50 8B 45 ?? }\n        $pattern1 = { 51 8B 45 ?? 8B 45 ?? }\n        $pattern2 = { 8B 45 ?? 52 8B 4D ?? }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation of Wildcards:**\n\n*   The `??` replace the memory addresses in `[EBP+offset]`\n*   The `??` in the patterns represent the memory offsets.\n\nThis rule targets the identified instructions, attempting to bypass the evasion check by skipping those instructions.  The `cape_options` will allow for dynamic bypassing during analysis.  The patterns are within the required 6-20 byte range.\n",
+    "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\1f3edb430ef26e79\\iter0_v1.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

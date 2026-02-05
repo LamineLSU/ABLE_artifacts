@@ -1,0 +1,11 @@
+rule ExitProcessCallPattern
+{
+    meta:
+        description = "Detects patterns involving calls to ExitProcess or related functions"
+    strings:
+        $a = { 53 } {FF 15} {?? ?? ?? ??} {33 FF} {8B C7} {EB 03}
+        $b = { 50 } {FF 15} {?? ?? ?? ??} {53} {FF 15} {?? ?? ?? ??}
+        $c = { E8 } {?? ?? ?? ??} {8B 0D} {?? ?? ?? ??} {83 C4 04} {8B 45 FC}
+    condition:
+        all of them
+}

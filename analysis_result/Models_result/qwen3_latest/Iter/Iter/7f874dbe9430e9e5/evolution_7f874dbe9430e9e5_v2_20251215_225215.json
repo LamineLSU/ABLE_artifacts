@@ -1,0 +1,81 @@
+{
+  "sha256": "7f874dbe9430e9e578b7e328e9b114cb105b3d1b427b4d4d69a237a225394937",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule EvasionCheck\n{\n    meta:\n        description = \"Detects potential sandbox evasion checks using CRT and system exit calls.\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n\n    strings:\n        $a = { FF 75 08 FF 15 ?? ?? ?? ?? }  // Call to ExitProcess\n        $b = { FF 75 08 E8 ?? ?? ?? ?? }      // Call to ___crtCorExitProcess\n        $c = { 55 8B EC FF 75 08 }            // Function prologue\n\n    condition:\n        any of ($a, $b, $c)\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1758",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 9,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Replace the generic $c string with a more specific pattern targeting the evasion logic (e.g., the exact call sequences to ExitProcess or ___crtCorExitProcess)."
+      ],
+      "debugger_log": "=== 8528.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 12:31:35 2025\nBreakpoint 0 hit by instruction at 0x00412C27 (thread 8536) EAX=0x100 EBX=0x19f6b8 ECX=0x73ca9f88 EDX=0x19fe4c ESI=0x7735df80 MultiByteToWideChar  EDI=0x100 ESP=0x19f6a4 *ESP=0x19f6b8 EBP=0x19f8d0\nBreak at 0x00412C27 in 7f874dbe9430e9e578b7.exe (RVA 0x12c27, thread 8536, Stack 0x00192000-0x001A0000, ImageBase 0x00400000)\n0x00412C27  FF7508                   PUSH      DWORD [EBP+0x8]               \nActionDispatcher: skipping instruction.\n0x00412C2A  FF15D0114000             CALL      GetStringTypeW                \n",
+      "raw_response": "To identify the critical points where the program may terminate or exit due to evasion checks, we analyze the assembly code and isolate the key functions that may be used for sandbox detection or environment checks. These include:\n\n- `call to ___crtCorExitProcess` (likely a CRT exit check)\n- `call to ExitProcess` (the actual system call to terminate the process)\n- `function prologue` (setup of the stack frame, which may be part of the function's logic)\n\n---\n\n### ✅ **Pattern 1: Call to `ExitProcess` with Surrounding Context**\n\nThis call is the actual system call to terminate the process. If skipped, the program would not terminate.\n\n**Hex Pattern:**\n```\nFF 75 08 FF 15 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `FF 75 08` is the `push dword [ebp + 8]` instruction.\n- `FF 15 ?? ?? ?? ??` is the `call` instruction with a 4-byte offset (replaced with wildcards `??`).\n- This 8-byte pattern captures the call to `ExitProcess` with the preceding stack push.\n\n---\n\n### ✅ **Pattern 2: Call to `___crtCorExitProcess` with Surrounding Context**\n\nThis call is likely part of the CRT (C Runtime) and may be used to detect sandbox environments or check for debugging tools. If this call is skipped, the program may continue execution.\n\n**Hex Pattern:**\n```\nFF 75 08 E8 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `FF 75 08` is the `push dword [ebp + 8]` instruction.\n- `E8 ?? ?? ?? ??` is the `call` instruction with a 4-byte offset (replaced with wildcards `??`).\n- This 8-byte pattern captures the call to `___crtCorExitProcess` with the preceding stack push.\n\n---\n\n### ✅ **Pattern 3: Function Prologue (Stack Setup)**\n\nThis pattern captures the function prologue, which may be used to set up the stack frame for subsequent checks. Skipping this setup may affect the integrity of the function's execution flow.\n\n**Hex Pattern:**\n```\n55 8B EC FF 75 08\n```\n\n**Explanation:**\n- `55` is the `push ebp` instruction.\n- `8B EC` is the `mov ebp, esp` instruction.\n- `FF 75 08` is the `push dword [ebp + 8]` instruction.\n- This 8-byte pattern captures the function prologue, which may be part of the logic to detect or bypass sandboxing.\n\n---\n\n### ✅ **Final Answer (YARA Rule Format)**\n\n```yara\nrule EvasionCheck\n{\n    meta:\n        description = \"Detects potential sandbox evasion checks using CRT and system exit calls.\"\n\n    strings:\n        $a = { FF 75 08 FF 15 ?? ?? ?? ?? }  // Call to ExitProcess\n        $b = { FF 75 08 E8 ?? ?? ?? ?? }      // Call to ___crtCorExitProcess\n        $c = { 55 8B EC FF 75 08 }            // Function prologue\n\n    condition:\n        any of ($a, $b, $c)\n}\n```\n\n---\n\n### ✅ **Summary**\n\n- **Pattern A** identifies the actual exit system call.\n- **Pattern B** identifies a potential CRT-based evasion check.\n- **Pattern C** captures the function setup that may be used in the logic for detection.\n\nThese patterns are useful for identifying and analyzing sandbox evasion behavior in runtime environments.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\7f874dbe9430e9e5\\iter0_v2.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 08 E8 C8 FF FF FF }  // Push ebp+08h + call ___crtCorExitProcess\n        $pattern1 = { FF 15 AC B0 41 00 }         // Call ExitProcess\n        $pattern2 = { 55 8B EC FF 75 08 }         // Push ebp + mov ebp, esp + push ebp+08h\n\n    condition:\n        all of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 85,
+      "opcodes": "",
+      "task_id": "1759",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 9,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule was too generic, leading to false positives. By focusing on specific call sequences to exit functions (___crtCorExitProcess and ExitProcess) and surrounding instructions, we target the evasion logic directly. These patterns are derived from the original trace and are specific enough to avoid false matches while remaining flexible for variants.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 85\n\n**REASONING**: These patterns target the exact call sequences to exit functions and their surrounding instructions, which are critical for evasion logic. By using concrete bytes from the trace, they reduce false positives while still being adaptable to variants. The first pattern captures the call to ___crtCorExitProcess, the second targets ExitProcess, and the third focuses on stack setup before the exit call.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 08 E8 C8 FF FF FF }  // Push ebp+08h + call ___crtCorExitProcess\n        $pattern1 = { FF 15 AC B0 41 00 }         // Call ExitProcess\n        $pattern2 = { 55 8B EC FF 75 08 }         // Push ebp + mov ebp, esp + push ebp+08h\n\n    condition:\n        all of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\7f874dbe9430e9e5\\iter1_v2.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v2",
+      "yara_rule": "rule MaliciousCode_Detection\n{\n    meta:\n        description = \"Detects code that performs stack frame setup and calls ExitProcess or CRT functions.\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n        author = \"Your Name\"\n        date = \"2025-03-25\"\n\n    strings:\n        $a = { FF 75 08 E8 C8 FF FF FF }\n        $b = { 55 8B EC FF 75 08 }\n        $c = { FF 75 08 FF 15 AC B0 41 00 }\n\n    condition:\n        all of ($a or $b or $c)\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1760",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 9,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To refine the detection of malicious behavior in the provided code snippet, we should focus on **specific sequences of instructions** rather than generic API calls like `ExitProcess`. This approach minimizes false positives and improves the specificity of the rule.\n\n---\n\n### ✅ **Key Observations from the Code Trace:**\n\nFrom the provided code snippet:\n\n```\n0040E7F3: FF7508      push dword ptr [ebp+08h]\n0040E7F6: E8C8FFFFFF  call 0040E7C3\n0040E7FB: 59          pop ecx\n0040E7FC: FF7508      push dword ptr [ebp+08h]\n0040E7FF: FF15ACB04100 call dword ptr [0041B0ACh]\n```\n\nWe can extract the following **unique and specific instruction sequences**:\n\n---\n\n### 🔍 **Pattern 1: `FF7508 E8C8FFFFFF`**  \n**Description**:  \n- `FF7508` pushes the value at `ebp+08h` onto the stack.\n- `E8C8FFFFFF` is a call to the `___crtCorExitProcess` function (imported from the CRT library).\n\nThis sequence is **unique** to this code and not commonly used in other contexts, making it a strong candidate for detection.\n\n---\n\n### 🔍 **Pattern 2: `55 8B EC FF7508`**  \n**Description**:  \n- `55` pushes `ebp` (standard stack frame setup).\n- `8B EC` moves `esp` to `ebp` (standard stack frame setup).\n- `FF7508` pushes the value at `ebp+08h` (part of the stack frame).\n\nThis sequence is **indicative of a stack frame setup** and is often seen in functions that manipulate the stack, making it a useful marker for obfuscated or malicious code.\n\n---\n\n### 🔍 **Pattern 3: `FF7508 FF15ACB04100`**  \n**Description**:  \n- `FF7508` pushes the value at `ebp+08h` (as before).\n- `FF15ACB04100` is a call to `ExitProcess` (a Windows API used to terminate a process).\n\nWhile `ExitProcess` is a common API, the **preceding `FF7508`** makes this sequence more specific and less likely to be a false positive.\n\n---\n\n### 📌 **Final YARA Rule (Example):**\n\n```yara\nrule MaliciousCode_Detection\n{\n    meta:\n        description = \"Detects code that performs stack frame setup and calls ExitProcess or CRT functions.\"\n        author = \"Your Name\"\n        date = \"2025-03-25\"\n\n    strings:\n        $a = { FF 75 08 E8 C8 FF FF FF }\n        $b = { 55 8B EC FF 75 08 }\n        $c = { FF 75 08 FF 15 AC B0 41 00 }\n\n    condition:\n        all of ($a or $b or $c)\n}\n```\n\n---\n\n### 📌 **Why This Works Better Than the Previous Rule:**\n\n- **Avoids Common APIs**: The previous rule focused on `ExitProcess`, which is widely used and leads to false positives.\n- **Focuses on Unique Sequences**: The new patterns are more specific to the code in question, improving detection accuracy.\n- **Stack Frame Analysis**: The use of `FF7508` and `55 8B EC` highlights a potential obfuscation or stack manipulation.\n\n---\n\n### 📌 **Next Steps:**\n\n- Test these rules in a sandboxed environment to confirm they detect the intended behavior without false positives.\n- Consider adding more patterns if additional obfuscation is present (e.g., `pop`/`push` pairs, `xor` operations, or indirect jumps).\n\nThis approach ensures you're detecting **behavior**, not just **API calls**, which is crucial for identifying malicious activity.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\7f874dbe9430e9e5\\iter2_v2.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

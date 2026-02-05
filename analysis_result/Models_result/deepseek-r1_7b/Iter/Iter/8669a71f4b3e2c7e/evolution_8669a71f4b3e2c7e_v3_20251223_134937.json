@@ -1,0 +1,593 @@
+{
+  "sha256": "8669a71f4b3e2c7efade6ad5c50d1b6ac42de52d560a0731909a9f68bbb303d9",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "rule EvasionBypass {\n    meta:\n        description = \"Evasion bypass patterns targeting memory tests\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B FF 55 8B EC FF 75 08 E8 C8 FF FF FF ?? ?? ?? ?? FF 40 68 C1 E8 EA 08 75 10 00 B5 A9 D0 FF 75 08 DD EB 08 FF 15 AC B0 41 00 CA DD 00 41 B0 AC }\n        $pattern1 = { 85 C0 55 8B EC E8 07 26 00 00 ?? ?? AE CA FF 15 8C E1 B6 00 }\n        $pattern2 = { 6A 5A 55 8B EC 8B EC E8 07 26 00 00 EA 01 00 B5 A9 D0 FF 75 08 DD EB 08 FF 15 40 E1 B6 00 CA DD 00 B6 E1 40 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1506",
+      "status": "bypass_failed",
+      "rule_hit": false,
+      "baseline_signatures": 37,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "YARA pattern did not match",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nAlright, let's tackle this problem step by step. The goal is to create three different bypass patterns based on the provided traces. Each pattern should be 6-20 bytes long and follow specific rules for wildcards and opcode usage.\n\nFirst, I need to understand the traces given. There are five traces from different execution points when exiting a sandbox or similar environment. Each trace has a series of instructions that seem to be part of an evasion mechanism by the malware. My task is to analyze these to find where the attacker's checks might be and then reverse-engineer possible bypasses.\n\nStarting with Phase 1: The attacker's perspective. They must have implemented some checks in their code, like testing specific registers or checking for certain values in memory. Looking at Trace #3 and Trace #4, there are calls to E8C8FFFFFF and FF15ACB04100, which might be placeholders for tests. Similarly, Trace #5 has a call to FF158CE1B600.\n\nIn Phase 2: From the defender's perspective, I need to find where these checks are in the trace and see how they can be bypassed. For each instruction that is part of an attacker's check, if it's skipped (like using a wildcard), the check might fail or not trigger anymore.\n\nLooking at Trace #3:\n- The call E8C8FFFFFF pushes a dword ptr [ebp+08h] and then pops it.\n- Similarly, in Trace #4, the same call is present. So these seem to be memory tests. If I can skip over the instruction where this test occurs, the bypass would work.\n\nIn Trace #5:\n- The attacker calls FF158CE1B600 after some operations. This might involve checking EAX or EBX for certain values.\n  \nSo potential bypass points are:\n\n1. Skipping the memory test in Trace 3/4 by manipulating EBP and the dword ptr offset.\n2. Skipping the test involving EAX/EBX before the call in Trace 5.\n\nNow, constructing patterns based on these observations.\n\nFor pattern0: Bypassing a memory test at E8C8FFFFFF\n- This instruction pushes a value into the stack. To bypass, skip this instruction by moving past it.\n- The bytes would include pushing, then the test (E8), which we can replace with ?? to bypass.\n\nPattern1: Maybe skipping a conditional jump before the call in Trace 5\n- Before E807260000, there's an cmp and jne. If we skip the cmp/jne, execution would go straight into the call.\n  \nPattern2: Bypassing another memory test after pushing to ebp\n\nWait, maybe Pattern1 could be a conditional jump that can be bypassed by skipping the condition.\n\nLooking again:\n\nIn Trace #5:\n- E807260000 is a call. Before it, there's cmp eax, 01h and jne 00B5A9D0h.\n- If we skip the cmp/jne, execution would go to the call.\n\nSo each pattern needs to combine multiple instructions with wildcards where applicable.\n\nFor Pattern0: Skipping E8C8FFFFFF\nThe instruction is pushing a value. To bypass, we can move past it by skipping the push and the test.\n\nPattern1: Skipping the conditional jump before the call in Trace5.\nBy skipping cmp/jne, execution proceeds to the call.\n\nPattern2: Another memory test after ebp manipulation.\n\nWait, maybe Pattern2 could be another memory check involving EBP. For example, in another trace, there's a similar push and test.\n\nPutting it together:\n\nPattern0: Skip the memory test at E8C8FFFFFF by moving past it.\nSo instructions would include pushing, then E8 (test), which we replace with ???\n\nPattern1: Skip the conditional jump before the call to FF158CE1B600 in Trace5.\n\nPattern2: Another similar bypass for a different memory test.\n\nEach pattern should be 6-20 bytes long. I'll make sure to include enough surrounding instructions so that they're specific and don't match other parts of the code.\n</think>\n\nTo create three distinct bypass patterns, we analyze the traces where the attacker's checks are implemented and craft sequences that skip these checks while maintaining valid program flow.\n\n1. **Pattern 0**: Bypasses a memory test by skipping the `E8C8FFFFFF` instruction, moving past it to continue execution.\n2. **Pattern 1**: Skips a conditional jump before calling `FF158CE1B600`, allowing the call to proceed without checking conditions.\n3. **Pattern 2**: Bypasses another memory test similar to Pattern 0 but in a different context.\n\nEach pattern is constructed with wildcards for address/offset bytes and concrete opcode/registry instructions where applicable, ensuring specificity and effectiveness.\n\n```yara\nrule EvasionBypass {\n    meta:\n        description = \"Evasion bypass patterns targeting memory tests\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8BFF 55 8BECP FF7508 E8C8FFFFFF ?? ?? ?? ?? FF4068 C1E8 shr eax,08h 7510 jne 00B5A9D0h FF7508 push dword ptr [ebp+08h] FF15ACB04100 call dword ptr [0041B0ACh ] }\n        $pattern1 = { 85C0 55 8BECP E807260000 ?? ??: jump past, then call FF158CE1B600 }\n        $pattern2 = { 6A5A 55 8BECP 8BEC E807260000 cmp eax,01h jne 00B5A9D0h FF7508 push dword ptr [ebp+08h] FF1540E1B600 call dword ptr [00B6E140h ] }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\8669a71f4b3e2c7e\\iter0_v3.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule Evasion_Bypass_Patterns\n{\n    meta:\n        description = \"Evasion bypass patterns targeting TEST EAX followed by JZX instructions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1507",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 37,
+      "new_signatures": 4,
+      "new_signature_names": [
+        "antivm_generic_system",
+        "creates_suspended_process",
+        "queries_computer_name",
+        "terminates_remote_process"
+      ],
+      "new_signature_details": [
+        {
+          "name": "queries_computer_name",
+          "description": "Queries computer hostname",
+          "categories": [
+            "system_discovery"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 3700,
+              "cid": 134
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "creates_suspended_process",
+          "description": "Creates a process in a suspended state, likely for injection",
+          "categories": [
+            "injection",
+            "process hollowing"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 50,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 1056,
+              "cid": 2
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "terminates_remote_process",
+          "description": "Terminates another process",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 1056,
+              "cid": 0
+            },
+            {
+              "process": "svchost.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "antivm_generic_system",
+          "description": "Checks the system manufacturer, likely for anti-virtualization",
+          "categories": [
+            "anti-vm"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [],
+          "new_data": [
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 8872
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            }
+          ],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": "=== 2972.log ===\nCAPE Sandbox - Debugger log: Wed Dec 24 05:07:17 2025\nBreakpoint 1 hit by instruction at 0x00CFE41D (thread 3068) EAX=0xffce ECX=0xffce ESI=0xd38bf0 cmd.exe EDI=0x7fe7 ESP=0x53f8ec *ESP=0xffce EBP=0x53f900\nBreak at 0x00CFE41D in cmd.exe (RVA 0xe41d, thread 3068, Stack 0x00443000-0x00540000, ImageBase 0x00CF0000)\n0x00CFE41D  E8038A0000               CALL      0x8a08                        \nActionDispatcher: skipping instruction.\n0x00CFE422  83C408                   ADD       ESP, 0x8                      \n\n\n=== 3700.log ===\nCAPE Sandbox - Debugger log: Wed Dec 24 05:07:08 2025\nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2adfb64 EDX=0x1 ESI=0x484283a L\"/Create\" EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\nBreak at 0x002DDADC in schtasks.exe (RVA 0x1dadc, thread 8364, Stack 0x02AD2000-0x02AE0000, ImageBase 0x002C0000)\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e74070 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e741f0 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e74090 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e740f0 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e740b0 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e741b0 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e74110 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e741d0 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e73bf0 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x1f ECX=0x2adfb00 EDX=0x1 ESI=0x484283a L\"/Create\" EDI=0x2adcc98 \"PARSER2\" ESP=0x2adcbe8 *ESP=0x2adfb04 EBP=0x2adcc30\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x484284a L\"/SC\" EDI=0x2adcc98 \"PARSER2\" ESP=0x2adcbe8 *ESP=0x2adfb04 EBP=0x2adcc30\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x4842860 L\"/MO\" EDI=0x2adcc98 \"PARSER2\" ESP=0x2adcbe8 *ESP=0x2adfb04 EBP=0x2adcc30\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x484286c L\"/TN\" EDI=0x2adcc98 \"PARSER2\" ESP=0x2adcbe8 *ESP=0x2adfb04 EBP=0x2adcc30\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x484288a L\"/TR\" EDI=0x2adcc98 \"PARSER2\" ESP=0x2adcbe8 *ESP=0x2adfb04 EBP=0x2adcc30\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x1f ECX=0x2adfb1c EDX=0x2 ESI=0x4842902 L\"/F\" EDI=0x2adcc98 \"PARSER2\" ESP=0x2adcbe8 *ESP=0x2adfb04 EBP=0x2adcc30\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \n\n\n=== 7864.log ===\nCAPE Sandbox - Debugger log: Wed Dec 24 05:06:09 2025\nBreakpoint 0 hit by instruction at 0x040C71C8 (thread 2796) EAX=0x1 EBX=0x41b5300 ECX=0x19e5b8 EDX=0x6b450c ESI=0x19e5d8 EDI=0x19e5b8 ESP=0x19e558 *ESP=0x0 EBP=0x19e608\n0x040C71C8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x040C71CA  0F8409020000             JZ        0x20f                         \nBreakpoint 0 hit by instruction at 0x040C71C8 (thread 2796) EAX=0x1 EBX=0x41b55d4 ECX=0x19e5b8 EDX=0x8b67d8 ESI=0x19e5d8 EDI=0x19e5b8 ESP=0x19e558 *ESP=0x0 EBP=0x19e608\n0x040C71C8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x040C71CA  0F8409020000             JZ        0x20f                         \n",
+      "raw_response": "<think>\nAlright, I need to generate a YARA rule based on the given trace and the adversarial analysis strategy. Let me start by understanding the problem.\n\nFirst, looking at the trace provided, it's from a sandbox execution of some code. The user wants to create an evasion bypass rule for a malware that was trying to detect certain instructions. My task is to identify where the attacker might have inserted checks and then find the points in the trace where the attacker could have bypassed those checks.\n\nFrom Phase 1, the attacker's perspective: They probably implemented some basic checks like using TEST EAX with certain conditions or checking for specific opcodes. Looking at the trace, I can see several TEST EAX instructions mixed throughout.\n\nIn Phase 2, as a defender trying to bypass this, I need to find decision points where these tests could be skipped without affecting execution. Each test instruction is an opportunity to insert a skip.\n\nNow, applying Phase 3: Adversarial Game Analysis. The attacker would want the bypasses to remain undetected for as long as possible. So each skip should only affect one test at a time or not trigger any others.\n\nMoving on to selecting 3 different bypass points:\n\n1. **First Bypass Point**: Looking through the trace, I see an instruction `85 C0` which is TEST EAX. If this instruction is skipped, it won't execute the subsequent `JZ 0F 84`, so that's one potential target.\n\n2. **Second Bypass Point**: Another `TEST EAX` is present further down with different instructions after. Skipping this would prevent the following `JZ 85 C0`.\n\n3. **Third Bypass Point**: The last TEST EAX in the trace can be skipped, which would avoid the final `JZ 0F 84`.\n\nEach of these points involves a TEST EAX followed by a JZX instruction. By skipping each TEST, their corresponding JZX is also skipped.\n\nNow, building patterns for each bypass point:\n\n- **Pattern 1**: Skip the first TEST EAX and its following JZX.\n- **Pattern 2**: Skip the second TEST EAX and its JZX.\n- **Pattern 3**: Skip the third TEST EAX and its JZX.\n\nI need to create these patterns with wildcards where applicable, using spaces between hex bytes as per YARA's format. Each pattern must be 6-20 bytes long, combining consecutive instructions with surrounding context to avoid triggering other signatures.\n\nFinally, ensuring that each pattern is unique and correctly formatted, then including them in the YARA rule with appropriate CAPE options for skipping each point.\n</think>\n\n```yara\nrule Evasion_Bypass_Patterns\n{\n    meta:\n        description = \"Evasion bypass patterns targeting TEST EAX followed by JZX instructions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\8669a71f4b3e2c7e\\iter1_v3.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v3",
+    "yara_rule": "rule Evasion_Bypass_Patterns\n{\n    meta:\n        description = \"Evasion bypass patterns targeting TEST EAX followed by JZX instructions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1507",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 37,
+    "new_signatures": 4,
+    "new_signature_names": [
+      "antivm_generic_system",
+      "creates_suspended_process",
+      "queries_computer_name",
+      "terminates_remote_process"
+    ],
+    "new_signature_details": [
+      {
+        "name": "queries_computer_name",
+        "description": "Queries computer hostname",
+        "categories": [
+          "system_discovery"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 3700,
+            "cid": 134
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "creates_suspended_process",
+        "description": "Creates a process in a suspended state, likely for injection",
+        "categories": [
+          "injection",
+          "process hollowing"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 50,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 1056,
+            "cid": 2
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "terminates_remote_process",
+        "description": "Terminates another process",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 1056,
+            "cid": 0
+          },
+          {
+            "process": "svchost.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "antivm_generic_system",
+        "description": "Checks the system manufacturer, likely for anti-virtualization",
+        "categories": [
+          "anti-vm"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [],
+        "new_data": [
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 8872
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          }
+        ],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": "=== 2972.log ===\nCAPE Sandbox - Debugger log: Wed Dec 24 05:07:17 2025\nBreakpoint 1 hit by instruction at 0x00CFE41D (thread 3068) EAX=0xffce ECX=0xffce ESI=0xd38bf0 cmd.exe EDI=0x7fe7 ESP=0x53f8ec *ESP=0xffce EBP=0x53f900\nBreak at 0x00CFE41D in cmd.exe (RVA 0xe41d, thread 3068, Stack 0x00443000-0x00540000, ImageBase 0x00CF0000)\n0x00CFE41D  E8038A0000               CALL      0x8a08                        \nActionDispatcher: skipping instruction.\n0x00CFE422  83C408                   ADD       ESP, 0x8                      \n\n\n=== 3700.log ===\nCAPE Sandbox - Debugger log: Wed Dec 24 05:07:08 2025\nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2adfb64 EDX=0x1 ESI=0x484283a L\"/Create\" EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\nBreak at 0x002DDADC in schtasks.exe (RVA 0x1dadc, thread 8364, Stack 0x02AD2000-0x02AE0000, ImageBase 0x002C0000)\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e74070 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e741f0 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e74090 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e740f0 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e740b0 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e741b0 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e74110 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e741d0 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x9 ECX=0x2e73bf0 EDX=0x1 EDI=0x2adf7f8 \"PARSER2\" ESP=0x2adf778 *ESP=0x2adfb78 EBP=0x2adf7c0\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x1f ECX=0x2adfb00 EDX=0x1 ESI=0x484283a L\"/Create\" EDI=0x2adcc98 \"PARSER2\" ESP=0x2adcbe8 *ESP=0x2adfb04 EBP=0x2adcc30\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x484284a L\"/SC\" EDI=0x2adcc98 \"PARSER2\" ESP=0x2adcbe8 *ESP=0x2adfb04 EBP=0x2adcc30\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x4842860 L\"/MO\" EDI=0x2adcc98 \"PARSER2\" ESP=0x2adcbe8 *ESP=0x2adfb04 EBP=0x2adcc30\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x484286c L\"/TN\" EDI=0x2adcc98 \"PARSER2\" ESP=0x2adcbe8 *ESP=0x2adfb04 EBP=0x2adcc30\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x1f EDX=0x2 ESI=0x484288a L\"/TR\" EDI=0x2adcc98 \"PARSER2\" ESP=0x2adcbe8 *ESP=0x2adfb04 EBP=0x2adcc30\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \nBreakpoint 0 hit by instruction at 0x002DDADC (thread 8364) EAX=0x1 EBX=0x1f ECX=0x2adfb1c EDX=0x2 ESI=0x4842902 L\"/F\" EDI=0x2adcc98 \"PARSER2\" ESP=0x2adcbe8 *ESP=0x2adfb04 EBP=0x2adcc30\n0x002DDADC  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x002DDADE  0F847F010000             JZ        0x185                         \n\n\n=== 7864.log ===\nCAPE Sandbox - Debugger log: Wed Dec 24 05:06:09 2025\nBreakpoint 0 hit by instruction at 0x040C71C8 (thread 2796) EAX=0x1 EBX=0x41b5300 ECX=0x19e5b8 EDX=0x6b450c ESI=0x19e5d8 EDI=0x19e5b8 ESP=0x19e558 *ESP=0x0 EBP=0x19e608\n0x040C71C8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x040C71CA  0F8409020000             JZ        0x20f                         \nBreakpoint 0 hit by instruction at 0x040C71C8 (thread 2796) EAX=0x1 EBX=0x41b55d4 ECX=0x19e5b8 EDX=0x8b67d8 ESI=0x19e5d8 EDI=0x19e5b8 ESP=0x19e558 *ESP=0x0 EBP=0x19e608\n0x040C71C8  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x040C71CA  0F8409020000             JZ        0x20f                         \n",
+    "raw_response": "<think>\nAlright, I need to generate a YARA rule based on the given trace and the adversarial analysis strategy. Let me start by understanding the problem.\n\nFirst, looking at the trace provided, it's from a sandbox execution of some code. The user wants to create an evasion bypass rule for a malware that was trying to detect certain instructions. My task is to identify where the attacker might have inserted checks and then find the points in the trace where the attacker could have bypassed those checks.\n\nFrom Phase 1, the attacker's perspective: They probably implemented some basic checks like using TEST EAX with certain conditions or checking for specific opcodes. Looking at the trace, I can see several TEST EAX instructions mixed throughout.\n\nIn Phase 2, as a defender trying to bypass this, I need to find decision points where these tests could be skipped without affecting execution. Each test instruction is an opportunity to insert a skip.\n\nNow, applying Phase 3: Adversarial Game Analysis. The attacker would want the bypasses to remain undetected for as long as possible. So each skip should only affect one test at a time or not trigger any others.\n\nMoving on to selecting 3 different bypass points:\n\n1. **First Bypass Point**: Looking through the trace, I see an instruction `85 C0` which is TEST EAX. If this instruction is skipped, it won't execute the subsequent `JZ 0F 84`, so that's one potential target.\n\n2. **Second Bypass Point**: Another `TEST EAX` is present further down with different instructions after. Skipping this would prevent the following `JZ 85 C0`.\n\n3. **Third Bypass Point**: The last TEST EAX in the trace can be skipped, which would avoid the final `JZ 0F 84`.\n\nEach of these points involves a TEST EAX followed by a JZX instruction. By skipping each TEST, their corresponding JZX is also skipped.\n\nNow, building patterns for each bypass point:\n\n- **Pattern 1**: Skip the first TEST EAX and its following JZX.\n- **Pattern 2**: Skip the second TEST EAX and its JZX.\n- **Pattern 3**: Skip the third TEST EAX and its JZX.\n\nI need to create these patterns with wildcards where applicable, using spaces between hex bytes as per YARA's format. Each pattern must be 6-20 bytes long, combining consecutive instructions with surrounding context to avoid triggering other signatures.\n\nFinally, ensuring that each pattern is unique and correctly formatted, then including them in the YARA rule with appropriate CAPE options for skipping each point.\n</think>\n\n```yara\nrule Evasion_Bypass_Patterns\n{\n    meta:\n        description = \"Evasion bypass patterns targeting TEST EAX followed by JZX instructions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\8669a71f4b3e2c7e\\iter1_v3.yar"
+  },
+  "best_score": 4,
+  "optimization_history": [
+    "Iteration 1: bypass_failed - YARA pattern did not match",
+    "Iteration 2: SUCCESS - 4 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    ""
+  ]
+}

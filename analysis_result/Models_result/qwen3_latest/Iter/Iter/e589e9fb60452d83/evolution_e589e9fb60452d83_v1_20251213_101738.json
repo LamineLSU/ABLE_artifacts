@@ -1,0 +1,81 @@
+{
+  "sha256": "e589e9fb60452d832fa5b63ff8f02d8f976f3091736b6c6bf2910052618b88a5",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "rule MaliciousCodeBehavior\n{\n    meta:\n        description = \"Identifies malicious code behavior through cmp, je, and call patterns\"\n        cape_options = \"bp0=$push_call_terminate+0,action0=skip,bp1=$push_call_exit+0,action1=skip,bp2=$call_cmp_je+0,action2=skip,count=0\"\n        author = \"Your Name\"\n        date = \"2025-04-05\"\n    \n    strings:\n        // Pattern 0: push eax followed by call to TerminateProcess\n        $push_call_terminate = { 50 FF 15 ?? ?? ?? ?? } (7 bytes)\n\n        // Pattern 1: push [ebp+08h] followed by call to ExitProcess\n        $push_call_exit = { FF 75 08 FF 15 ?? ?? ?? ?? } (9 bytes)\n\n        // Pattern 2: call to unknown function, cmp eax, 0x01, and je\n        $call_cmp_je = { E8 36 34 01 00 83 F8 01 74 20 } (10 bytes)\n\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1221",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 10,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "Here is a YARA rule that identifies the three key behavioral patterns associated with the observed malicious code flow, including the `cmp`, `je`, and `call` instructions that lead to termination or exit logic:\n\n```yara\nrule MaliciousCodeBehavior\n{\n    meta:\n        description = \"Identifies malicious code behavior through cmp, je, and call patterns\"\n        author = \"Your Name\"\n        date = \"2025-04-05\"\n    \n    strings:\n        // Pattern 0: push eax followed by call to TerminateProcess\n        $push_call_terminate = { 50 ff 15 ?? ?? ?? ?? } (7 bytes)\n\n        // Pattern 1: push [ebp+08h] followed by call to ExitProcess\n        $push_call_exit = { ff 75 08 ff 15 ?? ?? ?? ?? } (9 bytes)\n\n        // Pattern 2: call to unknown function, cmp eax, 0x01, and je\n        $call_cmp_je = { e8 36 34 01 00 83 f8 01 74 20 } (10 bytes)\n\n    condition:\n        all of them\n}\n```\n\n---\n\n### ✅ **Explanation of the Patterns**\n\n1. **`$push_call_terminate`**  \n   - This pattern identifies the sequence:  \n     `push eax` (50) followed by a `call` to a function (likely `TerminateProcess` or similar).  \n   - The `call` address is replaced with `?? ?? ?? ??` to account for address obfuscation.\n\n2. **`$push_call_exit`**  \n   - This pattern identifies:  \n     `push [ebp+08h]` (FF 75 08) followed by a `call` to a function (likely `ExitProcess`).  \n   - Again, the `call` address is obfuscated with `?? ?? ?? ??`.\n\n3. **`$call_cmp_je`**  \n   - This pattern identifies a call to an unknown function (likely a control flow hijack), followed by:\n     - `cmp eax, 0x01` (83 F8 01)\n     - `je` to a label (74 20)  \n   - These instructions may be used to conditionally trigger termination or exit logic.\n\n---\n\n### 📌 **Use Cases**\n- This rule can be used in malware analysis to detect potential termination or exit logic in a binary.\n- It is especially useful in memory-based analysis or sandbox detection, where such control flow patterns are indicative of malicious behavior.\n\nLet me know if you'd like to add more patterns or refine the detection logic!",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\e589e9fb60452d83\\iter0_v1.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 08 FF 15 ?? ?? ?? ?? }  // push+call GetCurrentProcess\n        $pattern1 = { 83 F8 01 74 20 }                // cmp eax,01h + je\n        $pattern2 = { A8 01 75 10 }                   // test al,01h + jne\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 85,
+      "opcodes": "",
+      "task_id": "1222",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 10,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Adjust the skip offset to target the `je` or `jne` instructions instead of the `call` instructions, allowing the code to reach the `ExitProcess` call."
+      ],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule hit but failed to find new signatures likely due to incorrect pattern location. The evasion check occurs before the exit call, not the exit itself. I'll focus on STRATEGY A (EVASION CHECK) by targeting the conditional logic around the exit decision. The patterns will capture the test/cmp operations and function calls that validate the exit condition.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 85\n\n**REASONING**: These patterns target the core evasion logic before the exit call. The first pattern captures the push+call sequence to GetCurrentProcess (a common check function). The second targets the cmp eax, 01h + je conditional check. The third captures the test al, 01h + jne check. All patterns use exact opcodes from the trace to avoid false positives while covering different parts of the evasion logic.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { FF 75 08 FF 15 ?? ?? ?? ?? }  // push+call GetCurrentProcess\n        $pattern1 = { 83 F8 01 74 20 }                // cmp eax,01h + je\n        $pattern2 = { A8 01 75 10 }                   // test al,01h + jne\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\e589e9fb60452d83\\iter1_v1.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83 F8 01 74 20 }  // cmp eax, 01h + je\n        $pattern1 = { A8 01 75 10 }      // test al, 01h + jne\n        $pattern2 = { FF 15 04 A2 46 00 }  // call ExitProcess\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 85,
+      "opcodes": "",
+      "task_id": "1223",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 10,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: Adjusting the focus from the ExitProcess call to the conditional jumps (je/jne) that precede it. These jumps are critical for evasion checks, and targeting them allows the bypass to skip the decision logic rather than the exit action itself. The three patterns are derived from the trace’s evasion checks and exit call, ensuring specificity while allowing for variant tolerance.\n\n---\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 85\n\n**REASONING**: The first two patterns target the `cmp`/`je` and `test`/`jne` sequences that determine whether the exit occurs. These are evasion checks, and bypassing them avoids triggering detection. The third pattern targets the `ExitProcess` call itself, which is a strong indicator of the exit decision. By combining these, the rule covers both the decision logic and the exit action, increasing the likelihood of bypassing detection.\n\n---\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83 F8 01 74 20 }  // cmp eax, 01h + je\n        $pattern1 = { A8 01 75 10 }      // test al, 01h + jne\n        $pattern2 = { FF 15 04 A2 46 00 }  // call ExitProcess\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\e589e9fb60452d83\\iter2_v1.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

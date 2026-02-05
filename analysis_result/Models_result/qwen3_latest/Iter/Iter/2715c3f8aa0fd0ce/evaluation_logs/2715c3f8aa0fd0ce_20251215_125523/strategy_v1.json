@@ -1,0 +1,93 @@
+{
+  "prompt_version": "v1",
+  "prompt_name": "Simple Chain-of-Thought",
+  "iterations": [
+    {
+      "iteration_number": 0,
+      "prompt_version": "v1",
+      "llm_query": {
+        "query_id": "f0cdb4b24b9c",
+        "timestamp": "2025-12-15T13:02:22.085160",
+        "iteration": 0,
+        "prompt_version": "v1",
+        "prompt_text": "# Malware Evasion Bypass Analysis\n\nYou are analyzing a malware execution trace that terminates early due to sandbox/VM evasion.\n\n## TRACE DATA\n\nSHA256: 2715c3f8aa0fd0ce4a2fa3d201bd12fe5dcdd443665934e05022b02bdbc43c91\nExitProcess Address: 0041B93C\nInstructions: 20\n--------------------------------------------------------------------------------\nAddress      Opcode               Instruction\n--------------------------------------------------------------------------------\n    0041B901  8BFF                 mov edi, edi\n    0041B903  55                   push ebp\n    0041B904  8BEC                 mov ebp, esp\n    0041B906  E8F7250000           call 0041DF02h\n    0041B90B  83F801               cmp eax, 01h\n    0041B90E  7420                 je 0041B930h\n    0041B910  64A130000000         mov eax, dword ptr fs:[00000030h]\n    0041B916  8B4068               mov eax, dword ptr [eax+68h]\n    0041B919  C1E808               shr eax, 08h\n    0041B91C  A801                 test al, 01h\n    0041B91E  7510                 jne 0041B930h\n    0041B920  FF7508               push dword ptr [ebp+08h]\n    0041B923  FF153CF14200         call dword ptr [0042F13Ch]  # GetCurrentProcess@KERNEL32.DLL (Import, Unknown Params)\n    0041B929  50                   push eax\n    0041B92A  FF1540F14200         call dword ptr [0042F140h]  # TerminateProcess@KERNEL32.DLL (Import, Unknown Params)\n    0041B930  FF7508               push dword ptr [ebp+08h]\n    0041B933  E80B000000           call 0041B943h\n    0041B938  59                   pop ecx\n    0041B939  FF7508               push dword ptr [ebp+08h]\n>>> 0041B93C  FF15A0F14200         call dword ptr [0042F1A0h]  # ExitProcess@KERNEL32.DLL (Import, Unknown Params)\n\n---\n\n## REASONING STRATEGY: Chain-of-Thought\n\nThink through this problem step by step:\n\n**Step 1: Identify all suspicious instructions**\nScan the trace and list every instruction that could be part of the evasion:\n- Conditional jumps (JE, JNE, JZ, JNZ, etc.)\n- Test/compare instructions (TEST, CMP)\n- Function calls (CALL)\n- The exit point\n\n**Step 2: Trace the exit path backwards**\nStarting from the exit, trace backwards to understand:\n- What instruction directly causes the exit?\n- What conditional jump led to that path?\n- What check determined that jump's direction?\n\n**Step 3: Select 3 different bypass candidates**\nChoose 3 DIFFERENT instructions that, if skipped, could bypass the evasion.\n\n**Step 4: Build patterns (6-20 bytes each)**\nFor each candidate, combine it with 2-3 adjacent instructions to create a specific pattern.\n\n**Step 5: Apply wildcards and generate the YARA rule**\nReplace address/offset bytes with ?? and create the final rule.\n\n---\n\n## PATTERN LENGTH REQUIREMENT (CRITICAL)\n\nEach pattern must be **6-20 bytes long** to be specific enough to match only the target location.\n\n**How to build patterns:**\n- Combine 2-3 consecutive instructions from the trace into one pattern\n- Include the target instruction PLUS surrounding context instructions\n- **All patterns MUST come from the TRACE DATA above** - do not invent byte sequences\n\n**Good Example:** `85 C0 0F 84 ?? ?? ?? ?? 8B 45 ??` (TEST EAX + JZ + MOV = 11 bytes)\n**Good Example:** `6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0` (PUSH + POP + MOV + CALL + TEST = 12 bytes)\n\n---\n\n## WILDCARD RULES\n\n**Wildcard principle:** Any byte that represents an address, offset, or displacement MUST be replaced with `??`\n\n**Apply wildcards to:**\n- CALL/JMP offset bytes (4 bytes after opcode)\n- Conditional jump offsets (1 or 4 bytes after opcode)\n- Memory address bytes\n- Stack offsets\n\n**Keep concrete:** All opcode bytes, register-encoding bytes\n\n---\n\n## OUTPUT FORMAT\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { [6-20 bytes with wildcards] }\n        $pattern1 = { [6-20 bytes - DIFFERENT sequence] }\n        $pattern2 = { [6-20 bytes - DIFFERENT sequence] }\n\n    condition:\n        any of them\n}\n```\n\n## REQUIREMENTS\n\n1. Extract exactly 3 patterns ($pattern0, $pattern1, $pattern2)\n2. All 3 patterns must be DIFFERENT hex sequences\n3. **Each pattern must be 6-20 bytes long** (combine multiple instructions)\n4. Use wildcards (??) for all address/offset bytes\n5. Keep opcode and register bytes concrete\n6. Format: spaces between hex bytes, patterns wrapped in { }\n7. cape_options references patterns as $pattern0, $pattern1, $pattern2",
+        "prompt_length": 4504,
+        "prompt_tokens": 1126,
+        "response_text": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83F801 74?? 8B4068 C1E808 A801 75?? }  // CMP + JE + MOV + SHR + TEST + JNE\n        $pattern1 = { FF7508 FF15?? ?? ?? ?? ?? 50 FF15?? ?? ?? ?? }  // PUSH + CALL + PUSH + CALL\n        $pattern2 = { FF7508 E8?? ?? ?? ?? FF15?? ?? ?? ?? }  // PUSH + CALL + CALL ExitProcess\n\n    condition:\n        any of them\n}\n```",
+        "response_length": 551,
+        "response_tokens": 137,
+        "query_start_time": 1765825256.0861206,
+        "query_end_time": 1765825342.0851402,
+        "query_duration_seconds": 85.99901962280273,
+        "model_name": "qwen3:latest",
+        "model_provider": "ollama",
+        "temperature": 0.7,
+        "pattern_type": "UNKNOWN",
+        "confidence": 50,
+        "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83F801 74?? 8B4068 C1E808 A801 75?? }  // CMP + JE + MOV + SHR + TEST + JNE\n        $pattern1 = { FF7508 FF15?? ?? ?? ?? ?? 50 FF15?? ?? ?? ?? }  // PUSH + CALL + PUSH + CALL\n        $pattern2 = { FF7508 E8?? ?? ?? ?? FF15?? ?? ?? ?? }  // PUSH + CALL + CALL ExitProcess\n\n    condition:\n        any of them\n}",
+        "opcodes_generic": "",
+        "opcodes_specific": ""
+      },
+      "cape_analysis": {
+        "task_id": 957,
+        "analysis_type": "bypass",
+        "vm_host": "192.168.197.147",
+        "vm_name": "cape_vm2",
+        "submit_time": 1765825352.3969984,
+        "complete_time": 1765825649.3392167,
+        "duration_seconds": 296.9422183036804,
+        "signatures_count": 23,
+        "signature_names": [
+          "dead_connect",
+          "queries_keyboard_layout",
+          "uses_windows_utilities_to_create_scheduled_task",
+          "http_request",
+          "suspicious_command_tools",
+          "infostealer_cookies",
+          "resumethread_remote_process",
+          "injection_rwx",
+          "antidebug_setunhandledexceptionfilter",
+          "uses_windows_utilities",
+          "queries_user_name",
+          "antisandbox_sleep",
+          "antiav_detectfile",
+          "recon_beacon",
+          "procmem_yara",
+          "language_check_registry",
+          "static_pe_pdbpath",
+          "persistence_autorun",
+          "stealth_window",
+          "queries_locale_api",
+          "stealth_timeout",
+          "queries_computer_name",
+          "persistence_autorun_tasks"
+        ],
+        "rule_hit": true,
+        "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83 F8 01 74 ?? 8B 40 68 C1 E8 08 A8 01 75 ?? }  // CMP + JE + MOV + SHR + TEST + JNE\n        $pattern1 = { FF 75 08 FF 15 ?? ?? ?? ?? ?? 50 FF 15 ?? ?? ?? ?? }  // PUSH + CALL + PUSH + CALL\n        $pattern2 = { FF 75 08 E8 ?? ?? ?? ?? FF 15 ?? ?? ?? ?? }  // PUSH + CALL + CALL ExitProcess\n\n    condition:\n        any of them\n}",
+        "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\2715c3f8aa0fd0ce\\iter0_v1.yar"
+      },
+      "success": true,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "static_pe_pdbpath"
+      ],
+      "feedback_given": null,
+      "evolution_reasoning": null
+    }
+  ],
+  "total_iterations": 1,
+  "iterations_to_success": 1,
+  "total_time_seconds": 393.2563831806183,
+  "avg_query_time_seconds": 85.99901962280273,
+  "avg_analysis_time_seconds": 296.9422183036804,
+  "total_input_tokens": 1126,
+  "total_output_tokens": 137,
+  "total_tokens": 1263,
+  "success": true,
+  "best_score": 1,
+  "best_iteration": 0,
+  "final_yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83 F8 01 74 ?? 8B 40 68 C1 E8 08 A8 01 75 ?? }  // CMP + JE + MOV + SHR + TEST + JNE\n        $pattern1 = { FF 75 08 FF 15 ?? ?? ?? ?? ?? 50 FF 15 ?? ?? ?? ?? }  // PUSH + CALL + PUSH + CALL\n        $pattern2 = { FF 75 08 E8 ?? ?? ?? ?? FF 15 ?? ?? ?? ?? }  // PUSH + CALL + CALL ExitProcess\n\n    condition:\n        any of them\n}",
+  "final_new_signatures": [
+    "static_pe_pdbpath"
+  ]
+}

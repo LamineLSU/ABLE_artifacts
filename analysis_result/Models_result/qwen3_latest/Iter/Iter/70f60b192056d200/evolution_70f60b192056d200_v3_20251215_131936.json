@@ -1,0 +1,469 @@
+{
+  "sha256": "70f60b192056d200088fdcd3863de5c26b6e10e7e7b38ca71375a930d6645014",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "To address the scenario where the goal is to **prevent the execution of the ExitProcess** (or a similar critical function), we can create **three distinct patterns** that can be used to **hook, patch, or bypass** the execution flow. These patterns are based on **common assembly structures** and **typical code flows** found in such scenarios. Below is a breakdown of the three patterns and their purpose:\n\n---\n\n### ✅ **Pattern 1: Call to TerminateProcess (and preceding instructions)**\n**Objective:** Prevent termination by intercepting the `TerminateProcess` call.\n\n**Code Structure:**\n```asm\npush ebp+08h\ncall [GetCurrentProcess]\npush eax\ncall [TerminateProcess]\n```\n\n**Hex Pattern (example):**\n```hex\nFF 75 08 FF 15 ?? ?? ?? ?? 36 50 FF 15 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `FF 75 08`: Push the `ebp+08h` register (common in function prologues).\n- `FF 15 ?? ?? ?? ??`: Call to `GetCurrentProcess` (4-byte address).\n- `36 50`: Push `eax` (common in cleanup logic).\n- `FF 15 ?? ?? ?? ??`: Call to `TerminateProcess` (4-byte address).\n\n**Use Case:** Hook this call to redirect execution to a safe location (e.g., a custom cleanup routine).\n\n---\n\n### ✅ **Pattern 2: Call to ExitProcess (and preceding instructions)**\n**Objective:** Prevent program termination by intercepting the `ExitProcess` call.\n\n**Code Structure:**\n```asm\ncall [ExitProcess]\n```\n\n**Hex Pattern (example):**\n```hex\nFF 15 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `FF 15 ?? ?? ?? ??`: Call to `ExitProcess` (4-byte address).\n\n**Use Case:** Hook this call to redirect execution to a custom handler (e.g., a `MessageBox` or a custom exit routine).\n\n---\n\n### ✅ **Pattern 3: Test al, 01h (and surrounding logic)**\n**Objective:** Bypass logic that checks for a flag (e.g., a `Terminate` flag) before calling `ExitProcess`.\n\n**Code Structure:**\n```asm\ntest al, 01h\njne [ExitProcess]\n```\n\n**Hex Pattern (example):**\n```hex\n83 F0 01 75 ?? ?? ?? ??\n```\n\n**Explanation:**\n- `83 F0 01`: Test `al` against `01h`.\n- `75 ?? ?? ?? ??`: Jump to `ExitProcess` if the test result is non-zero.\n\n**Use Case:** Modify this `jne` instruction to always skip the call to `ExitProcess` (e.g., by patching the `jne` to a `jmp` to a safe location).\n\n---\n\n### 🛠️ **Summary of Patterns**\n| Pattern | Purpose | Hex Example |\n|--------|---------|-------------|\n| 1 | Intercept `TerminateProcess` | `FF 75 08 FF 15 ?? ?? ?? ?? 36 50 FF 15 ?? ?? ?? ??` |\n| 2 | Intercept `ExitProcess` | `FF 15 ?? ?? ?? ??` |\n| 3 | Bypass flag check before `ExitProcess` | `83 F0 01 75 ?? ?? ?? ??` |\n\n---\n\n### 📌 Notes\n- These patterns are **example-based** and may vary depending on the actual code.\n- In real-world scenarios, **memory scanning** (e.g., using `ReadProcessMemory`) or **pattern scanning tools** (e.g., `Cheat Engine`) are used to locate these patterns.\n- For **hooking**, you could use **Detours**, **MinHook**, or **Inline Hooking** to redirect execution.\n- For **patching**, you could **overwrite the `jne`** in Pattern 3 to `jmp` to a safe location.\n\nLet me know if you'd like a **working code example** in C++ or Python to implement these patterns!",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 F7 25 00 00 83 F8 01 74 20 }  // CALL + CMP + JE evasion check\n        $pattern1 = { FF 15 40 F1 42 00 }             // TerminateProcess API call\n        $pattern2 = { FF 15 A0 F1 42 00 }             // ExitProcess API call\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE | API_CHECK | API_CHECK",
+      "confidence": 80,
+      "opcodes": "",
+      "task_id": "1700",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 26,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Adjust the YARA rule to target more generic patterns (e.g., use wildcards for API addresses) and avoid relying on exact opcode sequences. This reduces specificity and improves detection of obfuscated variants."
+      ],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt failed due to incorrect pattern selection. The original trace shows critical evasion logic in the first 30% of the trace (CALL → CMP → JE) and direct API calls to TerminateProcess/ExitProcess. I selected three distinct patterns: (1) the evasion check sequence (call + cmp + je), (2) the TerminateProcess API call, and (3) the ExitProcess API call. These patterns target the decision logic and exit mechanics, aligning with Strategy A and B while avoiding generic wildcards.\n\n**PATTERN_TYPE**: CALL_TEST_JE | API_CHECK | API_CHECK\n\n**CONFIDENCE**: 80 | 70 | 70\n\n**REASONING**:  \n1. **Pattern0** (E8F7250000 83F801 7420): Targets the evasion check logic (call to unknown function, cmp eax, 01h, je) which is likely a sandbox detection check. This is a high-confidence target for bypassing early-stage evasion.  \n2. **Pattern1** (FF1540F14200): Directly matches the TerminateProcess API call (imported from KERNEL32), which is a conditional exit point.  \n3. **Pattern2** (FF15A0F14200): Matches the ExitProcess API call, which is the final termination action. These API calls are specific to the sample and unlikely to match unrelated code.  \n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8F7250000 83F801 7420 }  // CALL + CMP + JE evasion check\n        $pattern1 = { FF1540F14200 }             // TerminateProcess API call\n        $pattern2 = { FF15A0F14200 }             // ExitProcess API call\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\70f60b192056d200\\iter1_v3.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 F7 25 00 00 83 F8 01 74 20 }  // CALL + CMP + JE (evasion check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? }                // Generic API call (GetCurrentProcess/TerminateProcess)\n        $pattern2 = { C1 E8 08 A8 01 75 10 }             // SHR + TEST + JNE (conditional logic)\n\n    condition:\n        any of them\n}",
+      "pattern_type": "API_CHECK",
+      "confidence": 85,
+      "opcodes": "",
+      "task_id": "1701",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 26,
+      "new_signatures": 2,
+      "new_signature_names": [
+        "antivm_generic_system",
+        "antivm_checks_available_memory"
+      ],
+      "new_signature_details": [
+        {
+          "name": "antivm_checks_available_memory",
+          "description": "Checks available memory",
+          "categories": [
+            "antivm"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 1308,
+              "cid": 19925
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "antivm_generic_system",
+          "description": "Checks the system manufacturer, likely for anti-virtualization",
+          "categories": [
+            "anti-vm"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [],
+          "new_data": [
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 1308
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 1308
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 1308
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 1308
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 1308
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 1308
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 1308
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 1308
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 1308
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 1308
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 1308
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            },
+            {
+              "process": {
+                "process_name": "wermgr.exe",
+                "process_id": 1308
+              },
+              "signs": [
+                {
+                  "type": "registry",
+                  "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+                }
+              ]
+            }
+          ],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 1120.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 02:35:33 2025\nBreakpoint 1 hit by instruction at 0x00522C75 (thread 1216) EAX=0xa458e EBX=0x4a51af8 ECX=0x522c70 schtasks.exe EDX=0x544000 ESI=0x522c70 schtasks.exe EDI=0x4a51b08 ESP=0x2e3fe30 *ESP=0x52adc0 schtasks.exe EBP=0x2e3fe70\nBreak at 0x00522C75 in schtasks.exe (RVA 0x22c75, thread 1216, Stack 0x02E33000-0x02E40000, ImageBase 0x00500000)\n0x00522C75  FF1504C05200             CALL      DWORD [0x52c004]              \nActionDispatcher: skipping instruction.\n0x00522C7B  85C0                     TEST      EAX, EAX                      \n\n\n=== 2512.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 02:35:59 2025\nBreakpoint 1 hit by instruction at 0x00DD5497 (thread 7728) EDX=0xf0 ESI=0xdd1134 cacls.exe EDI=0xdd4c90 cacls.exe ESP=0xc7fc10 *ESP=0x10000 EBP=0xc7fc28\nBreak at 0x00DD5497 in cacls.exe (RVA 0x5497, thread 7728, Stack 0x00C72000-0x00C80000, ImageBase 0x00DD0000)\n0x00DD5497  FF152C71DD00             CALL      DWORD [0xdd712c]              \nActionDispatcher: skipping instruction.\n0x00DD549D  59                       POP       ECX                           \n\n\n=== 5016.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 02:36:45 2025\nBreakpoint 1 hit by instruction at 0x00DD5497 (thread 2304) EDX=0xf0 ESI=0xdd1134 cacls.exe EDI=0xdd4c90 cacls.exe ESP=0xaffdd8 *ESP=0x10000 EBP=0xaffdf0\nBreak at 0x00DD5497 in cacls.exe (RVA 0x5497, thread 2304, Stack 0x00AF3000-0x00B00000, ImageBase 0x00DD0000)\n0x00DD5497  FF152C71DD00             CALL      DWORD [0xdd712c]              \nActionDispatcher: skipping instruction.\n0x00DD549D  59                       POP       ECX                           \n\n\n=== 6492.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 02:37:05 2025\nBreakpoint 1 hit by instruction at 0x00DD5497 (thread 9068) EDX=0xf0 ESI=0xdd1134 cacls.exe EDI=0xdd4c90 cacls.exe ESP=0x2f4f8f0 *ESP=0x10000 EBP=0x2f4f908\nBreak at 0x00DD5497 in cacls.exe (RVA 0x5497, thread 9068, Stack 0x02F42000-0x02F50000, ImageBase 0x00DD0000)\n0x00DD5497  FF152C71DD00             CALL      DWORD [0xdd712c]              \nActionDispatcher: skipping instruction.\n0x00DD549D  59                       POP       ECX                           \n\n\n=== 9200.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 02:36:35 2025\nBreakpoint 1 hit by instruction at 0x00DD5497 (thread 9188) EDX=0xf0 ESI=0xdd1134 cacls.exe EDI=0xdd4c90 cacls.exe ESP=0xcffa34 *ESP=0x10000 EBP=0xcffa4c\nBreak at 0x00DD5497 in cacls.exe (RVA 0x5497, thread 9188, Stack 0x00CF2000-0x00D00000, ImageBase 0x00DD0000)\n0x00DD5497  FF152C71DD00             CALL      DWORD [0xdd712c]              \nActionDispatcher: skipping instruction.\n0x00DD549D  59                       POP       ECX                           \n",
+      "raw_response": "**EVOLUTION_REASONING**: Adjusted patterns to target generic API call sequences and conditional checks from the trace, using wildcards for addresses to avoid specificity. Focus on early evasion checks (Strategy A) and conditional logic before exit (Strategy B) to improve bypass chances.\n\n**PATTERN_TYPE**: API_CHECK\n\n**CONFIDENCE**: 85\n\n**REASONING**: The patterns target API calls (GetCurrentProcess, TerminateProcess) and conditional checks (cmp+je, test+ jne) from the trace. Wildcards in addresses allow flexibility for variants while retaining core behavior. These patterns are less specific than previous attempts, reducing false positives and improving evasion chances.\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 F7 25 00 00 83 F8 01 74 20 }  // CALL + CMP + JE (evasion check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? }                // Generic API call (GetCurrentProcess/TerminateProcess)\n        $pattern2 = { C1 E8 08 A8 01 75 10 }             // SHR + TEST + JNE (conditional logic)\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\70f60b192056d200\\iter2_v3.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v3",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 F7 25 00 00 83 F8 01 74 20 }  // CALL + CMP + JE (evasion check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? }                // Generic API call (GetCurrentProcess/TerminateProcess)\n        $pattern2 = { C1 E8 08 A8 01 75 10 }             // SHR + TEST + JNE (conditional logic)\n\n    condition:\n        any of them\n}",
+    "pattern_type": "API_CHECK",
+    "confidence": 85,
+    "opcodes": "",
+    "task_id": "1701",
+    "status": "bypass_crashed",
+    "rule_hit": true,
+    "baseline_signatures": 26,
+    "new_signatures": 2,
+    "new_signature_names": [
+      "antivm_generic_system",
+      "antivm_checks_available_memory"
+    ],
+    "new_signature_details": [
+      {
+        "name": "antivm_checks_available_memory",
+        "description": "Checks available memory",
+        "categories": [
+          "antivm"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 1308,
+            "cid": 19925
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "antivm_generic_system",
+        "description": "Checks the system manufacturer, likely for anti-virtualization",
+        "categories": [
+          "anti-vm"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [],
+        "new_data": [
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 1308
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 1308
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 1308
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 1308
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 1308
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 1308
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 1308
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 1308
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 1308
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 1308
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 1308
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          },
+          {
+            "process": {
+              "process_name": "wermgr.exe",
+              "process_id": 1308
+            },
+            "signs": [
+              {
+                "type": "registry",
+                "value": "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\SystemInformation\\SystemManufacturer"
+              }
+            ]
+          }
+        ],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": "Rule caused crash: ['exec_crash']",
+    "improvement_suggestions": [],
+    "debugger_log": "=== 1120.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 02:35:33 2025\nBreakpoint 1 hit by instruction at 0x00522C75 (thread 1216) EAX=0xa458e EBX=0x4a51af8 ECX=0x522c70 schtasks.exe EDX=0x544000 ESI=0x522c70 schtasks.exe EDI=0x4a51b08 ESP=0x2e3fe30 *ESP=0x52adc0 schtasks.exe EBP=0x2e3fe70\nBreak at 0x00522C75 in schtasks.exe (RVA 0x22c75, thread 1216, Stack 0x02E33000-0x02E40000, ImageBase 0x00500000)\n0x00522C75  FF1504C05200             CALL      DWORD [0x52c004]              \nActionDispatcher: skipping instruction.\n0x00522C7B  85C0                     TEST      EAX, EAX                      \n\n\n=== 2512.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 02:35:59 2025\nBreakpoint 1 hit by instruction at 0x00DD5497 (thread 7728) EDX=0xf0 ESI=0xdd1134 cacls.exe EDI=0xdd4c90 cacls.exe ESP=0xc7fc10 *ESP=0x10000 EBP=0xc7fc28\nBreak at 0x00DD5497 in cacls.exe (RVA 0x5497, thread 7728, Stack 0x00C72000-0x00C80000, ImageBase 0x00DD0000)\n0x00DD5497  FF152C71DD00             CALL      DWORD [0xdd712c]              \nActionDispatcher: skipping instruction.\n0x00DD549D  59                       POP       ECX                           \n\n\n=== 5016.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 02:36:45 2025\nBreakpoint 1 hit by instruction at 0x00DD5497 (thread 2304) EDX=0xf0 ESI=0xdd1134 cacls.exe EDI=0xdd4c90 cacls.exe ESP=0xaffdd8 *ESP=0x10000 EBP=0xaffdf0\nBreak at 0x00DD5497 in cacls.exe (RVA 0x5497, thread 2304, Stack 0x00AF3000-0x00B00000, ImageBase 0x00DD0000)\n0x00DD5497  FF152C71DD00             CALL      DWORD [0xdd712c]              \nActionDispatcher: skipping instruction.\n0x00DD549D  59                       POP       ECX                           \n\n\n=== 6492.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 02:37:05 2025\nBreakpoint 1 hit by instruction at 0x00DD5497 (thread 9068) EDX=0xf0 ESI=0xdd1134 cacls.exe EDI=0xdd4c90 cacls.exe ESP=0x2f4f8f0 *ESP=0x10000 EBP=0x2f4f908\nBreak at 0x00DD5497 in cacls.exe (RVA 0x5497, thread 9068, Stack 0x02F42000-0x02F50000, ImageBase 0x00DD0000)\n0x00DD5497  FF152C71DD00             CALL      DWORD [0xdd712c]              \nActionDispatcher: skipping instruction.\n0x00DD549D  59                       POP       ECX                           \n\n\n=== 9200.log ===\nCAPE Sandbox - Debugger log: Tue Dec 16 02:36:35 2025\nBreakpoint 1 hit by instruction at 0x00DD5497 (thread 9188) EDX=0xf0 ESI=0xdd1134 cacls.exe EDI=0xdd4c90 cacls.exe ESP=0xcffa34 *ESP=0x10000 EBP=0xcffa4c\nBreak at 0x00DD5497 in cacls.exe (RVA 0x5497, thread 9188, Stack 0x00CF2000-0x00D00000, ImageBase 0x00DD0000)\n0x00DD5497  FF152C71DD00             CALL      DWORD [0xdd712c]              \nActionDispatcher: skipping instruction.\n0x00DD549D  59                       POP       ECX                           \n",
+    "raw_response": "**EVOLUTION_REASONING**: Adjusted patterns to target generic API call sequences and conditional checks from the trace, using wildcards for addresses to avoid specificity. Focus on early evasion checks (Strategy A) and conditional logic before exit (Strategy B) to improve bypass chances.\n\n**PATTERN_TYPE**: API_CHECK\n\n**CONFIDENCE**: 85\n\n**REASONING**: The patterns target API calls (GetCurrentProcess, TerminateProcess) and conditional checks (cmp+je, test+ jne) from the trace. Wildcards in addresses allow flexibility for variants while retaining core behavior. These patterns are less specific than previous attempts, reducing false positives and improving evasion chances.\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 F7 25 00 00 83 F8 01 74 20 }  // CALL + CMP + JE (evasion check)\n        $pattern1 = { FF 15 ?? ?? ?? ?? }                // Generic API call (GetCurrentProcess/TerminateProcess)\n        $pattern2 = { C1 E8 08 A8 01 75 10 }             // SHR + TEST + JNE (conditional logic)\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\70f60b192056d200\\iter2_v3.yar"
+  },
+  "best_score": 2,
+  "optimization_history": [
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: SUCCESS - 2 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    ""
+  ]
+}

@@ -1,0 +1,898 @@
+{
+  "sha256": "3eca87ed4d16eaf325ffcf6412cfeba6bdcd8746dd803db228263f7bac799e69",
+  "prompt_version": "v1",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v1",
+      "yara_rule": "",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Failed to generate YARA rule",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nOkay, I'm trying to figure out how to create a Yara rule for this malware sample's chain-of- thought. So, the user provided three traces from different debug sessions: one starting with 0x0, then 0xD6, and finally 0x61. Each trace seems to be part of an evasion attempt.\n\nFirst, I need to analyze each trace step by step. Let me start with the first trace at 0x0.\n\nLooking at the first trace, after some initial setup like moving registers and testing, there are several function calls using FF1588A0 as offsets. The exit is triggered via a call to 0x61E2 or similar. The instructions around the call seem to be setting up conditions before jumping out.\n\nI notice that in each trace, after some setup like testing EAX, moving CL into EBP, and handling other registers, there's a test (TEST EAX) followed by conditional jumps like JZ or JE. Then they call a function with an offset, which is the exit point. The exit seems to be using different offsets in each debug session.\n\nThe user wants me to find three bypass candidates that could potentially cause the malware to exit without being caught. Bypassing these would allow the sample to skip the security check.\n\nSo, I should look for instructions where the code can be made to jump or test differently than intended. Key instructions here are TEST EAX, the conditional jumps like JZ or JE after that, and the function calls with specific offsets.\n\nLet's think about possible bypass points:\n\n1. The TEST EAX instruction is followed by a conditional jump. If we can skip this test, the code would proceed to call the exit function immediately. So, replacing TEST EAX with a nop (no operation) could be one pattern.\n\n2. Another potential point is after the JE or JZ jump. Maybe bypassing that instruction so it doesn't check EAX but instead jumps directly based on another condition. But since we don't know the actual value of EAX, this might not be straightforward without more info.\n\n3. Alternatively, maybe bypassing the function call itself by making it skip to the exit point. That would mean replacing the call instruction with a direct jump or something that leads right past the security check into the exit code.\n\nWait, looking closer at each trace, after the conditional jumps (like JE 0x5E83h), there's a call to some offset address. So perhaps bypassing the TEST EAX instruction before that could cause it to skip the test and jump directly out.\n\nAnother thought: in the first trace, after testing EAX with TEST EAX, the code does a JZ or JE based on whether EAX is zero. If we can make this conditional jump go wrong, like always take the wrong branch, bypassing the test.\n\nBut since the actual value of EAX depends on previous operations, without knowing that, it's tricky. Maybe instead, looking for when the code calls a function with an offset and then jumps out, perhaps bypassing the call instruction to skip right to the exit.\n\nWait, let me see: in each trace, after setting up registers and testing EAX, there are several instructions leading up to a call. For example, in the first trace:\n\n- TEST EAX\n- JZ or JE based on EAX (but since EAX was set earlier by calling 0x5E83h, which is offset from 0xD6...)\nWait, maybe I'm getting lost.\n\nAlternatively, perhaps focusing on specific function calls. For example, the first trace has FF1588A0 as an offset in a call instruction. If we can make that call skip or go to the exit path directly, that would bypass the security.\n\nSo, possible bypass points could be:\n\n1. Bypassing the TEST EAX before it's used for conditional jumps.\n2. Making the conditional jump (JE/JZ) take an unintended branch without using EAX.\n3. Bypassing the call instruction to skip to the exit code.\n\nLet me try constructing patterns based on these ideas.\n\nPattern 0: Bypassing TEST EAX with a NOP or similar.\n\nThe first few instructions are:\n\n85 C0 (TEST EAX)\nThen JZ or JE, then a series of movs, calls, etc.\n\nIf we can skip the TEST EAX and proceed immediately to the call, that would bypass the test. So the pattern could be: [85] followed by some bytes that can be skipped. But since after TEST EAX is a conditional jump, maybe replacing those instructions with a no-op or something else that skips them.\n\nBut wait, in the trace, after TEST EAX, there's an instruction like JE 0x5E83h, which uses EAX (from earlier). If we can make this condition always true or false, bypassing it would allow proceeding to the call. However, without knowing EAX's value, that might not be feasible.\n\nAlternatively, perhaps replacing the conditional jump with a no-op so that execution proceeds beyond it.\n\nBut in terms of creating a Yara rule, I need to create patterns for sequences where these instructions are skipped or bypassed.\n\nSo, let me think:\n\nPattern 0: Bypass TEST EAX and its following conditional jump.\n\nThe bytes would be [TEST] followed by the conditional jump. Replacing them with a no-op (e.g., [00]) might cause the execution to skip those lines. But wait, in x86, the TEST instruction is followed by an instruction that uses EAX. So replacing it with a NOP wouldn't necessarily make sense because the next instruction after TEST would be a conditional jump.\n\nAlternatively, maybe we can replace the entire block from TEST onwards with something else, but that might not fit within 20 bytes.\n\nPattern 1: Bypassing the conditional jump (JE/JZ) without using EAX. So, for example, replacing the condition with another offset or making it take a different path based on known values.\n\nBut again, since we don't know EAX's value from previous operations, this might not be straightforward unless there's some setup in the trace that allows us to create such an offset.\n\nPattern 2: Bypassing the call instruction by replacing it with a direct jump or something else. For example, if after the call, there's a function that should return, but instead bypass directly to the exit code.\n\nLooking at each trace:\n\nIn first trace (0x0):\n... calls FF1588A02D01 and then later 012D8C42h\n\nIf we can make this call skip or jump directly after calling, that would be a bypass.\n\nAlternatively, maybe the function being called is supposed to return via RET, but if it's not present, perhaps just jumping over it.\n\nWait, in x86, a function call with a return address (like in the trace) should have a RET instruction. But if it's missing, you can jump directly from the instruction before.\n\nSo for example, after the call instruction, the next instruction is likely RET. So replacing that with a direct jump could bypass.\n\nLet me try to outline this:\n\nEach pattern needs to be 6-20 bytes long. Let's create three different patterns targeting these points.\n\nPattern 0: Bypass TEST EAX and the conditional jump.\nBytes would be something like:\n85 C0 (TEST)\nThen, after that, a no-op or something else.\n\nBut in reality, the next instruction is a conditional jump (JE/JZ), so maybe replace those two bytes with a single byte (e.g., 00) but I'm not sure how that would work. Alternatively, perhaps insert a different instruction at that point to bypass it.\n\nAlternatively, think about the sequence where after TEST EAX comes a conditional jump based on EAX. So if we can make that conditional always take one branch or another without looking at EAX, that could cause a bypass. But since we don't know EAX's value, this might not be feasible unless there are earlier instructions that set up the condition.\n\nWait, in each trace, before the TEST EAX, there are setup moves:\n\nFor example, in first trace:\n8B C0 (mov esp, ebp)\nThen 33 DB (xor ebx, ebx)\nBA04010000 (push 0x4)\nE825050000 (call...)\nSo perhaps before TEST EAX, there's an OR or AND that sets a register which can be used in the conditional.\n\nBut I'm getting confused. Maybe it's better to look for where the code is supposed to jump based on EAX but doesn't have any setup, so maybe we can create a bypass here by replacing the condition with a different value.\n\nAlternatively, perhaps after the TEST EAX comes JZ or JE, which could be replaced with an instruction that uses another register's value instead of EAX. But without knowing what else is available, it's difficult.\n\nAnother angle: in each trace, there's a call to 0x5E83h and similar offsets. Maybe bypassing these calls would allow the code to skip their execution, thus bypassing the security check.\n\nSo Pattern 1 could be replacing the call instruction with something else or causing it to go directly into the exit path.\n\nAlternatively, perhaps after the function returns from the call (via RET), we can cause it to jump back to the exit point. But that might not make sense unless there's a loop involved.\n\nWait, looking at each trace:\n\nAfter calling 0x5E83h or similar, the code continues with some movs and then another call. So maybe bypassing those calls would allow skipping their execution entirely.\n\nSo perhaps replacing the call instruction (e.g., FF1588A0) with a no-op (00), but that's not possible because it's an instruction byte. Alternatively, making the next instruction after the call be the exit point by inserting or bypassing the return address.\n\nBut in x86, function calls are followed by RET to return. If we can cause the program counter to jump directly to the exit code instead of returning, that would bypass the security check.\n\nSo perhaps a pattern where after the call instruction (FF1588A0), there's an instruction that jumps over the function body to the exit point.\n\nBut I'm not sure how to represent this as a single byte sequence. Maybe using a conditional jump or something similar.\n\nAlternatively, focusing on specific parts of the code:\n\nLooking at the first trace again:\nAfter some setup, we have:\n\n8B C0 (mov esp, ebp)\n33 DB (xor ebx,ebx)\nBA 04 01 00 00 (push 4)\nE8 25 05 00 00 (call...)\nThen a series of movs and then another call.\nSo perhaps the exit is after these jumps.\n\nIf we can bypass those initial setup steps, maybe the code would proceed directly to the exit. So Pattern 2 could be replacing those initial bytes with something else that skips them.\n\nAlternatively, focusing on the test EAX instruction being replaced by a no-op so that execution continues past it into the call or jump.\n\nWait, let's think about this step-by-step:\n\n1. In each trace, there is an 'call' instruction which has an offset.\n2. After calling, the code sets up some registers and then calls another function with 0x61E2h or similar.\n3. The exit seems to be at different offsets in each debug session.\n\nSo perhaps bypassing these function calls would allow skipping their execution entirely, thus exiting earlier than intended.\n\nTherefore, a possible pattern is replacing the call instruction (like FF1588A0) with something else that skips over it or causes an immediate jump after.\n\nAlternatively, considering that the exit code in each case is at 0x61E2h, if we can make the program skip past all those function calls and go directly there, that would be a bypass.\n\nBut how to represent this as a byte sequence. Maybe inserting a conditional jump before the call instruction or something similar.\n\nAlternatively, perhaps after setting up registers (push 4), if we replace the next instruction with a direct jump instead of pushing and then calling again.\n\nWait, in each trace:\n\nAfter pushing 4, there's an E825050000 (call...) Then some movs, then another call. So maybe after those initial steps, replacing the next instruction with something that jumps directly to the exit code would bypass the security check.\n\nPutting it all together, perhaps three patterns:\n\n1. Bypass TEST EAX and replace the conditional jump.\n2. Bypass one of the function calls by causing it to skip or go elsewhere.\n3. Directly jump after certain initial setup steps before the call.\n\nBut I'm not entirely sure how to structure these into Yara rules without more specific information on what's being tested in each case. Maybe using a placeholder for unknown values and making the instruction sequence flexible enough to bypass different conditions.\n\nSo, in summary:\n\nPattern 0: Bypass TEST EAX by replacing it with a no-op or a conditional that doesn't use EAX.\nPattern 1: Replace one of the function calls (like FF1588A0) with something else or cause it to skip.\nPattern 2: Create a jump after initial setup steps before the call, bypassing all security checks.\n\nI think these three patterns could potentially be exploited by an attacker to bypass the security measures in this malware sample.\n</think>\n\nTo create Yara rules for bypassing the security measures in the provided malware samples, we can focus on key points where instructions can be skipped or modified. Here are three potential patterns:\n\n1. **Bypass TEST EAX and Conditional Jump**: This pattern targets the initial setup by replacing the `TEST EAX` instruction and its subsequent conditional jump with a no-op, allowing execution to proceed past these security checks.\n\n2. **Function Call Bypass**: Replace one of the function calls (e.g., `0x5E83h`) with a direct jump or use an unknown offset, causing the code to skip their execution entirely.\n\n3. **Direct Jump After Setup**: Insert a conditional instruction after initial setup steps, bypassing all security checks and directly jumping to the exit point.\n\nEach pattern is designed to exploit different parts of the code flow where bypassing can be effective.\n\n```plaintext\n# Yara rules for bypassing malware security measures\n\n# Pattern 0: Bypass TEST EAX and conditional jump\n0x08064C2B        # Replace TEST EAX with a no-op (e.g., mov q, q)\n0x08064C2C        # Skip the conditional jump by replacing it with nothing\n\n# Pattern 1: Bypass function call by causing it to skip\n0x08064C2D        # Replace the function call instruction with a direct jump or unknown offset\n\n# Pattern 2: Direct jump after initial setup steps\n0x08064C2E        # Insert a conditional jump after setup, bypassing all security checks\n```\n\nThese patterns can be used to bypass different parts of the malware's execution flow.",
+      "yara_file": null
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v1",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule targeting conditional jumps and TEST instructions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 74 1E ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1306",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 15,
+      "new_signatures": 4,
+      "new_signature_names": [
+        "queries_locale_api",
+        "stealth_timeout",
+        "createtoolhelp32snapshot_module_enumeration",
+        "queries_keyboard_layout"
+      ],
+      "new_signature_details": [
+        {
+          "name": "queries_keyboard_layout",
+          "description": "Queries the keyboard layout",
+          "categories": [
+            "location_discovery"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 2399
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 2423
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 2454
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 2573
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 2576
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "queries_locale_api",
+          "description": "Queries the computer locale (possible geofencing)",
+          "categories": [
+            "location_discovery",
+            "geofence"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 2193
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 2357
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 2585
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "stealth_timeout",
+          "description": "Possible date expiration check, exits too soon after checking local time",
+          "categories": [
+            "stealth"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 40,
+          "references": [],
+          "data": [
+            {
+              "process": "soM66kM.exe, PID 7672"
+            },
+            {
+              "type": "call",
+              "pid": 7672,
+              "cid": 169
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "createtoolhelp32snapshot_module_enumeration",
+          "description": "Enumerates the modules from a process (may be used to locate base addresses in process injection)",
+          "categories": [
+            "discovery"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 247
+            },
+            {
+              "module": "pid 2848 module ntdll.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 249
+            },
+            {
+              "module": "pid 2848 module KERNEL32.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 250
+            },
+            {
+              "module": "pid 2848 module KERNELBASE.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 251
+            },
+            {
+              "module": "pid 2848 module apphelp.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 252
+            },
+            {
+              "module": "pid 2848 module AcLayers.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 253
+            },
+            {
+              "module": "pid 2848 module msvcrt.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 254
+            },
+            {
+              "module": "pid 2848 module USER32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 255
+            },
+            {
+              "module": "pid 2848 module win32u.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 256
+            },
+            {
+              "module": "pid 2848 module GDI32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 257
+            },
+            {
+              "module": "pid 2848 module gdi32full.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 258
+            },
+            {
+              "module": "pid 2848 module msvcp_win.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 259
+            },
+            {
+              "module": "pid 2848 module ucrtbase.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 260
+            },
+            {
+              "module": "pid 2848 module SHELL32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 261
+            },
+            {
+              "module": "pid 2848 module SHLWAPI.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 262
+            },
+            {
+              "module": "pid 2848 module OLEAUT32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 263
+            },
+            {
+              "module": "pid 2848 module combase.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 264
+            },
+            {
+              "module": "pid 2848 module RPCRT4.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 265
+            },
+            {
+              "module": "pid 2848 module SETUPAPI.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 266
+            },
+            {
+              "module": "pid 2848 module cfgmgr32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 267
+            },
+            {
+              "module": "pid 2848 module bcrypt.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 268
+            },
+            {
+              "module": "pid 2848 module MPR.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 269
+            },
+            {
+              "module": "pid 2848 module sfc.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 270
+            },
+            {
+              "module": "pid 2848 module WINSPOOL.DRV"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 271
+            },
+            {
+              "module": "pid 2848 module sfc_os.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 272
+            },
+            {
+              "module": "pid 2848 module IMM32.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 273
+            },
+            {
+              "module": "pid 2848 module CRYPT32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 274
+            },
+            {
+              "module": "pid 2848 module WS2_32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 275
+            },
+            {
+              "module": "pid 2848 module ADVAPI32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 276
+            },
+            {
+              "module": "pid 2848 module sechost.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 277
+            },
+            {
+              "module": "pid 2848 module ole32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 278
+            },
+            {
+              "module": "pid 2848 module CRYPTBASE.DLL"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 279
+            },
+            {
+              "module": "pid 2848 module SspiCli.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 280
+            },
+            {
+              "module": "pid 2848 module msimg32.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 281
+            },
+            {
+              "module": "pid 2848 module kernel.appcore.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 282
+            },
+            {
+              "module": "pid 2848 module bcryptPrimitives.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 283
+            },
+            {
+              "module": "pid 2848 module uxtheme.dll"
+            },
+            {
+              "type": "call",
+              "pid": 2848,
+              "cid": 284
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": "=== 2848.log ===\nCAPE Sandbox - Debugger log: Mon Dec 22 03:45:18 2025\nBreakpoint 2 hit by instruction at 0x076239EE (thread 8464) EAX=0x4217ad8 ECX=0x76330b0 EDX=0x1085e L\"23456789\" ESI=0x4217a74 \"\f#c\" EDI=0x19c858 \"LY!\" ESP=0x19c7ec \"(\u0010!\" *ESP=0x5211028 EBP=0x19c81c\n0x076239EE  741E                     JZ        0x20                          \nActionDispatcher: skipping instruction.\n0x076239F0  EB36                     JMP       0x07623A28                    \nBreakpoint 2 hit by instruction at 0x076239EE (thread 8464) EAX=0x4217e88 ECX=0x76330b0 EDX=0x1085f ESI=0x4217e24 \"\f#c\" EDI=0x19c298 \"LY!\" ESP=0x19c22c \"(\u0010!\" *ESP=0x5211028 EBP=0x19c25c\n0x076239EE  741E                     JZ        0x20                          \nActionDispatcher: skipping instruction.\n0x076239F0  EB36                     JMP       0x07623A28                    \n\n\n=== 7672.log ===\nCAPE Sandbox - Debugger log: Mon Dec 22 03:44:54 2025\nBreakpoint 2 hit by instruction at 0x00FC4BDA (thread 7684) EAX=0x1 EBX=0x7c9e88 ECX=0x1 ESI=0xfc4bc0 soM66kM.exe EDI=0x1 ESP=0x47f87c *ESP=0x47f8c8 EBP=0x47f87c\nBreak at 0x00FC4BDA in soM66kM.exe (RVA 0x4bda, thread 7684, Stack 0x00472000-0x00480000, ImageBase 0x00FC0000)\n0x00FC4BDA  741E                     JZ        0x20                          \nActionDispatcher: skipping instruction.\n0x00FC4BDC  2BC1                     SUB       EAX, ECX                      \nBreakpoint 2 hit by instruction at 0x00FC4BDA (thread 7684) EBX=0x7c9e88 ECX=0x1 ESI=0xfc4bc0 soM66kM.exe EDI=0x1 ESP=0x47f87c *ESP=0x47f8c8 EBP=0x47f87c\n0x00FC4BDA  741E                     JZ        0x20                          \nActionDispatcher: skipping instruction.\n0x00FC4BDC  2BC1                     SUB       EAX, ECX                      \n",
+      "raw_response": "<think>\nAlright, let's tackle this problem step by step. The user has provided a trace from an execution and wants to generate a bypass rule using Yara for three different patterns that can evade security checks.\n\nFirst, I'll start by identifying all the suspicious instructions in the trace. Looking at both traces (from 0x00 to 0x621D), I notice several conditional jumps like JZ, JE, and JNZ. There are also TEST instructions followed by jumps, which could be potential bypass points.\n\nNext, tracing back from the exit point (around 0x6218) to understand what leads to it. It seems that the exit is called via a function call at address 0x6E2A and then an interrupt at 0x621D with INT3. So, any instruction before this could cause the bypass.\n\nI need to select three different ways to bypass these checks. Let's look for instructions where the offset can be bypassed or where the condition is not checked.\n\nFor the first pattern, maybe a TEST EAX followed by JZ. In the trace, there's a TEST EAX and then JZ 0x0. If we can skip the TEST instruction, that would bypass it. So, the pattern could include a conditional jump without the TEST.\n\nThe second pattern might involve a different condition. Perhaps using a conditional jump with a displacement. Looking at the trace, after some instructions, there's an E8 instruction which is likely a call with an offset. Replacing this offset with ?? would allow bypassing the call.\n\nThe third pattern could be another way to skip a TEST instruction but in a different location. Maybe replacing another TEST EAX followed by JZ 0x0. Wait, that might not be different enough. Alternatively, perhaps using a different opcode and conditional jump combination.\n\nI need to ensure each pattern is unique and covers different parts of the code. Each should consist of 6-20 bytes with wildcards for address offsets and keep opcodes and registers concrete.\n\nPutting it all together, I'll create three distinct patterns by selecting different instruction sequences from the trace that include either a skipped TEST or a displaced jump.\n</think>\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule targeting conditional jumps and TEST instructions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 74 1E ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\3eca87ed4d16eaf3\\iter1_v1.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v1",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule targeting conditional jumps and TEST instructions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 74 1E ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1306",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 15,
+    "new_signatures": 4,
+    "new_signature_names": [
+      "queries_locale_api",
+      "stealth_timeout",
+      "createtoolhelp32snapshot_module_enumeration",
+      "queries_keyboard_layout"
+    ],
+    "new_signature_details": [
+      {
+        "name": "queries_keyboard_layout",
+        "description": "Queries the keyboard layout",
+        "categories": [
+          "location_discovery"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 2399
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 2423
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 2454
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 2573
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 2576
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "queries_locale_api",
+        "description": "Queries the computer locale (possible geofencing)",
+        "categories": [
+          "location_discovery",
+          "geofence"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 2193
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 2357
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 2585
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "stealth_timeout",
+        "description": "Possible date expiration check, exits too soon after checking local time",
+        "categories": [
+          "stealth"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 40,
+        "references": [],
+        "data": [
+          {
+            "process": "soM66kM.exe, PID 7672"
+          },
+          {
+            "type": "call",
+            "pid": 7672,
+            "cid": 169
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "createtoolhelp32snapshot_module_enumeration",
+        "description": "Enumerates the modules from a process (may be used to locate base addresses in process injection)",
+        "categories": [
+          "discovery"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 247
+          },
+          {
+            "module": "pid 2848 module ntdll.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 249
+          },
+          {
+            "module": "pid 2848 module KERNEL32.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 250
+          },
+          {
+            "module": "pid 2848 module KERNELBASE.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 251
+          },
+          {
+            "module": "pid 2848 module apphelp.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 252
+          },
+          {
+            "module": "pid 2848 module AcLayers.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 253
+          },
+          {
+            "module": "pid 2848 module msvcrt.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 254
+          },
+          {
+            "module": "pid 2848 module USER32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 255
+          },
+          {
+            "module": "pid 2848 module win32u.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 256
+          },
+          {
+            "module": "pid 2848 module GDI32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 257
+          },
+          {
+            "module": "pid 2848 module gdi32full.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 258
+          },
+          {
+            "module": "pid 2848 module msvcp_win.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 259
+          },
+          {
+            "module": "pid 2848 module ucrtbase.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 260
+          },
+          {
+            "module": "pid 2848 module SHELL32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 261
+          },
+          {
+            "module": "pid 2848 module SHLWAPI.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 262
+          },
+          {
+            "module": "pid 2848 module OLEAUT32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 263
+          },
+          {
+            "module": "pid 2848 module combase.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 264
+          },
+          {
+            "module": "pid 2848 module RPCRT4.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 265
+          },
+          {
+            "module": "pid 2848 module SETUPAPI.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 266
+          },
+          {
+            "module": "pid 2848 module cfgmgr32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 267
+          },
+          {
+            "module": "pid 2848 module bcrypt.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 268
+          },
+          {
+            "module": "pid 2848 module MPR.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 269
+          },
+          {
+            "module": "pid 2848 module sfc.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 270
+          },
+          {
+            "module": "pid 2848 module WINSPOOL.DRV"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 271
+          },
+          {
+            "module": "pid 2848 module sfc_os.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 272
+          },
+          {
+            "module": "pid 2848 module IMM32.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 273
+          },
+          {
+            "module": "pid 2848 module CRYPT32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 274
+          },
+          {
+            "module": "pid 2848 module WS2_32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 275
+          },
+          {
+            "module": "pid 2848 module ADVAPI32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 276
+          },
+          {
+            "module": "pid 2848 module sechost.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 277
+          },
+          {
+            "module": "pid 2848 module ole32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 278
+          },
+          {
+            "module": "pid 2848 module CRYPTBASE.DLL"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 279
+          },
+          {
+            "module": "pid 2848 module SspiCli.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 280
+          },
+          {
+            "module": "pid 2848 module msimg32.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 281
+          },
+          {
+            "module": "pid 2848 module kernel.appcore.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 282
+          },
+          {
+            "module": "pid 2848 module bcryptPrimitives.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 283
+          },
+          {
+            "module": "pid 2848 module uxtheme.dll"
+          },
+          {
+            "type": "call",
+            "pid": 2848,
+            "cid": 284
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": "=== 2848.log ===\nCAPE Sandbox - Debugger log: Mon Dec 22 03:45:18 2025\nBreakpoint 2 hit by instruction at 0x076239EE (thread 8464) EAX=0x4217ad8 ECX=0x76330b0 EDX=0x1085e L\"23456789\" ESI=0x4217a74 \"\f#c\" EDI=0x19c858 \"LY!\" ESP=0x19c7ec \"(\u0010!\" *ESP=0x5211028 EBP=0x19c81c\n0x076239EE  741E                     JZ        0x20                          \nActionDispatcher: skipping instruction.\n0x076239F0  EB36                     JMP       0x07623A28                    \nBreakpoint 2 hit by instruction at 0x076239EE (thread 8464) EAX=0x4217e88 ECX=0x76330b0 EDX=0x1085f ESI=0x4217e24 \"\f#c\" EDI=0x19c298 \"LY!\" ESP=0x19c22c \"(\u0010!\" *ESP=0x5211028 EBP=0x19c25c\n0x076239EE  741E                     JZ        0x20                          \nActionDispatcher: skipping instruction.\n0x076239F0  EB36                     JMP       0x07623A28                    \n\n\n=== 7672.log ===\nCAPE Sandbox - Debugger log: Mon Dec 22 03:44:54 2025\nBreakpoint 2 hit by instruction at 0x00FC4BDA (thread 7684) EAX=0x1 EBX=0x7c9e88 ECX=0x1 ESI=0xfc4bc0 soM66kM.exe EDI=0x1 ESP=0x47f87c *ESP=0x47f8c8 EBP=0x47f87c\nBreak at 0x00FC4BDA in soM66kM.exe (RVA 0x4bda, thread 7684, Stack 0x00472000-0x00480000, ImageBase 0x00FC0000)\n0x00FC4BDA  741E                     JZ        0x20                          \nActionDispatcher: skipping instruction.\n0x00FC4BDC  2BC1                     SUB       EAX, ECX                      \nBreakpoint 2 hit by instruction at 0x00FC4BDA (thread 7684) EBX=0x7c9e88 ECX=0x1 ESI=0xfc4bc0 soM66kM.exe EDI=0x1 ESP=0x47f87c *ESP=0x47f8c8 EBP=0x47f87c\n0x00FC4BDA  741E                     JZ        0x20                          \nActionDispatcher: skipping instruction.\n0x00FC4BDC  2BC1                     SUB       EAX, ECX                      \n",
+    "raw_response": "<think>\nAlright, let's tackle this problem step by step. The user has provided a trace from an execution and wants to generate a bypass rule using Yara for three different patterns that can evade security checks.\n\nFirst, I'll start by identifying all the suspicious instructions in the trace. Looking at both traces (from 0x00 to 0x621D), I notice several conditional jumps like JZ, JE, and JNZ. There are also TEST instructions followed by jumps, which could be potential bypass points.\n\nNext, tracing back from the exit point (around 0x6218) to understand what leads to it. It seems that the exit is called via a function call at address 0x6E2A and then an interrupt at 0x621D with INT3. So, any instruction before this could cause the bypass.\n\nI need to select three different ways to bypass these checks. Let's look for instructions where the offset can be bypassed or where the condition is not checked.\n\nFor the first pattern, maybe a TEST EAX followed by JZ. In the trace, there's a TEST EAX and then JZ 0x0. If we can skip the TEST instruction, that would bypass it. So, the pattern could include a conditional jump without the TEST.\n\nThe second pattern might involve a different condition. Perhaps using a conditional jump with a displacement. Looking at the trace, after some instructions, there's an E8 instruction which is likely a call with an offset. Replacing this offset with ?? would allow bypassing the call.\n\nThe third pattern could be another way to skip a TEST instruction but in a different location. Maybe replacing another TEST EAX followed by JZ 0x0. Wait, that might not be different enough. Alternatively, perhaps using a different opcode and conditional jump combination.\n\nI need to ensure each pattern is unique and covers different parts of the code. Each should consist of 6-20 bytes with wildcards for address offsets and keep opcodes and registers concrete.\n\nPutting it all together, I'll create three distinct patterns by selecting different instruction sequences from the trace that include either a skipped TEST or a displaced jump.\n</think>\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule targeting conditional jumps and TEST instructions\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 74 1E ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\3eca87ed4d16eaf3\\iter1_v1.yar"
+  },
+  "best_score": 4,
+  "optimization_history": [
+    "Iteration 2: SUCCESS - 4 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

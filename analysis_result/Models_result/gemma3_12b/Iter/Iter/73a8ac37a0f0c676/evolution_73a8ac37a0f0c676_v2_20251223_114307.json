@@ -1,0 +1,159 @@
+{
+  "sha256": "73a8ac37a0f0c6761800a276b77b0fd34d1cf43830f822ef18ff50dbda934751",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule - Skip in al, dx\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 08 8B 48 10 56 6A 35 6A 00 51 }\n        $pattern1 = { 8D B0 74 0C 00 00 56 50 }\n        $pattern2 = { 8B 55 14 8B 45 10 8B 4D 0C }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1569",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 18,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Instead of using `skip`, which abruptly halts execution, we should attempt to mimic the behavior of the bypassed instructions. This involves understanding what the instructions are doing (e.g., loading values, modifying registers) and manually replicating that behavior"
+      ],
+      "debugger_log": "=== 7872.log ===\nCAPE Sandbox - Debugger log: Wed Dec 24 01:54:41 2025\nBreakpoint 0 hit by instruction at 0x0041A243 (thread 8504) EAX=0x11deca4 ECX=0x17f0000 EDX=0x6b98e5d0 BLXSJMSP.dll ESI=0x2 EDI=0x11deca4 ESP=0x11deb54 *ESP=0x11deb6c EBP=0x11deb54\nBreak at 0x0041A243 in 73a8ac37a0f0c6761800.exe (RVA 0x1a243, thread 8504, Stack 0x011D1000-0x011E0000, ImageBase 0x00400000)\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A24F (thread 8504) EAX=0x11deca4 ECX=0x77270000 EDX=0x6b98e5d0 BLXSJMSP.dll ESI=0x2 EDI=0x11deca4 ESP=0x11deb44 *ESP=0x77270000 EBP=0x11deb54\n0x0041A24F  8DB0740C0000             LEA       ESI, [EAX+0xc74]              \nActionDispatcher: skipping instruction.\n0x0041A255  56                       PUSH      ESI                           \n",
+      "raw_response": "Okay, let's analyze the trace and generate 3 bypass patterns following the specified rules.\n\n**Phase 1 & 2: Initial Analysis and Hypothesis Generation**\n\nThe trace shows a complex sequence of instructions.  The final `call eax` at `0041A2A8` is the exit point.  The code leading up to this is doing some interesting things with stack manipulation and calls to `0041AB30h`.  This suggests a possible delay execution technique, or something attempting to interact with the system in a way that triggers an anti-VM/sandbox.\n\nLet's start by focusing on the area leading up to the final `call eax`.\n\n**Counterfactual Analysis and Pattern Selection**\n\nHere are my three proposed bypass patterns, along with the reasoning:\n\n**Pattern 1: Skipping the Final `call eax`**\n\nThis is the most obvious candidate. If we skip this call, we are bypassing the exit.\n\n*   Factual: `FFD0 call eax` -> Exit\n*   Counterfactual: `FFD0 call eax` skipped -> Would execution continue?\n*   Necessity: Likely, as this is the exit point.\n*   Sufficiency: Potentially, it depends on what `eax` points to.\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule - Skip call eax\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B16 50 51 FFD2 5E 5D C3 }\n        $pattern1 = { A971E4558B 55 8BEC }\n        $pattern2 = { 8B4508 8B4810 56 6A35 6A00 51 }\n\n    condition:\n        any of them\n}\n```\n\n**Pattern 2: Skipping the `call 0041AB30h`**\n\nThis call is repeated and likely involved in the evasion logic.  Skipping it might prevent the sandbox from detecting the malicious activity.\n\n*   Factual: `E844090000 call 0041AB30h` ->  Contributes to evasion\n*   Counterfactual: `E844090000 call 0041AB30h` skipped -> Would execution continue?\n*   Necessity: Potentially, if this is part of a complex evasion check.\n*   Sufficiency: Possibly, but less likely than skipping the final `call`.\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule - Skip call 0041AB30h\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B4508 8B4810 56 6A35 6A00 51 }\n        $pattern1 = { 8DB0740C0000 56 50 }\n        $pattern2 = { 8B5514 8B4510 8B4D0C }\n\n    condition:\n        any of them\n}\n```\n\n**Pattern 3: Skipping the `in al, dx` instruction**\n\nThis instruction is unusual and might be part of an anti-VM check.\n\n*   Factual: `EC in al, dx` -> Possibly part of an anti-VM check\n*   Counterfactual: `EC in al, dx` skipped -> Would execution continue?\n*   Necessity: Possibly, if it's a key component of the evasion.\n*   Sufficiency: Less likely, but worth a try.\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule - Skip in al, dx\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B4508 8B4810 56 6A35 6A00 51 }\n        $pattern1 = { 8DB0740C0000 56 50 }\n        $pattern2 = { 8B5514 8B4510 8B4D0C }\n\n    condition:\n        any of them\n}\n```\n\n**Important Considerations:**\n\n*   **Context:** The effectiveness of these bypasses depends heavily on the specific anti-VM/sandbox environment.\n*   **Testing:**  These are educated guesses. Thorough testing is required to confirm their effectiveness.\n*   **Complexity:** The evasion logic could be more complex than what's visible in this trace snippet.\n*   **Wildcards:** The wildcards are crucial for ensuring that the bypasses don't trigger new signatures.\n\nI've aimed to create patterns that are reasonably specific while adhering to the length constraints and wildcard rules. Remember that this is just a starting point, and further refinement is likely needed.\n",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\73a8ac37a0f0c676\\iter0_v2.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B 16 50 51 FF D2 5E 5D }\n        $pattern1 = { 8B 45 08 8B 48 10 56 6A 35 6A 00 51 8D B0 74 0C 00 00 }\n        $pattern2 = { 8B 55 14 8B 45 10 8B 4D 0C 83 C4 14 52 8B 16 50 51 FF D2 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1570",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 18,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Instead of using fixed skip offsets, we should consider a more flexible approach that accounts for the variability in the instruction sequence. A better approach might be to target a different, more stable instruction within the loop that is less likely to change across variants. Alternatively, using a more generic pattern that can adapt to the dynamic operands could be beneficial. Since we don't have enough context to know"
+      ],
+      "debugger_log": "=== 7536.log ===\nCAPE Sandbox - Debugger log: Tue Dec 23 19:58:24 2025\nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c ECX=0x11b0000 EDX=0x6b92e5d0 dWamuVKT.dll ESI=0x2 EDI=0xbfef9c ESP=0xbfee4c *ESP=0xbfee64 EBP=0xbfee4c\nBreak at 0x0041A243 in 73a8ac37a0f0c6761800.exe (RVA 0x1a243, thread 7540, Stack 0x00BF2000-0x00C00000, ImageBase 0x00400000)\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x4650020 \"MZ\" ECX=0x11b0000 EDX=0x47e3633 \"040<0D0L0T0`0h0l0t0|0\" ESI=0x47f9020 \"MZ\" EDI=0xbfef9c ESP=0xbfee04 *ESP=0xbfee1c EBP=0xbfee04\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeec8 \"$B\u001d\" ECX=0x11b0000 EDX=0x11d4210 \"\u0010B\u001d\" ESI=0x11d4210 \"\u0010B\u001d\" EDI=0x11d5218 \"\u0018R\u001d\" ESP=0xbfee2c *ESP=0xbfee44 EBP=0xbfee2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeec8 \",R\u001d\" ECX=0x11b0000 EDX=0x11d5218 \"\u0018R\u001d\" ESI=0x11d5218 \"\u0018R\u001d\" EDI=0x11e13d8 ESP=0xbfee2c *ESP=0xbfee44 EBP=0xbfee2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeec8 ECX=0x11b0000 EDX=0x11e13d8 ESI=0x11e13d8 EDI=0x11e43e0 ESP=0xbfee2c *ESP=0xbfee44 EBP=0xbfee2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeec8 ECX=0x11b0000 EDX=0x11e43e0 ESI=0x11e43e0 EDI=0x11e83e8 ESP=0xbfee2c *ESP=0xbfee44 EBP=0xbfee2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeeb8 \"$B\u001d\" ECX=0x11b0000 EDX=0x11d4210 \"\u0010B\u001d\" ESI=0x11d4210 \"\u0010B\u001d\" EDI=0x11d5218 \"\u0018R\u001d\" ESP=0xbfee2c *ESP=0xbfee44 EBP=0xbfee2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeeb8 \",R\u001d\" ECX=0x11b0000 EDX=0x11d5218 \"\u0018R\u001d\" ESI=0x11d5218 \"\u0018R\u001d\" EDI=0x11ed3f0 ESP=0xbfee2c *ESP=0xbfee44 EBP=0xbfee2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeeb8 ECX=0x11b0000 EDX=0x11ed3f0 ESI=0x11ed3f0 EDI=0x11e13d8 ESP=0xbfee2c *ESP=0xbfee44 EBP=0xbfee2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeeb8 ECX=0x11b0000 EDX=0x11e13d8 ESI=0x11e13d8 EDI=0x11ed3f0 ESP=0xbfee2c *ESP=0xbfee44 EBP=0xbfee2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeec4 \"$B\u001d\" ECX=0x11b0000 EDX=0x11d4210 \"\u0010B\u001d\" ESI=0x11d4210 \"\u0010B\u001d\" EDI=0x11d5218 \"\u0018R\u001d\" ESP=0xbfee2c *ESP=0xbfee44 EBP=0xbfee2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeec4 \",R\u001d\" ECX=0x11b0000 EDX=0x11d5218 \"\u0018R\u001d\" ESI=0x11d5218 \"\u0018R\u001d\" EDI=0x11f23f8 ESP=0xbfee2c *ESP=0xbfee44 EBP=0xbfee2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeec4 \"\f$\u001f\" ECX=0x11b0000 EDX=0x11f23f8 ESI=0x11f23f8 EDI=0x11e13d8 ESP=0xbfee2c *ESP=0xbfee44 EBP=0xbfee2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeec4 ECX=0x11b0000 EDX=0x11e13d8 ESI=0x11e13d8 EDI=0x11f23f8 ESP=0xbfee2c *ESP=0xbfee44 EBP=0xbfee2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x49a0000 \"MZ\" ECX=0x11b0000 EDX=0xbfef9c ESI=0xbfef9c EDI=0xe6 ESP=0xbfee50 *ESP=0xbfee68 EBP=0xbfee50\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x49a0000 \"MZ\" ECX=0x11b0000 EDX=0xbfef9c ESI=0xbfef9c EDI=0xe6 ESP=0xbfee48 *ESP=0xbfee60 EBP=0xbfee48\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x49a0000 \"MZ\" ECX=0x11b0000 EDX=0xbfef9c ESI=0xbfef9c EDI=0xe6 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x49a0000 \"MZ\" ECX=0x11b0000 EDX=0xbfef9c ESI=0xbfef9c EDI=0xe6 ESP=0xbfee38 *ESP=0xbfee50 EBP=0xbfee38\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x49a0000 \"MZ\" ECX=0x11b0000 EDX=0xbfef9c ESI=0xbfef9c EDI=0xe6 ESP=0xbfee30 *ESP=0xbfee48 EBP=0xbfee30\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeedc \"4b\u001d\" ECX=0x11b0000 EDX=0x11d6220 \" b\u001d\" ESI=0x11d6220 \" b\u001d\" EDI=0x11df3c8 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeedc ECX=0x11b0000 EDX=0x11df3c8 ESI=0x11df3c8 EDI=0x11e13d0 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeedc ECX=0x11b0000 EDX=0x11e13d0 ESI=0x11e13d0 EDI=0x11e43d8 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeedc ECX=0x11b0000 EDX=0x11e43d8 ESI=0x11e43d8 EDI=0x11df3c8 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeecc \"4b\u001d\" ECX=0x11b0000 EDX=0x11d6220 \" b\u001d\" ESI=0x11d6220 \" b\u001d\" EDI=0x11e43d8 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeecc ECX=0x11b0000 EDX=0x11e43d8 ESI=0x11e43d8 EDI=0x11e63e0 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeecc ECX=0x11b0000 EDX=0x11e63e0 ESI=0x11e63e0 EDI=0x11e93e8 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeecc ECX=0x11b0000 EDX=0x11e93e8 ESI=0x11e93e8 EDI=0x11e43d8 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeed8 \"4b\u001d\" ECX=0x11b0000 EDX=0x11d6220 \" b\u001d\" ESI=0x11d6220 \" b\u001d\" EDI=0x11e93e8 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeed8 ECX=0x11b0000 EDX=0x11e93e8 ESI=0x11e93e8 EDI=0x11eb3f0 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeed8 ECX=0x11b0000 EDX=0x11eb3f0 ESI=0x11eb3f0 EDI=0x11ee3f8 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0xbfeed8 ECX=0x11b0000 EDX=0x11ee3f8 ESI=0x11ee3f8 EDI=0x11e93e8 ESP=0xbfee40 *ESP=0xbfee58 EBP=0xbfee40\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x4b43000 \"MZ\" ECX=0x11b0000 EDX=0xbfef9c ESI=0xbfef9c EDI=0xe6 ESP=0xbfee64 *ESP=0xbfee7c EBP=0xbfee64\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x4b43000 \"MZ\" ECX=0x11b0000 EDX=0xbfef9c ESI=0xbfef9c EDI=0xe6 ESP=0xbfee5c *ESP=0xbfee74 EBP=0xbfee5c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x4b43000 \"MZ\" ECX=0x11b0000 EDX=0xbfef9c ESI=0xbfef9c EDI=0xe6 ESP=0xbfee54 *ESP=0xbfee6c EBP=0xbfee54\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x4b43000 \"MZ\" ECX=0x11b0000 EDX=0xbfef9c ESI=0xbfef9c EDI=0xe6 ESP=0xbfee4c *ESP=0xbfee64 EBP=0xbfee4c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x4b43000 \"MZ\" ECX=0x11b0000 EDX=0xbfef9c ESI=0xbfef9c EDI=0xe6 ESP=0xbfee44 *ESP=0xbfee5c EBP=0xbfee44\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c ECX=0x11b0000 EDX=0x6b92e5d0 dWamuVKT.dll ESI=0x5 EDI=0xbfef9c ESP=0xbfedec *ESP=0xbfee04 EBP=0xbfedec\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x6 ECX=0x11b0000 EDX=0xbfea79 ESI=0xbfef9c EDI=0x11d13b0 L\"\\Windows\\SysWOW64\\ntdll.dll\" ESP=0xbfeecc *ESP=0xbfeee4 EBP=0xbfeecc\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 1 hit by instruction at 0x0041A243 (thread 7540) EAX=0xbfef9c EBX=0x47f9020 \"MZ\" ECX=0x11b0000 EDX=0xbfeaff ESI=0xbfef9c EDI=0x11b29f0 \"x.\u001b\" ESP=0xbfef2c *ESP=0xbfef44 EBP=0xbfef2c\n0x0041A243  8B4508                   MOV       EAX, [EBP+0x8]                \nActionDispatcher: skipping instruction.\n0x0041A246  8B4810                   MOV       ECX, [EAX+0x10]               \nBreakpoint 2 hit by instruction at 0x0041A3BF (thread 7540) EAX=0x4da0000 EBX=0xc09000 ECX=0x76972994 advapi32.dll EDX=0x1b0 ESI=0xbffc28 EDI=0x41ed40 ESP=0xbfeee4 *ESP=0xbfef9c EBP=0xbfeefc\n0x0041A3BF  8B5514                   MOV       EDX, [EBP+0x14]               \nActionDispatcher: skipping instruction.\n0x0041A3C2  8B4510                   MOV       EAX, [EBP+0x10]               \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B16 50 51 FFD2 5E 5D }\n        $pattern1 = { 8B4508 8B4810 56 6A35 6A00 51 8DB0740C0000 }\n        $pattern2 = { 8B5514 8B4510 8B4D0C 83C414 52 8B16 50 51 FFD2 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\73a8ac37a0f0c676\\iter1_v2.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B 16 50 51 FF D2 5E 5D C3 }\n        $pattern1 = { 55 8B EC EC 8B 45 08 8B 48 10 56 6A 35 6A 00 51 8D B0 74 0C 00 00 56 50 E8 44 09 00 00 }\n        $pattern2 = { 55 8B EC 8B 45 08 8B 88 14 0A 00 00 56 6A 36 6A 00 51 8D B0 7C 0C 00 00 56 50 E8 44 09 00 00 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1571",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 18,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "new_signature_details": [
+        {
+          "name": "terminates_remote_process",
+          "description": "Terminates another process",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 6064,
+              "cid": 2744
+            },
+            {
+              "process": "73a8ac37a0f0c6761800.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B16 50 51 FFD2 5E 5D C3 }\n        $pattern1 = { 55 8BEC EC 8B4508 8B4810 56 6A35 6A00 51 8DB0740C0000 56 50 E844090000 }\n        $pattern2 = { 55 8BEC 8B4508 8B88140A0000 56 6A36 6A00 51 8DB07C0C0000 56 50 E844090000 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\73a8ac37a0f0c676\\iter2_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B 16 50 51 FF D2 5E 5D C3 }\n        $pattern1 = { 55 8B EC EC 8B 45 08 8B 48 10 56 6A 35 6A 00 51 8D B0 74 0C 00 00 56 50 E8 44 09 00 00 }\n        $pattern2 = { 55 8B EC 8B 45 08 8B 88 14 0A 00 00 56 6A 36 6A 00 51 8D B0 7C 0C 00 00 56 50 E8 44 09 00 00 }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1571",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 18,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "terminates_remote_process"
+    ],
+    "new_signature_details": [
+      {
+        "name": "terminates_remote_process",
+        "description": "Terminates another process",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 6064,
+            "cid": 2744
+          },
+          {
+            "process": "73a8ac37a0f0c6761800.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 52 8B16 50 51 FFD2 5E 5D C3 }\n        $pattern1 = { 55 8BEC EC 8B4508 8B4810 56 6A35 6A00 51 8DB0740C0000 56 50 E844090000 }\n        $pattern2 = { 55 8BEC 8B4508 8B88140A0000 56 6A36 6A00 51 8DB07C0C0000 56 50 E844090000 }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\73a8ac37a0f0c676\\iter2_v2.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

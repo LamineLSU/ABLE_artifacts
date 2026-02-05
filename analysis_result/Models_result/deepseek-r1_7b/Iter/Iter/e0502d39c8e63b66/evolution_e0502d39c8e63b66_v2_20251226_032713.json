@@ -1,0 +1,131 @@
+{
+  "sha256": "e0502d39c8e63b66265eefe36bae775d0178a4f897958164cf97276ff2b2b745",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample {\n    meta: description = \"Evasion bypass rule\"\n    strings: $pattern0 = { 8B 45 6A ... }, etc.\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": null,
+      "status": "error",
+      "rule_hit": false,
+      "baseline_signatures": 0,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Generated rule is a detection rule, not a bypass rule (missing cape_options)",
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nOkay, I need to help the user correct their Yara rule by generating a properly formatted and accurate bypass rule based on the provided analysis. Let me break down what they've done so far.\n\nFirst, looking at the initial YARA rule they provided:\n```yara\nrule Bypass_Sample {\n    meta: description = \"Evasion bypass rule\"\n    strings: $pattern0 = { 8B 45 6A ... }, etc.\n}\n```\nThey have a problem because their current setup is missing `cape_options` in the meta section. From the validation errors, I remember that CAPE rules require `cape_options` to specify how each pattern should be bypassed.\n\nSo, my first step is to add `cape_options`. Each bypass action (like skipping) needs an associated byte. In Yara, using wildcards means adding `??` after each target instruction in the pattern. For example, if we want to skip a call, we can set it as `E8 ??` so that any offset after E8 is ignored.\n\nNext, I need to extract three distinct patterns from the provided trace data. Each pattern should be 6-20 bytes long and include context around the target instruction to avoid triggering new signatures. Let's look at the traces:\n\nFrom TRACE #1, there are two calls: `8B 45 6A` in different instructions. I can create patterns that capture these calls with surrounding context.\n\nFor the first pattern, maybe take the call from the first trace:\n- Opcode: E8 (since it's a jump)\n- Offset bytes after E8: ?? ?? ?? ?? \n- Then include some following instructions to provide context.\nSo Pattern 1 could be `E8 ?? ?? ?? ?? 83 C4 ?? 85 C0`.\n\nPattern 2 can come from another call in the second trace. Let's take a call from the third trace, which is a different instruction sequence:\n- Opcode: 6A (push)\n- Following instructions include a conditional jump and some operations.\nSo Pattern 2 could be `6A ?? 5A 8B CE E8 ?? ?? ?? ??`.\n\nFor Pattern 3, looking at the fifth trace, there's another call. Let's capture that with surrounding context:\n- Opcode: FF (call)\n- Followed by a conditional jump and some stack operations.\nSo Pattern 3 could be `FF ?? ?? ???? ?F05 8B ...`.\n\nI need to ensure each pattern is unique and captures the target instruction along with enough context. Also, I should replace any raw addresses or offsets with `??` as per the wildcard rule.\n\nFinally, I'll structure each pattern within braces `{}`, using spaces between hex bytes for readability. Each pattern will be wrapped in `$pattern0`, `$pattern1`, `$pattern2`.\n\nNow, putting it all together, adding the `cape_options` and ensuring three distinct patterns.\n</think>\n\n```\nrule Bypass_Sample {\n    meta: \n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n    \n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 }\n        $pattern1 = { FF ?? ???? ?F05 8B CE E8 ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? }\n    \n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\e0502d39c8e63b66\\iter0_v2.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved with multiple strategies\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83 EC 48 00 00 00 00 00 }  // TEST JAE at offset 0\n        $pattern1 = { 83 65 E4 00 00 00 00 00 }  // JE/JNE before exit decision\n        $pattern2 = { F8 00 4F 00 00 00 00 00 }  // RDPSC for evasion tech\n    condition:\n        any of them\n}",
+      "pattern_type": "-",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "1713",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 31,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "stealth_timeout"
+      ],
+      "new_signature_details": [
+        {
+          "name": "stealth_timeout",
+          "description": "Possible date expiration check, exits too soon after checking local time",
+          "categories": [
+            "stealth"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 40,
+          "references": [],
+          "data": [
+            {
+              "process": "dllhost.exe, PID 716"
+            },
+            {
+              "type": "call",
+              "pid": 716,
+              "cid": 737
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "<think>\nOkay, I need to help the user generate an improved YARA bypass rule based on their feedback and analysis. Let me start by understanding what they've done so far.\n\nFrom the history, I see that in Iteration 1, the generated rule was a detection rule because it was missing 'cape_options'. The latest attempt didn't find any new signatures either, which suggests that the current patterns might not be matching the right places or times in the trace. \n\nLooking at the provided traces, there are two main call sequences: one at TRACE #1 with calls to dword ptr addresses and another at TRACE #2 with more complex instructions involving RDPSC and other operations.\n\nThe user's task is to use Strategy A, B, or C for their new patterns. Since previous attempts didn't hit the right spots, maybe the current patterns are either too broad or not specific enough.\n\nI need to find three distinct 6-20 byte patterns from the traces using exact hex values where possible. Each pattern should be in a different location in the trace and target the bypass points correctly.\n\nFor Strategy A (Evasion Check), I can look for a TEST JAE instruction early on, maybe right after the first few calls. In TRACE #1, after the initial push ebp, there's an 'add esp, 48h' which is RDPSC, followed by 'sub esp, 0Ch'. That might be a good spot.\n\nFor Strategy B (Exit Decision), I can find where the exit process is called and insert a bypass before it. In TRACE #2, after the call to E0502D39C8E63B66, there's an 'add esp, 4Ch' followed by calls to E167F5. That seems like a solid exit point.\n\nFor Strategy C (Evasion Tech), maybe something involving specific jumps or conditional checks. In both traces, I notice some conditional jumps using JE/JNE after the initial test instructions. Maybe capturing those could help bypass the checks more effectively.\n\nI should ensure each pattern is unique and covers different parts of the trace to reduce false positives. Also, including a variety of strategies might make the rule more robust against evasion tactics.\n\nFinally, I'll structure the YARA rule with these patterns, making sure to use wildcards where offsets vary and exact matches for others. This way, the rule will be specific enough but still effective in bypassing evasions.\n</think>\n\n**EVOLUTION_REASONING**: \nThe previous attempts missed the correct bypass points because they were too broad or did not match the specific instructions that trigger program termination. By focusing on the early calls to test EAX (Strategy A), before the exit decision point (Strategy B), and incorporating unique instruction sequences for evasions (Strategy C), we can create a more effective rule.\n\n**PATTERN_TYPE**: \n- **Evasion Check (TEST JAE)**: Strategy A\n- **Exit Decision (JE/JNE)**: Strategy B\n- **Evasion Tech (RDPSC)**: Strategy C\n\n---\n\n**PATTERN SPECIFICITY**:\nAll patterns must be found in the original trace and use exact hex values from the data.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved with multiple strategies\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83EC480000000000 }  # TEST JAE at offset 0\n        $pattern1 = { 8365E40000000000 }  # JE/JNE before exit decision\n        $pattern2 = { F8004F0000000000 }  # RDPSC for evasion tech\n    condition:\n        any of them\n}\n```\n\n---\n\n**EXPLANATION**:\n1. **Evasion Check (TEST JAE)**: Matches the TEST EAX and JE/JNE instructions early in the trace to bypass checks before program termination.\n2. **Exit Decision (JE/JNE)**: Matches conditional jumps directly related to exiting, ensuring bypass occurs at the correct decision point.\n3. **Evasion Tech (RDPSC)**: Targets specific stack manipulation instructions known for evasions, increasing specificity and reducing false positives.\n\nThis rule uses a combination of strategies to create a more robust bypass mechanism that is harder to detect while maintaining precision.",
+      "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\e0502d39c8e63b66\\iter1_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved with multiple strategies\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83 EC 48 00 00 00 00 00 }  // TEST JAE at offset 0\n        $pattern1 = { 83 65 E4 00 00 00 00 00 }  // JE/JNE before exit decision\n        $pattern2 = { F8 00 4F 00 00 00 00 00 }  // RDPSC for evasion tech\n    condition:\n        any of them\n}",
+    "pattern_type": "-",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "1713",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 31,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "stealth_timeout"
+    ],
+    "new_signature_details": [
+      {
+        "name": "stealth_timeout",
+        "description": "Possible date expiration check, exits too soon after checking local time",
+        "categories": [
+          "stealth"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 40,
+        "references": [],
+        "data": [
+          {
+            "process": "dllhost.exe, PID 716"
+          },
+          {
+            "type": "call",
+            "pid": 716,
+            "cid": 737
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "<think>\nOkay, I need to help the user generate an improved YARA bypass rule based on their feedback and analysis. Let me start by understanding what they've done so far.\n\nFrom the history, I see that in Iteration 1, the generated rule was a detection rule because it was missing 'cape_options'. The latest attempt didn't find any new signatures either, which suggests that the current patterns might not be matching the right places or times in the trace. \n\nLooking at the provided traces, there are two main call sequences: one at TRACE #1 with calls to dword ptr addresses and another at TRACE #2 with more complex instructions involving RDPSC and other operations.\n\nThe user's task is to use Strategy A, B, or C for their new patterns. Since previous attempts didn't hit the right spots, maybe the current patterns are either too broad or not specific enough.\n\nI need to find three distinct 6-20 byte patterns from the traces using exact hex values where possible. Each pattern should be in a different location in the trace and target the bypass points correctly.\n\nFor Strategy A (Evasion Check), I can look for a TEST JAE instruction early on, maybe right after the first few calls. In TRACE #1, after the initial push ebp, there's an 'add esp, 48h' which is RDPSC, followed by 'sub esp, 0Ch'. That might be a good spot.\n\nFor Strategy B (Exit Decision), I can find where the exit process is called and insert a bypass before it. In TRACE #2, after the call to E0502D39C8E63B66, there's an 'add esp, 4Ch' followed by calls to E167F5. That seems like a solid exit point.\n\nFor Strategy C (Evasion Tech), maybe something involving specific jumps or conditional checks. In both traces, I notice some conditional jumps using JE/JNE after the initial test instructions. Maybe capturing those could help bypass the checks more effectively.\n\nI should ensure each pattern is unique and covers different parts of the trace to reduce false positives. Also, including a variety of strategies might make the rule more robust against evasion tactics.\n\nFinally, I'll structure the YARA rule with these patterns, making sure to use wildcards where offsets vary and exact matches for others. This way, the rule will be specific enough but still effective in bypassing evasions.\n</think>\n\n**EVOLUTION_REASONING**: \nThe previous attempts missed the correct bypass points because they were too broad or did not match the specific instructions that trigger program termination. By focusing on the early calls to test EAX (Strategy A), before the exit decision point (Strategy B), and incorporating unique instruction sequences for evasions (Strategy C), we can create a more effective rule.\n\n**PATTERN_TYPE**: \n- **Evasion Check (TEST JAE)**: Strategy A\n- **Exit Decision (JE/JNE)**: Strategy B\n- **Evasion Tech (RDPSC)**: Strategy C\n\n---\n\n**PATTERN SPECIFICITY**:\nAll patterns must be found in the original trace and use exact hex values from the data.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved with multiple strategies\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83EC480000000000 }  # TEST JAE at offset 0\n        $pattern1 = { 8365E40000000000 }  # JE/JNE before exit decision\n        $pattern2 = { F8004F0000000000 }  # RDPSC for evasion tech\n    condition:\n        any of them\n}\n```\n\n---\n\n**EXPLANATION**:\n1. **Evasion Check (TEST JAE)**: Matches the TEST EAX and JE/JNE instructions early in the trace to bypass checks before program termination.\n2. **Exit Decision (JE/JNE)**: Matches conditional jumps directly related to exiting, ensuring bypass occurs at the correct decision point.\n3. **Evasion Tech (RDPSC)**: Targets specific stack manipulation instructions known for evasions, increasing specificity and reducing false positives.\n\nThis rule uses a combination of strategies to create a more robust bypass mechanism that is harder to detect while maintaining precision.",
+    "yara_file": "ablation_results\\deepseek-r1_7b\\Iter\\Iter\\e0502d39c8e63b66\\iter1_v2.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: error - Generated rule is a detection rule, not a bypass rule (missing cape_options)",
+    "Iteration 2: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    ""
+  ]
+}
