@@ -1,0 +1,247 @@
+{
+  "sha256": "00e518d4a6f40a49c10b9ab5c87439f756f5d04f9f1296019c231c132903d091",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "rule ExitCheck\n{\n    meta:\n        description = \"Detects a call to ExitProcess with preceding checks\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n        author = \"Your Name\"\n        date = \"2023-10-15\"\n\n    strings:\n        $a = { 85 C0 74 ?? 6A ?? }  // First test and je followed by push\n        $b = { 85 C0 0F 84 ?? ?? ?? ?? }  // Second test and je\n        $c = { 85 C0 E8 ?? ?? ?? ?? }  // Test followed by call to ExitProcess\n\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "876",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Adjust the skip offsets to target the `call` instruction directly, avoiding premature jumps. Use more flexible wildcards for offsets and ensure the bypass modifies the `call` to `ExitProcess` without disrupting the flow."
+      ],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule ExitCheck\n{\n    meta:\n        description = \"Detects a call to ExitProcess with preceding checks\"\n        author = \"Your Name\"\n        date = \"2023-10-15\"\n\n    strings:\n        $a = {85 C0 74 ?? 6A ??}  // First test and je followed by push\n        $b = {85 C0 0F 84 ?? ?? ?? ??}  // Second test and je\n        $c = {85 C0 E8 ?? ?? ?? ??}  // Test followed by call to ExitProcess\n\n    condition:\n        all of them\n}\n```\n\n### Explanation:\n- **Pattern `$a`**: Combines the first `test eax, eax` instruction (`85 C0`), the `je` instruction (`74 ??`), and the subsequent `push` instruction (`6A ??`). This captures the early check before a potential exit.\n- **Pattern `$b`**: Captures the second `test eax, eax` followed by a `je` instruction with a large offset, indicating a conditional jump to an exit point.\n- **Pattern `$c`**: Detects a `test` instruction followed by a `call` to `ExitProcess` (indicated by the `E8` opcode), which is the actual exit call.\n\n### Key Considerations:\n- **Wildcard Usage**: The `??` placeholders represent variable address offsets, which are common in x86 assembly.\n- **Length**: All patterns are within the 6-20 byte range, ensuring specificity without over-restrictiveness.\n- **Conditions**: The `all of them` condition ensures that all three patterns must be present for a match, indicating a structured exit flow.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\00e518d4a6f40a49\\iter0_v3.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule CallPatterns\n{\n    meta:\n        description = \"Detects specific call patterns in a binary\"\n        cape_options = \"bp0=$call1+0,action0=skip,bp1=$call2+0,action1=skip,bp2=$call3+0,action2=skip,count=0\"\n        author = \"Your Name\"\n        date = \"2023-10-05\"\n\n    strings:\n        $call1 = { E8 25 05 00 00 85 C0 74 12 }\n        $call2 = { E8 74 FA FF FF 85 C0 0F 84 33 FD FF FF }\n        $call3 = { FF 15 2C A1 AC 00 }\n\n    condition:\n        all of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "877",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Replace $call3 with a valid call instruction present in the binary (e.g., `E8` followed by relative address). Adjust skip offsets to avoid invalid jumps."
+      ],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule CallPatterns\n{\n    meta:\n        description = \"Detects specific call patterns in a binary\"\n        author = \"Your Name\"\n        date = \"2023-10-05\"\n\n    strings:\n        $call1 = { E8 25 05 00 00 85 C0 74 12 }\n        $call2 = { E8 74 FA FF FF 85 C0 0F 84 33 FD FF FF }\n        $call3 = { FF 15 2C A1 AC 00 }\n\n    condition:\n        all of them\n}\n```\n\n### Explanation:\n- **$call1**: Captures the first call instruction (`E8 25 05 00 00`) followed by a test (`85 C0`) and a conditional jump (`74 12`), which are likely part of a control flow structure.\n- **$call2**: Captures the second call instruction (`E8 74 FA FF FF`) followed by a test (`85 C0`) and a conditional jump (`0F 84 33 FD FF FF`), indicating another control flow segment.\n- **$call3**: Captures the call to the `ExitProcess` function (`FF 15 2C A1 AC 00`), which is a common Windows API call for terminating a process.\n\nThis rule is designed to detect specific call patterns that may be indicative of certain behaviors or functions in a binary.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\00e518d4a6f40a49\\iter1_v3.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern1 = { E8 E3 FA FF FF 50 FF 15 ?? ?? ?? ?? }\n        $pattern2 = { FF 15 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "CALL_TEST_JE",
+      "confidence": 95,
+      "opcodes": "",
+      "task_id": "878",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 2,
+      "new_signature_names": [
+        "queries_keyboard_layout",
+        "queries_locale_api"
+      ],
+      "new_signature_details": [
+        {
+          "name": "queries_keyboard_layout",
+          "description": "Queries the keyboard layout",
+          "categories": [
+            "location_discovery"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 7616,
+              "cid": 1459
+            },
+            {
+              "type": "call",
+              "pid": 7616,
+              "cid": 1483
+            },
+            {
+              "type": "call",
+              "pid": 7616,
+              "cid": 1517
+            },
+            {
+              "type": "call",
+              "pid": 7616,
+              "cid": 1635
+            },
+            {
+              "type": "call",
+              "pid": 7616,
+              "cid": 1638
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "queries_locale_api",
+          "description": "Queries the computer locale (possible geofencing)",
+          "categories": [
+            "location_discovery",
+            "geofence"
+          ],
+          "severity": 1,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 7616,
+              "cid": 1252
+            },
+            {
+              "type": "call",
+              "pid": 7616,
+              "cid": 1417
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule failed because it used a generic call instruction without specific byte sequences from the trace. By extracting concrete call patterns followed by test/jump instructions (Strategy A) and the direct ExitProcess call (Strategy B), we target evasion logic and termination points. These patterns are specific to the trace, reducing false positives and ensuring alignment with the sample's behavior.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 95\n\n**REASONING**: The first two patterns capture call instructions followed by test/jump sequences, which are likely used for evasion checks. The third pattern targets the ExitProcess call directly, a strong indicator of termination logic. All patterns are derived from the trace, ensuring accuracy and avoiding mismatches.\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern1 = { E8 E3 FA FF FF 50 FF 15 ?? ?? ?? ?? }\n        $pattern2 = { FF 15 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\00e518d4a6f40a49\\iter2_v3.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v3",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern1 = { E8 E3 FA FF FF 50 FF 15 ?? ?? ?? ?? }\n        $pattern2 = { FF 15 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "CALL_TEST_JE",
+    "confidence": 95,
+    "opcodes": "",
+    "task_id": "878",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 16,
+    "new_signatures": 2,
+    "new_signature_names": [
+      "queries_keyboard_layout",
+      "queries_locale_api"
+    ],
+    "new_signature_details": [
+      {
+        "name": "queries_keyboard_layout",
+        "description": "Queries the keyboard layout",
+        "categories": [
+          "location_discovery"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 7616,
+            "cid": 1459
+          },
+          {
+            "type": "call",
+            "pid": 7616,
+            "cid": 1483
+          },
+          {
+            "type": "call",
+            "pid": 7616,
+            "cid": 1517
+          },
+          {
+            "type": "call",
+            "pid": 7616,
+            "cid": 1635
+          },
+          {
+            "type": "call",
+            "pid": 7616,
+            "cid": 1638
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "queries_locale_api",
+        "description": "Queries the computer locale (possible geofencing)",
+        "categories": [
+          "location_discovery",
+          "geofence"
+        ],
+        "severity": 1,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 7616,
+            "cid": 1252
+          },
+          {
+            "type": "call",
+            "pid": 7616,
+            "cid": 1417
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "**EVOLUTION_REASONING**: The previous rule failed because it used a generic call instruction without specific byte sequences from the trace. By extracting concrete call patterns followed by test/jump instructions (Strategy A) and the direct ExitProcess call (Strategy B), we target evasion logic and termination points. These patterns are specific to the trace, reducing false positives and ensuring alignment with the sample's behavior.\n\n**PATTERN_TYPE**: CALL_TEST_JE\n\n**CONFIDENCE**: 95\n\n**REASONING**: The first two patterns capture call instructions followed by test/jump sequences, which are likely used for evasion checks. The third pattern targets the ExitProcess call directly, a strong indicator of termination logic. All patterns are derived from the trace, ensuring accuracy and avoiding mismatches.\n\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern1 = { E8 E3 FA FF FF 50 FF 15 ?? ?? ?? ?? }\n        $pattern2 = { FF 15 ?? ?? ?? ?? }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\00e518d4a6f40a49\\iter2_v3.yar"
+  },
+  "best_score": 2,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: SUCCESS - 2 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

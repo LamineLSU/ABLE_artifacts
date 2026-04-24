@@ -1,0 +1,85 @@
+{
+  "sha256": "0f34c32345a18ec40967c1c91f3fad3a9ef56de8792d2c8e57303763933c8ea6",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "rule BypassCheck1\n{\n    meta:\n        description = \"Bypasses the IN AL, DX instruction which may be used for hardware communication checks.\"\n        cape_options = \"bp0=$a+0,action0=skip,count=0\"\n    strings:\n        $a = { 8B 06 DB 0E 56 E8 } // MOV EAX, [ESI] | IN AL, DX | PUSH ESI | CALL (offsets wildcards)\n    condition:\n        all_of(\n            $a\n        )\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "915",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Correct the hex pattern to reflect the actual opcode `EC` for `IN AL, DX`. Adjust the skip offset to ensure it bypasses the correct instruction sequence."
+      ],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule BypassCheck1\n{\n    meta:\n        description = \"Bypasses the IN AL, DX instruction which may be used for hardware communication checks.\"\n    strings:\n        $a = {8B 06 DB 0E 56 E8} // MOV EAX, [ESI] | IN AL, DX | PUSH ESI | CALL (offsets wildcards)\n    condition:\n        all_of(\n            $a\n        )\n}\n\nrule BypassCheck2\n{\n    meta:\n        description = \"Bypasses the call to RtlAllocateHeap which may be used for memory allocation checks.\"\n    strings:\n        $b = {E8 ?? ?? ?? ?? 8B 45 ??} // CALL (offsets wildcards) | MOV EAX, [ESP+?]\n    condition:\n        all_of(\n            $b\n        )\n}\n\nrule BypassCheck3\n{\n    meta:\n        description = \"Bypasses the call to 0041EAE7 which may be used for additional system checks.\"\n    strings:\n        $c = {56 E8 ?? ?? ?? ?? 8B 45 ??} // PUSH ESI | CALL (offsets wildcards) | MOV EAX, [ESP+?]\n    condition:\n        all_of(\n            $c\n        )\n}\n```\n\n---\n\n### 🔍 **Explanation of Each Rule**\n\n#### **Rule 1: `BypassCheck1`**\n- **Target:** `IN AL, DX` instruction\n- **Purpose:** This instruction is often used in low-level hardware communication. Bypassing it could avoid triggering checks for system or device interaction.\n- **Pattern:** \n  - `8B 06` → `MOV EAX, [ESI]`\n  - `DB 0E` → `IN AL, DX`\n  - `56` → `PUSH ESI`\n  - `E8 ?? ?? ?? ??` → `CALL` (with 4-byte offset wildcard)\n- **Why it's effective:** This pattern captures a sequence of instructions that may be used for hardware interaction checks. Bypassing it can disable such checks.\n\n---\n\n#### **Rule 2: `BypassCheck2`**\n- **Target:** `CALL` to `RtlAllocateHeap`\n- **Purpose:** This function is used for memory allocation. Bypassing the call could prevent memory allocation checks or limit the allocation size.\n- **Pattern:**\n  - `E8 ?? ?? ?? ??` → `CALL` (with 4-byte offset wildcard)\n  - `8B 45 ??` → `MOV EAX, [ESP+?]`\n- **Why it's effective:** This sequence may be used to verify or log memory allocation. Bypassing it could prevent such checks from being executed.\n\n---\n\n#### **Rule 3: `BypassCheck3`**\n- **Target:** `CALL` to `0041EAE7`\n- **Purpose:** This call is likely to a custom or system-specific function. Bypassing it could prevent execution of any checks or initialization logic.\n- **Pattern:**\n  - `56` → `PUSH ESI`\n  - `E8 ?? ?? ?? ??` → `CALL` (with 4-byte offset wildcard)\n  - `8B 45 ??` → `MOV EAX, [ESP+?]`\n- **Why it's effective:** This pattern suggests a function call that may be used for initialization or validation. Bypassing it can skip these steps.\n\n---\n\n### 🛡️ **Security Note**\nThese rules are intended for **analysis and understanding** of behavior in sandboxed or monitored environments. Bypassing checks like this may be used in **malicious contexts**, and such actions are typically **against security policies and laws**.\n\nAlways ensure that your use of these rules is **within legal and ethical boundaries**.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\0f34c32345a18ec4\\iter0_v3.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "916",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Refine the patterns to target specific, less-variant opcodes (e.g., `CALL` to `RtlAllocateHeap`) and adjust skip offsets to avoid disrupting critical execution flow."
+      ],
+      "debugger_log": "=== 1392.log ===\nCAPE Sandbox - Debugger log: Mon Dec 15 11:29:56 2025\nBreakpoint 1 hit by instruction at 0x0041875B (thread 7536) EAX=0x8feb04 EBX=0x120089 ECX=0x9928f8 L\"C:\\Windows\\SYSTEM32\\ntdll.dll\" EDX=0x7 ESI=0x5 EDI=0x8febf4 ESP=0x8fea8c *ESP=0x8febf4 EBP=0x8feb28\nBreak at 0x0041875B in regsvcs.exe (RVA 0x1875b, thread 7536, Stack 0x008F1000-0x00900000, ImageBase 0x00400000)\n0x0041875B  E807500000               CALL      0x500c                        \nActionDispatcher: skipping instruction.\n0x00418760  83C414                   ADD       ESP, 0x14                     \n\n\n=== 8936.log ===\nCAPE Sandbox - Debugger log: Mon Dec 15 11:29:40 2025\nBreakpoint 0 hit by instruction at 0x073ABE67 (thread 8940) EAX=0x1 EBX=0x4e63f14 ECX=0x6fe628 EDX=0x72e5a48 ESI=0x6fe648 EDI=0x6fe628 ESP=0x6fe5c8 *ESP=0x0 EBP=0x6fe678\n0x073ABE67  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x073ABE69  0F8409020000             JZ        0x20f                         \nBreakpoint 0 hit by instruction at 0x073ABE67 (thread 8940) EAX=0x1 EBX=0x4e63a90 ECX=0x6fe628 EDX=0x4e367d8 ESI=0x6fe648 EDI=0x6fe628 ESP=0x6fe5c8 *ESP=0x0 EBP=0x6fe678\n0x073ABE67  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x073ABE69  0F8409020000             JZ        0x20f                         \nBreakpoint 0 hit by instruction at 0x073ABE67 (thread 8940) EAX=0x1 EBX=0x4e87a8c ECX=0x6fdd94 EDX=0x74b6160 ESI=0x6fddb4 EDI=0x6fdd94 ESP=0x6fdd34 *ESP=0x0 EBP=0x6fdde4\n0x073ABE67  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x073ABE69  0F8409020000             JZ        0x20f                         \nBreakpoint 0 hit by instruction at 0x073ABE67 (thread 8940) EAX=0x1 EBX=0x4e63a90 ECX=0x6fdd94 EDX=0x4e367d8 ESI=0x6fddb4 EDI=0x6fdd94 ESP=0x6fdd34 *ESP=0x0 EBP=0x6fdde4\n0x073ABE67  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x073ABE69  0F8409020000             JZ        0x20f                         \nBreakpoint 0 hit by instruction at 0x073ABE67 (thread 8940) EAX=0x1 EBX=0x4ed70ac ECX=0x6feca0 EDX=0x7398500 ESI=0x6fecc0 EDI=0x6feca0 ESP=0x6fec40 *ESP=0x0 EBP=0x6fecf0\n0x073ABE67  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x073ABE69  0F8409020000             JZ        0x20f                         \nBreakpoint 0 hit by instruction at 0x073ABE67 (thread 8940) EAX=0x1 EBX=0x4e634a8 ECX=0x6feca0 EDX=0x4e367d8 ESI=0x6fecc0 EDI=0x6feca0 ESP=0x6fec40 *ESP=0x0 EBP=0x6fecf0\n0x073ABE67  85C0                     TEST      EAX, EAX                      \nActionDispatcher: skipping instruction.\n0x073ABE69  0F8409020000             JZ        0x20f                         \n",
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 85 C0 0F 84 ?? ?? ?? ?? 8B 45 ?? }\n        $pattern1 = { E8 ?? ?? ?? ?? 83 C4 ?? 85 C0 0F 84 ?? ?? ?? ?? }\n        $pattern2 = { 6A ?? 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\0f34c32345a18ec4\\iter1_v3.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v3",
+      "yara_rule": "rule MalwareEvasion\n{\n    meta:\n        description = \"Detects evasion techniques in malware based on specific instruction sequences\"\n        cape_options = \"bp0=$a+0,action0=skip,bp1=$b+0,action1=skip,bp2=$c+0,action2=skip,count=0\"\n        author = \"Security Analyst\"\n\n    strings:\n        $a = { 85 C0 0F 84 ?? ?? ?? ?? }  // CMP EAX, EAX followed by JZ with offset\n        $b = { E8 ?? ?? ?? ?? 83 C4 04 85 C0 }  // CALL, ADD ESP, CMP EAX, EAX\n        $c = { 6A ?? 5A E8 ?? ?? ?? ?? }  // PUSH, POP, CALL with offset\n\n    condition:\n        all of ($a, $b, $c)\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "917",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 16,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Refine the patterns to target more flexible instruction sequences (e.g., use wildcards for offsets) and validate against the actual trace. Adjust skip offsets to avoid invalid jumps."
+      ],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule MalwareEvasion\n{\n    meta:\n        description = \"Detects evasion techniques in malware based on specific instruction sequences\"\n        author = \"Security Analyst\"\n\n    strings:\n        $a = { 85 C0 0F 84 ?? ?? ?? ?? }  // CMP EAX, EAX followed by JZ with offset\n        $b = { E8 ?? ?? ?? ?? 83 C4 04 85 C0 }  // CALL, ADD ESP, CMP EAX, EAX\n        $c = { 6A ?? 5A E8 ?? ?? ?? ?? }  // PUSH, POP, CALL with offset\n\n    condition:\n        all of ($a, $b, $c)\n}\n```\n\n---\n\n### **Explanation of Patterns**\n\n1. **Pattern `$a`**  \n   - **`85 C0`**: `CMP EAX, EAX` (compares EAX with itself, often used to check for zero).  \n   - **`0F 84 ?? ?? ?? ??`**: `JZ` (jump if zero) with a 4-byte offset.  \n   - **Purpose**: This sequence checks if EAX is zero and jumps to a location, potentially bypassing checks or triggering evasion logic.\n\n2. **Pattern `$b`**  \n   - **`E8 ?? ?? ?? ??`**: `CALL` with a 4-byte offset (hardcoded address).  \n   - **`83 C4 04`**: `ADD ESP, 4` (adjusts stack pointer).  \n   - **`85 C0`**: `CMP EAX, EAX` (same as above).  \n   - **Purpose**: Combines a call to a hardcoded address with stack manipulation and a zero-check, likely part of a control flow obfuscation or anti-debugging mechanism.\n\n3. **Pattern `$c`**  \n   - **`6A ??`**: `PUSH` with an immediate value (e.g., `PUSH 0x??`).  \n   - **`5A`**: `POP` (restores a value from the stack).  \n   - **`E8 ?? ?? ?? ??`**: `CALL` with a 4-byte offset.  \n   - **Purpose**: This sequence may be used to manipulate the stack or redirect execution, possibly to inject shellcode or bypass memory protections.\n\n---\n\n### **Key Considerations**\n- **Wildcard Usage**: All hardcoded addresses (`??`) are replaced with wildcards to match any offset, ensuring flexibility against variations.\n- **Overlap Detection**: The `all of` condition ensures all three patterns are present, reducing false positives while targeting specific evasion logic.\n- **Relevance**: These patterns align with common obfuscation techniques like control flow hijacking, anti-debugging, or memory corruption checks.",
+      "yara_file": "ablation_results\\qwen3_latest\\Iter\\Iter\\0f34c32345a18ec4\\iter2_v3.yar"
+    }
+  ],
+  "best_attempt": null,
+  "best_score": 0,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: rule_hit - Rule hit but no new signatures"
+  ],
+  "successful_patterns": [],
+  "failed_patterns": [
+    "",
+    "",
+    ""
+  ]
+}

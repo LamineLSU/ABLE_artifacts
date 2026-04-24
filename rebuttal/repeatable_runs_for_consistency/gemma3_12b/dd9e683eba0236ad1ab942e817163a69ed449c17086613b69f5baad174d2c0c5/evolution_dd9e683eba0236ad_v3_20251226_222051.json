@@ -1,0 +1,249 @@
+{
+  "sha256": "dd9e683eba0236ad1ab942e817163a69ed449c17086613b69f5baad174d2c0c5",
+  "prompt_version": "v3",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 55 14 8B 45 10 8B 4D 0C 83 C4 14 52 8B 16 50 51 FF D2 }\n        $pattern1 = { 6A 35 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n        $pattern2 = { 6A 36 5A 8B CE E8 ?? ?? ?? ?? 85 C0 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "36",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 26,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [
+        "Instead of skipping the `8B 55 14` instruction, we should target a later instruction that is more characteristic of the bypass behavior, while still allowing the program to execute the necessary memory access.  Alternatively, we can add context bytes to the pattern to ensure it only matches the exact sequence we want to bypass."
+      ],
+      "debugger_log": "=== 7752.log ===\nCAPE Sandbox - Debugger log: Sat Dec 27 11:04:53 2025\nBreakpoint 0 hit by instruction at 0x0041A7AF (thread 8104) EAX=0x4d20000 EBX=0xbe5000 ECX=0x76972994 advapi32.dll EDX=0x1b0 ESI=0xd3fcbc EDI=0x41f050 ESP=0xd3ef78 *ESP=0xd3f030 EBP=0xd3ef90\nBreak at 0x0041A7AF in dd9e683eba0236ad1ab9.exe (RVA 0x1a7af, thread 8104, Stack 0x00D32000-0x00D40000, ImageBase 0x00400000)\n0x0041A7AF  8B5514                   MOV       EDX, [EBP+0x14]               \nActionDispatcher: skipping instruction.\n0x0041A7B2  8B4510                   MOV       EAX, [EBP+0x10]               \n",
+      "raw_response": "Okay, let's analyze this trace and craft some bypass patterns.\n\n**Phase 1 & 2: Adversarial Analysis & Identification of Evasion Checks**\n\nThe trace exhibits a mix of instructions, including pushes, calls, and memory manipulation. The `call eax` at `0041A698` is likely the termination point, suggesting it's related to the evasion. The `push 35h, 35h, 0h, 0h` before the `call 0041AF20h` and similar pushes before the final `call eax` are suspicious. These are likely being used to pass parameters to functions, which may be part of the evasion check. The `outsb` instruction is also a potential indicator of sandbox detection. The repeated instructions are also a potential obfuscation technique.\n\nThe key seems to be that the malware is performing checks and exiting if certain conditions are met.  We need to find a point where we can manipulate the execution flow to prevent these checks from triggering the exit.\n\n**Phase 3: Adversarial Game Analysis**\n\nAny bypass needs to be robust enough to avoid detection by the malware's evasion logic and ideally, applicable to variations of the evasion.\n\n**Phase 4: Bypass Point Selection**\n\nHere are three bypass points, along with reasoning:\n\n1.  **Target: `0041A698 FF D0` (call eax)** - This is the final `call` that terminates the process. Bypassing this directly is the most obvious approach.\n2.  **Target: `0041A63A 6A 35` (push 0x35)** -  This is one of the `push 35h` instructions.  If we can prevent this value from being passed, it might alter the behavior of the called function.\n3.  **Target: `0041A67D 6A 36` (push 0x36)** - Similar to the above, but a different parameter.\n\n**Phase 5: Pattern Building**\n\nNow, let's create the YARA patterns.\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 55 14, 8B 45 10, 8B 4D 0C, 83 C4 14, 52, 8B 16, 50, 51, FF D2 }\n        $pattern1 = { 6A 35, 5A, 8B CE, E8 ?? ?? ?? ??, 85 C0 }\n        $pattern2 = { 6A 36, 5A, 8B CE, E8 ?? ?? ?? ??, 85 C0 }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation of Patterns:**\n\n*   **`$pattern0` (Bypass `call eax`):** `8B 55 14, 8B 45 10, 8B 4D 0C, 83 C4 14, 52, 8B 16, 50, 51, FF D2` - This pattern encompasses the instructions leading up to the final `call eax`, providing context for the bypass.\n*   **`$pattern1` (Bypass `push 0x35`):** `6A 35, 5A, 8B CE, E8 ?? ?? ?? ??, 85 C0` -  This pattern includes the `push 0x35` instruction and surrounding instructions, including a `call` and a `test`.\n*   **`$pattern2` (Bypass `push 0x36`):** `6A 36, 5A, 8B CE, E8 ?? ?? ?? ??, 85 C0` - This is the same pattern as `$pattern1`, but for the `push 0x36` instruction.\n\n**Rationale for Wildcards and Pattern Lengths:**\n\n*   The `E8` instructions (calls) have `??` wildcards for the displacement bytes.\n*   The patterns are all within the 6-20 byte range.\n*   The surrounding instructions are included to provide context and reduce the likelihood of false positives.\n*   The `5A` instruction (pop) is included as it is common in stack manipulation.\n\nThis YARA rule provides three potential bypass points for the evasion.  The `cape_options` are included to allow for easy testing and experimentation with these bypasses in a sandbox environment.\n",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\dd9e683eba0236ad\\iter0_v3.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83 48 0C 74 12 8B 48 10 }\n        $pattern1 = { 56 56 6A 35 6A 35 }\n        $pattern2 = { 8B 55 14 8B 45 10 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "API_CHECK",
+      "confidence": 65,
+      "opcodes": "",
+      "task_id": "37",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 26,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Modify the YARA rule to be less reliant on exact instruction sequences and to use more specific conditions. Instead of `any of them`, use `all of them` or a more complex condition that ensures the patterns are found in a meaningful context. Also, consider adjusting the skip offsets to account for potential variations in code layout.  The most important instruction sequence appears to be around the call to `0041AF20h`.  Focus on capturing data being manipulated"
+      ],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous attempt caused a crash, indicating that the initial bypass point was too aggressive or targeted an instruction critical for execution. We need to move the bypass point earlier and target a conditional check before the `ExitProcess` call. This approach aims to alter the program's control flow before the termination occurs, effectively bypassing the evasion check. The selected patterns target instructions involved in a conditional check, allowing the program to proceed past the intended evasion logic.\n\n**PATTERN_TYPE**: API_CHECK\n\n**CONFIDENCE**: 65\n\n**REASONING**: These patterns target a conditional check before the exit, focusing on a sequence that seems to control the execution path. The use of concrete bytes minimizes the chance of false positives, while wildcards are used for offsets. The `cape_options` will skip the targeted instructions.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 83 48 0C 74 12 8B 48 10 }\n        $pattern1 = { 56 56 6A 35 6A 35 }\n        $pattern2 = { 8B 55 14 8B 45 10 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\dd9e683eba0236ad\\iter1_v3.yar"
+    },
+    {
+      "iteration": 2,
+      "prompt_version": "v3",
+      "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 10 8B 48 10 56 6A 35 6A 35 }\n        $pattern1 = { 51 51 6A 00 6A 00 50 50 }\n        $pattern2 = { E8 44 09 00 00 8B 55 14 8B 45 10 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "API_CHECK",
+      "confidence": 75,
+      "opcodes": "",
+      "task_id": "38",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 26,
+      "new_signatures": 3,
+      "new_signature_names": [
+        "uses_windows_utilities",
+        "suspicious_command_tools",
+        "uses_remote_desktop_session"
+      ],
+      "new_signature_details": [
+        {
+          "name": "uses_windows_utilities",
+          "description": "Uses Windows utilities for basic functionality",
+          "categories": [
+            "command",
+            "lateral"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 80,
+          "references": [],
+          "data": [
+            {
+              "command": "\"C:\\Windows\\SysWOW64\\mstsc.exe\""
+            },
+            {
+              "command": "C:\\Windows\\SysWOW64\\cmd.exe /c del \"C:\\Users\\sanya\\AppData\\Local\\Temp\\dd9e683eba0236ad1ab9.exe\""
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "uses_remote_desktop_session",
+          "description": "Connects to/from or queries a remote desktop session",
+          "categories": [
+            "command"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "command": "\"C:\\Windows\\SysWOW64\\mstsc.exe\""
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        },
+        {
+          "name": "suspicious_command_tools",
+          "description": "Uses suspicious command line tools or Windows utilities",
+          "categories": [
+            "command",
+            "lateral"
+          ],
+          "severity": 3,
+          "weight": 1,
+          "confidence": 80,
+          "references": [],
+          "data": [
+            {
+              "command": "\"C:\\Windows\\SysWOW64\\mstsc.exe\""
+            },
+            {
+              "command": "/c del \"C:\\Users\\sanya\\AppData\\Local\\Temp\\dd9e683eba0236ad1ab9.exe\""
+            },
+            {
+              "command": "C:\\Windows\\SysWOW64\\cmd.exe /c del \"C:\\Users\\sanya\\AppData\\Local\\Temp\\dd9e683eba0236ad1ab9.exe\""
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "**EVOLUTION_REASONING**: The previous rule hit but didn't produce new signatures, indicating it matched the wrong context. We need to be more specific about the instruction sequences around the call to `0041AF20h` which appears to be crucial for the evasion check. I'm focusing on a sequence involving data manipulation and a conditional jump. The patterns are designed to be more context-aware and less reliant on exact instruction sequences.\n\n**PATTERN_TYPE**: API_CHECK\n\n**CONFIDENCE**: 75\n\n**REASONING**: These patterns target a sequence involving a comparison, a jump, and data manipulation, all occurring around the call to `0041AF20h`. The use of wildcards for address offsets allows for some flexibility in the code layout while still maintaining a degree of specificity.  The patterns are extracted directly from the trace and aim to capture the decision-making logic rather than the action itself.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B4510 8B4810 56 6A35 6A35 }\n        $pattern1 = { 51 51 6A00 6A00 50 50 }\n        $pattern2 = { E844090000 8B5514 8B4510 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\dd9e683eba0236ad\\iter2_v3.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 2,
+    "prompt_version": "v3",
+    "yara_rule": "rule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 45 10 8B 48 10 56 6A 35 6A 35 }\n        $pattern1 = { 51 51 6A 00 6A 00 50 50 }\n        $pattern2 = { E8 44 09 00 00 8B 55 14 8B 45 10 }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "API_CHECK",
+    "confidence": 75,
+    "opcodes": "",
+    "task_id": "38",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 26,
+    "new_signatures": 3,
+    "new_signature_names": [
+      "uses_windows_utilities",
+      "suspicious_command_tools",
+      "uses_remote_desktop_session"
+    ],
+    "new_signature_details": [
+      {
+        "name": "uses_windows_utilities",
+        "description": "Uses Windows utilities for basic functionality",
+        "categories": [
+          "command",
+          "lateral"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 80,
+        "references": [],
+        "data": [
+          {
+            "command": "\"C:\\Windows\\SysWOW64\\mstsc.exe\""
+          },
+          {
+            "command": "C:\\Windows\\SysWOW64\\cmd.exe /c del \"C:\\Users\\sanya\\AppData\\Local\\Temp\\dd9e683eba0236ad1ab9.exe\""
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "uses_remote_desktop_session",
+        "description": "Connects to/from or queries a remote desktop session",
+        "categories": [
+          "command"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "command": "\"C:\\Windows\\SysWOW64\\mstsc.exe\""
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      },
+      {
+        "name": "suspicious_command_tools",
+        "description": "Uses suspicious command line tools or Windows utilities",
+        "categories": [
+          "command",
+          "lateral"
+        ],
+        "severity": 3,
+        "weight": 1,
+        "confidence": 80,
+        "references": [],
+        "data": [
+          {
+            "command": "\"C:\\Windows\\SysWOW64\\mstsc.exe\""
+          },
+          {
+            "command": "/c del \"C:\\Users\\sanya\\AppData\\Local\\Temp\\dd9e683eba0236ad1ab9.exe\""
+          },
+          {
+            "command": "C:\\Windows\\SysWOW64\\cmd.exe /c del \"C:\\Users\\sanya\\AppData\\Local\\Temp\\dd9e683eba0236ad1ab9.exe\""
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "**EVOLUTION_REASONING**: The previous rule hit but didn't produce new signatures, indicating it matched the wrong context. We need to be more specific about the instruction sequences around the call to `0041AF20h` which appears to be crucial for the evasion check. I'm focusing on a sequence involving data manipulation and a conditional jump. The patterns are designed to be more context-aware and less reliant on exact instruction sequences.\n\n**PATTERN_TYPE**: API_CHECK\n\n**CONFIDENCE**: 75\n\n**REASONING**: These patterns target a sequence involving a comparison, a jump, and data manipulation, all occurring around the call to `0041AF20h`. The use of wildcards for address offsets allows for some flexibility in the code layout while still maintaining a degree of specificity.  The patterns are extracted directly from the trace and aim to capture the decision-making logic rather than the action itself.\n\n**YARA_RULE**:\n```yara\nrule Bypass_Sample_Evolved\n{\n    meta:\n        description = \"Evasion bypass rule - evolved\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B4510 8B4810 56 6A35 6A35 }\n        $pattern1 = { 51 51 6A00 6A00 50 50 }\n        $pattern2 = { E844090000 8B5514 8B4510 }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\dd9e683eba0236ad\\iter2_v3.yar"
+  },
+  "best_score": 3,
+  "optimization_history": [
+    "Iteration 1: bypass_crashed - Rule caused crash: ['exec_crash']",
+    "Iteration 2: rule_hit - Rule hit but no new signatures",
+    "Iteration 3: SUCCESS - 3 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    "",
+    ""
+  ]
+}

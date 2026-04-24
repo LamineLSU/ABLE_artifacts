@@ -1,0 +1,126 @@
+{
+  "sha256": "dd9e683eba0236ad1ab942e817163a69ed449c17086613b69f5baad174d2c0c5",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 06 83 C4 14 52 52 FF D0 }\n        $pattern1 = { 56 6A 35 6A 35 6A 00 51 E8 44 09 00 00 }\n        $pattern2 = { 8B 45 10 8B 4D 0C 83 C4 14 52 8B 16 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "33",
+      "status": "bypass_crashed",
+      "rule_hit": true,
+      "baseline_signatures": 26,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "terminates_remote_process"
+      ],
+      "new_signature_details": [
+        {
+          "name": "terminates_remote_process",
+          "description": "Terminates another process",
+          "categories": [
+            "persistence",
+            "stealth"
+          ],
+          "severity": 2,
+          "weight": 1,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 4664,
+              "cid": 7327
+            },
+            {
+              "process": "dd9e683eba0236ad1ab9.exe"
+            },
+            {
+              "type": "call",
+              "pid": 4664,
+              "cid": 7341
+            },
+            {
+              "process": "dd9e683eba0236ad1ab9.exe"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": "Rule caused crash: ['exec_crash']",
+      "improvement_suggestions": [],
+      "debugger_log": "=== 9116.log ===\nCAPE Sandbox - Debugger log: Sat Dec 27 10:05:08 2025\nBreakpoint 2 hit by instruction at 0x0041A7B2 (thread 4136) EAX=0x48e0000 EBX=0xeaf000 ECX=0x76972994 advapi32.dll EDX=0x10feb08 ESI=0x10ff7d4 EDI=0x41f050 ESP=0x10fea90 *ESP=0x10feb48 EBP=0x10feaa8\nBreak at 0x0041A7B2 in dd9e683eba0236ad1ab9.exe (RVA 0x1a7b2, thread 4136, Stack 0x010F1000-0x01100000, ImageBase 0x00400000)\n0x0041A7B2  8B4510                   MOV       EAX, [EBP+0x10]               \nActionDispatcher: skipping instruction.\n0x0041A7B5  8B4D0C                   MOV       ECX, [EBP+0xc]                \n",
+      "raw_response": "Okay, let's analyze the trace and craft some bypass patterns following the provided guidelines.  I'll focus on identifying points where skipping an instruction might lead to continued execution, and where the impact of skipping is likely to be significant enough to bypass the evasion.\n\n**Initial Observations:**\n\n*   The trace terminates with a `call eax` at `0041A698`. This is the exit point.  The goal is to prevent this `call` from executing.\n*   There's a lot of repeated code (duplication) which is common in packed/obfuscated malware. This can be exploited to find bypass points.\n*   The use of `lea` instructions and pushes to the stack suggest potential control flow manipulation.\n*   The `call 0041AF20h` appears repeatedly.  This might be a key function, and bypassing it could be valuable.\n\n**Counterfactual Analysis & Pattern Selection:**\n\nHere are three potential bypass points, along with reasoning:\n\n**Pattern 1: Focus on the `call eax` instruction**\n\n*   **Instruction:** `FFD0             call eax` at `0041A698`\n*   **Rationale:**  This is the final instruction before exit.  Skipping it *should* prevent the exit.\n*   **Pattern:** `8B06 83C414 52 52 FFD0` (11 bytes). This includes the preceding `mov eax, dword ptr [esi]` and the `add esp, 14h` and the two `push edx` instructions.  The `mov eax, dword ptr [esi]` is likely loading the address to be called, so we want to bypass that call.\n*   **Wildcards:** None needed in this case.\n\n**Pattern 2: Focus on the repeated `call 0041AF20h`**\n\n*   **Instruction:** `E844090000       call 0041AF20h` at `0041A647` (and repeated at `0041A68A`)\n*   **Rationale:**  This function call is executed multiple times.  Skipping one instance *might* not immediately cause the program to exit, but it could disrupt the malware's logic and potentially lead to a different outcome.\n*   **Pattern:** `56 6A35 6A35 6A00 51 E844090000` (14 bytes). This includes the preceding `push esi` instructions and the `push 00000035h` and `push 00000000h` and the `push ecx` instructions.\n*   **Wildcards:** None needed.\n\n**Pattern 3: Focus on the instruction before the final call**\n\n*   **Instruction:** `8B4510 8B4D0C 83C414 52 8B16` at `0041A64F`\n*   **Rationale:** This instruction sequence prepares for the `call eax` instruction.  Bypassing this sequence might prevent the setup of the `eax` register.\n*   **Pattern:** `8B4510 8B4D0C 83C414 52 8B16` (15 bytes).\n*   **Wildcards:** None needed.\n\n**YARA Rule:**\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 06 83 C4 14 52 52 FF D0 }\n        $pattern1 = { 56 6A 35 6A 35 6A 00 51 E8 44 09 00 00 }\n        $pattern2 = { 8B 45 10 8B 4D 0C 83 C4 14 52 8B 16 }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation:**\n\n*   The YARA rule defines three patterns, `$pattern0`, `$pattern1`, and `$pattern2`.\n*   Each pattern consists of the hex sequences identified above.\n*   The `cape_options` meta tag is included to instruct Cuckoo Sandbox (or similar tools) to use these patterns as bypass points, skipping the matched instructions.  The `count=0` ensures that all occurrences of the patterns are skipped.\n*   The `condition: any of them` indicates that any of the three patterns matching will trigger the rule.\n\n**Important Considerations:**\n\n*   **Testing:** These patterns are educated guesses.  Thorough testing in a sandbox environment is essential to confirm their effectiveness.\n*   **Malware Variations:** Malware authors often introduce variations to evade detection. These patterns may need to be adjusted based on observed behavior.\n*   **Context:** The effectiveness of these bypasses depends on the specific behavior of the malware and the sandbox environment.\n*   **Further Analysis:**  Analyzing the functions called at `0041AF20h` would provide more insight into the malware's behavior and potentially reveal more effective bypass points.\n",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\dd9e683eba0236ad\\iter0_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 0,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 06 83 C4 14 52 52 FF D0 }\n        $pattern1 = { 56 6A 35 6A 35 6A 00 51 E8 44 09 00 00 }\n        $pattern2 = { 8B 45 10 8B 4D 0C 83 C4 14 52 8B 16 }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "33",
+    "status": "bypass_crashed",
+    "rule_hit": true,
+    "baseline_signatures": 26,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "terminates_remote_process"
+    ],
+    "new_signature_details": [
+      {
+        "name": "terminates_remote_process",
+        "description": "Terminates another process",
+        "categories": [
+          "persistence",
+          "stealth"
+        ],
+        "severity": 2,
+        "weight": 1,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 4664,
+            "cid": 7327
+          },
+          {
+            "process": "dd9e683eba0236ad1ab9.exe"
+          },
+          {
+            "type": "call",
+            "pid": 4664,
+            "cid": 7341
+          },
+          {
+            "process": "dd9e683eba0236ad1ab9.exe"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": "Rule caused crash: ['exec_crash']",
+    "improvement_suggestions": [],
+    "debugger_log": "=== 9116.log ===\nCAPE Sandbox - Debugger log: Sat Dec 27 10:05:08 2025\nBreakpoint 2 hit by instruction at 0x0041A7B2 (thread 4136) EAX=0x48e0000 EBX=0xeaf000 ECX=0x76972994 advapi32.dll EDX=0x10feb08 ESI=0x10ff7d4 EDI=0x41f050 ESP=0x10fea90 *ESP=0x10feb48 EBP=0x10feaa8\nBreak at 0x0041A7B2 in dd9e683eba0236ad1ab9.exe (RVA 0x1a7b2, thread 4136, Stack 0x010F1000-0x01100000, ImageBase 0x00400000)\n0x0041A7B2  8B4510                   MOV       EAX, [EBP+0x10]               \nActionDispatcher: skipping instruction.\n0x0041A7B5  8B4D0C                   MOV       ECX, [EBP+0xc]                \n",
+    "raw_response": "Okay, let's analyze the trace and craft some bypass patterns following the provided guidelines.  I'll focus on identifying points where skipping an instruction might lead to continued execution, and where the impact of skipping is likely to be significant enough to bypass the evasion.\n\n**Initial Observations:**\n\n*   The trace terminates with a `call eax` at `0041A698`. This is the exit point.  The goal is to prevent this `call` from executing.\n*   There's a lot of repeated code (duplication) which is common in packed/obfuscated malware. This can be exploited to find bypass points.\n*   The use of `lea` instructions and pushes to the stack suggest potential control flow manipulation.\n*   The `call 0041AF20h` appears repeatedly.  This might be a key function, and bypassing it could be valuable.\n\n**Counterfactual Analysis & Pattern Selection:**\n\nHere are three potential bypass points, along with reasoning:\n\n**Pattern 1: Focus on the `call eax` instruction**\n\n*   **Instruction:** `FFD0             call eax` at `0041A698`\n*   **Rationale:**  This is the final instruction before exit.  Skipping it *should* prevent the exit.\n*   **Pattern:** `8B06 83C414 52 52 FFD0` (11 bytes). This includes the preceding `mov eax, dword ptr [esi]` and the `add esp, 14h` and the two `push edx` instructions.  The `mov eax, dword ptr [esi]` is likely loading the address to be called, so we want to bypass that call.\n*   **Wildcards:** None needed in this case.\n\n**Pattern 2: Focus on the repeated `call 0041AF20h`**\n\n*   **Instruction:** `E844090000       call 0041AF20h` at `0041A647` (and repeated at `0041A68A`)\n*   **Rationale:**  This function call is executed multiple times.  Skipping one instance *might* not immediately cause the program to exit, but it could disrupt the malware's logic and potentially lead to a different outcome.\n*   **Pattern:** `56 6A35 6A35 6A00 51 E844090000` (14 bytes). This includes the preceding `push esi` instructions and the `push 00000035h` and `push 00000000h` and the `push ecx` instructions.\n*   **Wildcards:** None needed.\n\n**Pattern 3: Focus on the instruction before the final call**\n\n*   **Instruction:** `8B4510 8B4D0C 83C414 52 8B16` at `0041A64F`\n*   **Rationale:** This instruction sequence prepares for the `call eax` instruction.  Bypassing this sequence might prevent the setup of the `eax` register.\n*   **Pattern:** `8B4510 8B4D0C 83C414 52 8B16` (15 bytes).\n*   **Wildcards:** None needed.\n\n**YARA Rule:**\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 8B 06 83 C4 14 52 52 FF D0 }\n        $pattern1 = { 56 6A 35 6A 35 6A 00 51 E8 44 09 00 00 }\n        $pattern2 = { 8B 45 10 8B 4D 0C 83 C4 14 52 8B 16 }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation:**\n\n*   The YARA rule defines three patterns, `$pattern0`, `$pattern1`, and `$pattern2`.\n*   Each pattern consists of the hex sequences identified above.\n*   The `cape_options` meta tag is included to instruct Cuckoo Sandbox (or similar tools) to use these patterns as bypass points, skipping the matched instructions.  The `count=0` ensures that all occurrences of the patterns are skipped.\n*   The `condition: any of them` indicates that any of the three patterns matching will trigger the rule.\n\n**Important Considerations:**\n\n*   **Testing:** These patterns are educated guesses.  Thorough testing in a sandbox environment is essential to confirm their effectiveness.\n*   **Malware Variations:** Malware authors often introduce variations to evade detection. These patterns may need to be adjusted based on observed behavior.\n*   **Context:** The effectiveness of these bypasses depends on the specific behavior of the malware and the sandbox environment.\n*   **Further Analysis:**  Analyzing the functions called at `0041AF20h` would provide more insight into the malware's behavior and potentially reveal more effective bypass points.\n",
+    "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\dd9e683eba0236ad\\iter0_v2.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": []
+}

@@ -1,0 +1,1923 @@
+{
+  "sha256": "d7d0bc493a595023fe6ad9f55afea962fc4c56914b1dff3cffb076b519eb871d",
+  "prompt_version": "v2",
+  "iterations": [
+    {
+      "iteration": 0,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8B EC FF 75 08 E8 C1 FF FF FF 59 FF 75 08 }\n        $pattern1 = { 55 8B EC FF 75 08 FF 15 68 F3 20 00 59 FF 75 08 }\n        $pattern2 = { 55 8B EC FF 75 08 FF 15 68 F3 8D 00 59 FF 75 08 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "26",
+      "status": "rule_hit",
+      "rule_hit": true,
+      "baseline_signatures": 24,
+      "new_signatures": 0,
+      "new_signature_names": [],
+      "new_signature_details": [],
+      "failure_reason": "Rule hit but no new signatures",
+      "improvement_suggestions": [
+        "Instead of skipping the entire instruction sequence, focus on the `call` instruction itself and its target.  This is because the `call` instruction is the point of divergence and represents the bypassed functionality.  The YARA rule should be updated to target this `call` instruction and potentially incorporate a more flexible skip offset to account for variations in the preceding code. Also, remove `count=0` from the `CAPE_OPTIONS` meta tag to allow the rule to match multiple instances of the pattern."
+      ],
+      "debugger_log": "=== 7020.log ===\nCAPE Sandbox - Debugger log: Sat Dec 27 04:53:51 2025\nBreakpoint 0 hit by instruction at 0x00C932DF (thread 8648) EBX=0x12304c8 ECX=0x8 EDX=0x1230000 ESI=0x776d4d90 RtlDecodePointer  EDI=0x12304c4 ESP=0x11afed0 *ESP=0xc93583 d7d0bc493a595023fe6a.exe EBP=0x11aff14\nBreak at 0x00C932DF in d7d0bc493a595023fe6a.exe (RVA 0x232df, thread 8648, Stack 0x0115F000-0x011B0000, ImageBase 0x00C70000)\n0x00C932DF  55                       PUSH      EBP                           \nActionDispatcher: skipping instruction.\n0x00C932E0  8BEC                     MOV       EBP, ESP                      \n",
+      "raw_response": "Okay, let's analyze the trace data and construct three bypass patterns following the specified rules.\n\n**Phase 1 & 2: Identifying Potential Bypass Points**\n\nThe repeated sequence `55 8BEC FF7508 E8C1FFFFFF 59 FF7508` is present in all traces.  The `call 001A32ABh` and `call dword ptr [0020F368h]` / `call dword ptr [008DF368h]` are the most likely exit triggers.  The calls to memory locations are especially suspicious as they could be dynamic API calls based on sandbox detection.\n\n**Phase 3: Counterfactual Analysis & Selection**\n\nLet's analyze some instructions.\n\n*   **`E8C1FFFFFF` (call 001A32ABh/001A32ABh):**  What if this call were skipped? This is a strong candidate, as it's present in all traces before the `ExitProcess`. Skipping this would likely prevent the exit, as it appears to be a key part of the evasion logic.\n*   **`FF1568F32000` / `FF1568F38D00` (call dword ptr [0020F368h]/[008DF368h]):** This is also a good candidate.  The indirect call through a memory address is a common evasion technique.  Skipping this would likely prevent the exit, as it is a key part of the evasion logic.\n*   **`FF7508` (push dword ptr [ebp+08h]):**  This could be related to the evasion logic as well.\n\n**Phase 4 & 5: Pattern Construction**\n\nBased on the above analysis, I'll select the following bypass points and construct patterns.\n\n**Pattern 1: Bypass the first call**\n\nThe instruction `E8C1FFFFFF` is the key. We'll include some surrounding context to make the pattern more robust.\n\n```\n$pattern0 = { 55 8BEC FF7508 E8C1FFFFFF 59 FF7508 }\n```\n\n**Pattern 2: Bypass the second call**\n\nThe instruction `FF1568F32000` is the key. We'll include some surrounding context to make the pattern more robust.  Note the difference in addresses for traces 2 & 4.\n\n```\n$pattern1 = { 55 8BEC FF7508 FF1568F32000 59 FF7508 }\n```\n\n**Pattern 3: Bypass the second call (alternate address)**\n\nThe instruction `FF1568F38D00` is the key. We'll include some surrounding context to make the pattern more robust.  Note the difference in addresses for traces 3 & 4.\n\n```\n$pattern2 = { 55 8BEC FF7508 FF1568F38D00 59 FF7508 }\n```\n\n**Final YARA Rule**\n\n```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { 55 8BEC FF7508 E8C1FFFFFF 59 FF7508 }\n        $pattern1 = { 55 8BEC FF7508 FF1568F32000 59 FF7508 }\n        $pattern2 = { 55 8BEC FF7508 FF1568F38D00 59 FF7508 }\n\n    condition:\n        any of them\n}\n```\n\n**Explanation:**\n\n*   **`$pattern0`, `$pattern1`, `$pattern2`:** These strings define the byte sequences to match.\n*   **`cape_options`:** This metadata tells Cuckoo Sandbox (or other compatible sandboxes) how to use the bypass patterns.  `bp0`, `bp1`, and `bp2` refer to the bypass points defined by `$pattern0`, `$pattern1`, and `$pattern2` respectively. `action0`, `action1`, and `action2` specify that the instructions at those points should be skipped. `count=0` means the bypass applies only once.\n*   **`condition: any of them`:**  The rule will trigger if *any* of the patterns are found in the analyzed file.\n\nThis solution fulfills all the requirements:\n\n*   **3 Patterns:** We have three distinct patterns.\n*   **6-20 Bytes:** All patterns are within the specified length.\n*   **Different Sequences:** The patterns are different.\n*   **Wildcards:** No wildcards were needed as the addresses were already in memory addresses.\n*   **Context:** The patterns include context instructions.\n*   **Format:** The YARA rule is correctly formatted.\n*   **cape_options:** The cape_options are correctly defined.\n",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\d7d0bc493a595023\\iter0_v2.yar"
+    },
+    {
+      "iteration": 1,
+      "prompt_version": "v2",
+      "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 C1 FF FF FF 59 FF 15 68 F3 20 00 }\n        $pattern1 = { 55 8B EC FF 75 08 E8 C1 FF FF FF 59 FF 15 68 F3 8D 00 }\n        $pattern2 = { 55 8B EC FF 75 08 E8 C1 FF FF FF 59 FF 15 68 F3 20 00 }\n\n    condition:\n        any of them\n}",
+      "pattern_type": "UNKNOWN",
+      "confidence": 50,
+      "opcodes": "",
+      "task_id": "27",
+      "status": "bypass_success",
+      "rule_hit": true,
+      "baseline_signatures": 24,
+      "new_signatures": 1,
+      "new_signature_names": [
+        "antisandbox_sleep"
+      ],
+      "new_signature_details": [
+        {
+          "name": "antisandbox_sleep",
+          "description": "A process attempted to delay the analysis task.",
+          "categories": [
+            "anti-sandbox"
+          ],
+          "severity": 2,
+          "weight": 4,
+          "confidence": 100,
+          "references": [],
+          "data": [
+            {
+              "type": "call",
+              "pid": 7904,
+              "cid": 1096
+            },
+            {
+              "type": "call",
+              "pid": 7904,
+              "cid": 1098
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 768
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 773
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 906
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 918
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 964
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 980
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 992
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 996
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 999
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1273
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1285
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1286
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1296
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1297
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1306
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1333
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1353
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1354
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1362
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1371
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1373
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1382
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1383
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1385
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1396
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1402
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1412
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1413
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1417
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1426
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1427
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1436
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1437
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1446
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1452
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1454
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1463
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1464
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1466
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1475
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1476
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1486
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1487
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1495
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1504
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1510
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1519
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1520
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1522
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1531
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1532
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1534
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1543
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1544
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1546
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1555
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1561
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1563
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1572
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1574
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1583
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1584
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1586
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1596
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1597
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1599
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1612
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1618
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1621
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1630
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1631
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1633
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1643
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1645
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1655
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1656
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1658
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1668
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1674
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1683
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1684
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1693
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1694
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1706
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1707
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1716
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1722
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1731
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1732
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1741
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1742
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1751
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1752
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1761
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1767
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1776
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1777
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1786
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1787
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1789
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1798
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1799
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1808
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1814
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1823
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1824
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1833
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1834
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1843
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1845
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1854
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1860
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1869
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1870
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1872
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1881
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1886
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1895
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1896
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1905
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1911
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1920
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1922
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1924
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1933
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1934
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1943
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1944
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1953
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1959
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1968
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1969
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1979
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1980
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1989
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1990
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 1999
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2000
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2006
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2015
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2016
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2025
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2026
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2035
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2036
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2045
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2046
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2060
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2069
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2070
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2083
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2084
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2086
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2095
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2097
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2107
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2108
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2115
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2124
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2125
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2134
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2135
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2144
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2146
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2155
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2156
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2162
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2171
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2172
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2181
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2182
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2192
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2193
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2202
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2203
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2209
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2218
+            },
+            {
+              "type": "call",
+              "pid": 5600,
+              "cid": 2219
+            },
+            {
+              "note": "RegAsm.exe tried to sleep 250.005 seconds, actually delayed analysis time by 0.0 seconds"
+            }
+          ],
+          "new_data": [],
+          "alert": false,
+          "families": []
+        }
+      ],
+      "failure_reason": null,
+      "improvement_suggestions": [],
+      "debugger_log": null,
+      "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 C1 FF FF FF 59 FF 15 68 F3 20 00 }\n        $pattern1 = { 55 8BEC FF7508 E8 C1 FF FF FF 59 FF 15 68 F3 8D 00 }\n        $pattern2 = { 55 8BEC FF7508 E8 C1 FF FF FF 59 FF 15 68 F3 20 00 }\n\n    condition:\n        any of them\n}\n```",
+      "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\d7d0bc493a595023\\iter1_v2.yar"
+    }
+  ],
+  "best_attempt": {
+    "iteration": 1,
+    "prompt_version": "v2",
+    "yara_rule": "rule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 C1 FF FF FF 59 FF 15 68 F3 20 00 }\n        $pattern1 = { 55 8B EC FF 75 08 E8 C1 FF FF FF 59 FF 15 68 F3 8D 00 }\n        $pattern2 = { 55 8B EC FF 75 08 E8 C1 FF FF FF 59 FF 15 68 F3 20 00 }\n\n    condition:\n        any of them\n}",
+    "pattern_type": "UNKNOWN",
+    "confidence": 50,
+    "opcodes": "",
+    "task_id": "27",
+    "status": "bypass_success",
+    "rule_hit": true,
+    "baseline_signatures": 24,
+    "new_signatures": 1,
+    "new_signature_names": [
+      "antisandbox_sleep"
+    ],
+    "new_signature_details": [
+      {
+        "name": "antisandbox_sleep",
+        "description": "A process attempted to delay the analysis task.",
+        "categories": [
+          "anti-sandbox"
+        ],
+        "severity": 2,
+        "weight": 4,
+        "confidence": 100,
+        "references": [],
+        "data": [
+          {
+            "type": "call",
+            "pid": 7904,
+            "cid": 1096
+          },
+          {
+            "type": "call",
+            "pid": 7904,
+            "cid": 1098
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 768
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 773
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 906
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 918
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 964
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 980
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 992
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 996
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 999
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1273
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1285
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1286
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1296
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1297
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1306
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1333
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1353
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1354
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1362
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1371
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1373
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1382
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1383
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1385
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1396
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1402
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1412
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1413
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1417
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1426
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1427
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1436
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1437
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1446
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1452
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1454
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1463
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1464
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1466
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1475
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1476
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1486
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1487
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1495
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1504
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1510
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1519
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1520
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1522
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1531
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1532
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1534
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1543
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1544
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1546
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1555
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1561
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1563
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1572
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1574
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1583
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1584
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1586
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1596
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1597
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1599
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1612
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1618
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1621
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1630
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1631
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1633
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1643
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1645
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1655
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1656
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1658
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1668
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1674
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1683
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1684
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1693
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1694
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1706
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1707
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1716
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1722
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1731
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1732
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1741
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1742
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1751
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1752
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1761
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1767
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1776
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1777
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1786
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1787
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1789
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1798
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1799
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1808
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1814
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1823
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1824
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1833
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1834
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1843
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1845
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1854
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1860
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1869
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1870
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1872
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1881
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1886
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1895
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1896
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1905
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1911
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1920
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1922
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1924
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1933
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1934
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1943
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1944
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1953
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1959
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1968
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1969
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1979
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1980
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1989
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1990
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 1999
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2000
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2006
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2015
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2016
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2025
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2026
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2035
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2036
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2045
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2046
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2060
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2069
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2070
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2083
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2084
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2086
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2095
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2097
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2107
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2108
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2115
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2124
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2125
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2134
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2135
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2144
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2146
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2155
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2156
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2162
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2171
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2172
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2181
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2182
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2192
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2193
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2202
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2203
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2209
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2218
+          },
+          {
+            "type": "call",
+            "pid": 5600,
+            "cid": 2219
+          },
+          {
+            "note": "RegAsm.exe tried to sleep 250.005 seconds, actually delayed analysis time by 0.0 seconds"
+          }
+        ],
+        "new_data": [],
+        "alert": false,
+        "families": []
+      }
+    ],
+    "failure_reason": null,
+    "improvement_suggestions": [],
+    "debugger_log": null,
+    "raw_response": "```yara\nrule Bypass_Sample\n{\n    meta:\n        description = \"Evasion bypass rule\"\n        cape_options = \"bp0=$pattern0+0,action0=skip,bp1=$pattern1+0,action1=skip,bp2=$pattern2+0,action2=skip,count=0\"\n\n    strings:\n        $pattern0 = { E8 C1 FF FF FF 59 FF 15 68 F3 20 00 }\n        $pattern1 = { 55 8BEC FF7508 E8 C1 FF FF FF 59 FF 15 68 F3 8D 00 }\n        $pattern2 = { 55 8BEC FF7508 E8 C1 FF FF FF 59 FF 15 68 F3 20 00 }\n\n    condition:\n        any of them\n}\n```",
+    "yara_file": "ablation_results\\gemma3_12b\\Iter\\Iter\\d7d0bc493a595023\\iter1_v2.yar"
+  },
+  "best_score": 1,
+  "optimization_history": [
+    "Iteration 1: rule_hit - Rule hit but no new signatures",
+    "Iteration 2: SUCCESS - 1 new signatures"
+  ],
+  "successful_patterns": [
+    ""
+  ],
+  "failed_patterns": [
+    ""
+  ]
+}
